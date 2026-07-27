@@ -23,6 +23,7 @@ const _tabs = [
   _Tab('Grocery', LucideIcons.carrot, Color(0xFF43A047)),
   _Tab('Food', LucideIcons.utensils, Color(0xFFFF8A3D)),
   _Tab('Gifts', LucideIcons.gift, Color(0xFF9C6ADE)),
+  _Tab('Beauty', LucideIcons.brush, Color(0xFFF06292)),
 ];
 
 class HomeScreen extends StatefulWidget {
