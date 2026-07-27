@@ -52,6 +52,47 @@ const shops = [
         'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400',
     tab: 'Beauty',
   ),
+  Shop(
+    name: 'Urban Threads',
+    tagline: 'Streetwear new drops weekly',
+    imageUrl:
+        'https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=400',
+  ),
+  Shop(
+    name: 'TechnoWorld',
+    tagline: 'Phones, laptops & accessories',
+    imageUrl:
+        'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=400',
+    tab: 'Electronics',
+  ),
+  Shop(
+    name: 'Daily Basket',
+    tagline: 'Groceries delivered in minutes',
+    imageUrl:
+        'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=400',
+    tab: 'Grocery',
+  ),
+  Shop(
+    name: 'Sweet Tooth',
+    tagline: 'Cakes, desserts & bakes',
+    imageUrl:
+        'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400',
+    tab: 'Food',
+  ),
+  Shop(
+    name: 'Petal & Co',
+    tagline: 'Flowers & handmade gifts',
+    imageUrl:
+        'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400',
+    tab: 'Gifts',
+  ),
+  Shop(
+    name: 'Velvet Touch',
+    tagline: 'Luxury fragrances & care',
+    imageUrl:
+        'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400',
+    tab: 'Beauty',
+  ),
 ];
 
 // Prices in INR.

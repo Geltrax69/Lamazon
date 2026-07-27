@@ -257,7 +257,7 @@ class _ShopRow extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(child: NetImage(url: shop.imageUrl)),
                 Padding(
