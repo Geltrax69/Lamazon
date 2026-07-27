@@ -23,7 +23,9 @@ class HomeScreen extends StatelessWidget {
                 const _TopBar(),
                 const SizedBox(height: 20),
                 const _SearchBar(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+                const _TabBar(),
+                const SizedBox(height: 12),
                 const _PromoBanner(),
                 const SizedBox(height: 24),
                 const _SectionHeader(title: 'Categories'),
@@ -197,6 +199,53 @@ class _PromoBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TabBar extends StatelessWidget {
+  const _TabBar();
+
+  static const _icons = [
+    LucideIcons.layoutGrid,
+    LucideIcons.umbrella,
+    LucideIcons.headphones,
+    LucideIcons.brush,
+    LucideIcons.lamp,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: tabNames.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 30),
+        itemBuilder: (_, i) {
+          final active = i == 0; // ponytail: static tab; state when tabs filter
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(_icons[i], size: 22, color: kInk),
+              const SizedBox(height: 4),
+              Text(tabNames[i],
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: active ? FontWeight.w800 : FontWeight.w500)),
+              const SizedBox(height: 4),
+              Container(
+                height: 3,
+                width: 34,
+                decoration: BoxDecoration(
+                  color: active ? kInk : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

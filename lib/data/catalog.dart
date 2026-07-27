@@ -3,6 +3,9 @@ import '../models/product.dart';
 // ponytail: static catalog. Paste any image links / shop links below and the
 // UI renders them. Swap for an API/scraper later if it ever exists.
 
+// Tab bar under the search bar.
+const tabNames = ['All', 'Monsoon', 'Electronics', 'Beauty', 'Deco'];
+
 const categories = [
   Category(
     name: "Men's outfit",
