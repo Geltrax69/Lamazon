@@ -93,6 +93,34 @@ const shops = [
         'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400',
     tab: 'Beauty',
   ),
+  Shop(
+    name: 'Biryani House',
+    tagline: 'Authentic dum biryani',
+    imageUrl:
+        'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400',
+    tab: 'Food',
+  ),
+  Shop(
+    name: 'Cafe Brew',
+    tagline: 'Coffee, shakes & snacks',
+    imageUrl:
+        'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400',
+    tab: 'Food',
+  ),
+  Shop(
+    name: 'Nature Fresh',
+    tagline: 'Organic staples & dairy',
+    imageUrl:
+        'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=400',
+    tab: 'Grocery',
+  ),
+  Shop(
+    name: 'ToyVerse',
+    tagline: 'Figures, toys & collectibles',
+    imageUrl:
+        'https://images.unsplash.com/photo-1558679908-541bcf1249ff?w=400',
+    tab: 'Gifts',
+  ),
 ];
 
 // Prices in INR.
@@ -124,6 +152,11 @@ const products = [
     imageUrl:
         'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600',
     sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    extraImages: [
+      'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=300',
+      'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=300',
+      'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=300',
+    ],
   ),
   Product(
     id: 'p4',
@@ -213,5 +246,115 @@ const products = [
     imageUrl:
         'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600',
     store: 'GlowUp',
+  ),
+  Product(
+    id: 'p13',
+    name: 'Paneer Dum Biryani',
+    category: 'Biryani',
+    tab: 'Food',
+    price: 299,
+    imageUrl:
+        'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600',
+    store: 'Biryani House',
+  ),
+  Product(
+    id: 'p14',
+    name: 'Cold Coffee & Brownie',
+    category: 'Beverages',
+    tab: 'Food',
+    price: 189,
+    imageUrl:
+        'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=600',
+    store: 'Cafe Brew',
+  ),
+  Product(
+    id: 'p15',
+    name: 'Chocolate Truffle Cake',
+    category: 'Desserts',
+    tab: 'Food',
+    price: 549,
+    imageUrl:
+        'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600',
+    store: 'Sweet Tooth',
+  ),
+  Product(
+    id: 'p16',
+    name: 'Anime Action Figure',
+    category: 'Collectibles',
+    tab: 'Gifts',
+    price: 799,
+    imageUrl:
+        'https://images.unsplash.com/photo-1608889175123-8ee362201f81?w=600',
+    store: 'ToyVerse',
+  ),
+  Product(
+    id: 'p17',
+    name: 'Classic Analog Watch',
+    category: 'Watches',
+    tab: 'Gifts',
+    price: 1999,
+    imageUrl:
+        'https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=600',
+    store: 'Wrap & Give',
+  ),
+  Product(
+    id: 'p18',
+    name: 'Scented Candle Set',
+    category: 'Home',
+    tab: 'Gifts',
+    price: 499,
+    imageUrl:
+        'https://images.unsplash.com/photo-1602874801007-bd458bb1b8b6?w=600',
+    store: 'Petal & Co',
+  ),
+  Product(
+    id: 'p19',
+    name: 'Teddy Bear (Large)',
+    category: 'Soft Toys',
+    tab: 'Gifts',
+    price: 599,
+    imageUrl:
+        'https://images.unsplash.com/photo-1562040506-a9b32cb51b94?w=600',
+    store: 'ToyVerse',
+  ),
+  Product(
+    id: 'p20',
+    name: 'Fresh Milk 1L',
+    category: 'Dairy',
+    tab: 'Grocery',
+    price: 68,
+    imageUrl:
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600',
+    store: 'Nature Fresh',
+  ),
+  Product(
+    id: 'p21',
+    name: 'Multigrain Bread',
+    category: 'Bakery',
+    tab: 'Grocery',
+    price: 45,
+    imageUrl:
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600',
+    store: 'Daily Basket',
+  ),
+  Product(
+    id: 'p22',
+    name: 'Basmati Rice 5kg',
+    category: 'Staples',
+    tab: 'Grocery',
+    price: 499,
+    imageUrl:
+        'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600',
+    store: 'Nature Fresh',
+  ),
+  Product(
+    id: 'p23',
+    name: 'Farm Eggs (12)',
+    category: 'Dairy',
+    tab: 'Grocery',
+    price: 96,
+    imageUrl:
+        'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=600',
+    store: 'Daily Basket',
   ),
 ];

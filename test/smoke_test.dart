@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/main.dart';
+import 'package:lamazon/screens/details_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 void main() {
@@ -15,6 +17,18 @@ void main() {
       expect(find.text('Electronics'), findsOneWidget);
       expect(find.text('Home'), findsOneWidget);
       expect(find.textContaining('₹'), findsWidgets);
+    });
+  });
+
+  testWidgets('details screen renders product', (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(
+        MaterialApp(home: DetailsScreen(product: products.first)),
+      );
+      expect(find.text(products.first.name), findsOneWidget);
+      expect(find.text('Add to Cart'), findsOneWidget);
+      expect(find.text('Buy Now'), findsOneWidget);
+      expect(find.text('Select Size'), findsOneWidget);
     });
   });
 }

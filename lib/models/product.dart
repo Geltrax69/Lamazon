@@ -6,6 +6,7 @@ class Product {
   final double price;
   final String imageUrl; // any web image link works here
   final String store;
+  final String description;
   final List<String> sizes;
   final List<String> extraImages;
 
@@ -17,6 +18,9 @@ class Product {
     required this.price,
     required this.imageUrl,
     this.store = 'Lamazon Store',
+    this.description =
+        'Crafted with premium materials for everyday comfort and style. '
+        'Quality checked and delivered fresh from the store to your door.',
     this.sizes = const [],
     this.extraImages = const [],
   });

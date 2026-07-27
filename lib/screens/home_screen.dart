@@ -5,6 +5,7 @@ import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
+import 'details_screen.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
@@ -113,7 +114,15 @@ class _HomeScreenState extends State<HomeScreen> {
             childAspectRatio: 0.68,
           ),
           itemCount: shownProducts.length,
-          itemBuilder: (_, i) => ProductCard(product: shownProducts[i]),
+          itemBuilder: (_, i) => ProductCard(
+            product: shownProducts[i],
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DetailsScreen(product: shownProducts[i]),
+              ),
+            ),
+          ),
         ),
       ],
     );
