@@ -1,17 +1,30 @@
-# lamazon
+# Lamazon
 
-A new Flutter project.
+Amazon-style shopping app built with Flutter.
 
-## Getting Started
+## 📲 Download
 
-This project is a starting point for a Flutter application.
+[![Build APK](https://github.com/Geltrax69/Lamazon/actions/workflows/build-apk.yml/badge.svg)](https://github.com/Geltrax69/Lamazon/actions/workflows/build-apk.yml)
 
-A few resources to get you started if this is your first Flutter project:
+**[⬇️ Download the latest APK](https://github.com/Geltrax69/Lamazon/releases/latest/download/app-release.apk)**
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+This link always serves the newest build — every push to `main` automatically
+rebuilds the APK and replaces it, so re-downloading gives you the updated app.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Run from source
+
+```bash
+flutter pub get
+flutter run
+```
+
+## Structure
+
+```
+lib/
+  main.dart              app entry + theme
+  models/product.dart    Product / Category models
+  data/catalog.dart      paste image/product links here — the UI renders them
+  screens/home_screen.dart
+  widgets/product_card.dart
+```
