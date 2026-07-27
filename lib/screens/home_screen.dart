@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
-        const _SectionHeader(title: 'Shop By Shop'),
+        const _SectionHeader(title: 'Shop By Shop', serif: true),
         const SizedBox(height: 12),
         _ShopRow(shops: shownShops),
         const SizedBox(height: 24),
@@ -242,52 +242,38 @@ class _ShopRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 170,
+      height: 208,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: shops.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        separatorBuilder: (_, _) => const SizedBox(width: 16),
         itemBuilder: (_, i) {
           final shop = shops[i];
-          return Container(
-            width: 230,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            clipBehavior: Clip.antiAlias,
+          return SizedBox(
+            width: 150,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: NetImage(url: shop.imageUrl)),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(shop.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700)),
-                            Text(shop.tagline,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF6B6B6B))),
-                          ],
-                        ),
-                      ),
-                      const Icon(LucideIcons.arrowUpRight,
-                          size: 18, color: kInk),
-                    ],
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: NetImage(url: shop.imageUrl),
                   ),
                 ),
+                const SizedBox(height: 10),
+                Text(shop.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(shop.tagline,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF6B6B6B))),
               ],
             ),
           );
@@ -299,15 +285,23 @@ class _ShopRow extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader({required this.title});
+  final bool serif; // editorial serif look, as in the Shop By Shop design
+  const _SectionHeader({required this.title, this.serif = false});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            style: serif
+                ? const TextStyle(
+                    fontSize: 24,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w600)
+                : const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
         const Text('See all',
             style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E))),
       ],
