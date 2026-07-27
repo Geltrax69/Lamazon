@@ -1,4 +1,4 @@
-name: Build APK
+name: Ship update
 
 on:
   push:
@@ -9,8 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  apk:
+  ship:
     runs-on: ubuntu-latest
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -23,8 +25,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test
-      - run: flutter build apk --release
-      # Rolling "latest" release: same tag every push, APK asset replaced.
+      - uses: shorebirdtech/setup-shorebird@v1
+      # ponytail: patch the current release; if none exists for this version
+      # (first run / version bump), create a full release instead.
+      - name: Patch or release
+        run: |
+          shorebird patch android || shorebird release android --artifact apk
+      # On release runs an APK is produced; keep the README download link fresh.
+      # On patch runs nothing matches — old APK stays valid and self-patches on launch.
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
