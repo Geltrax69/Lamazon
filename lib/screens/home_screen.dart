@@ -2,57 +2,111 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/catalog.dart';
+import '../models/product.dart';
 import '../widgets/product_card.dart';
+import '../widgets/status_views.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
+const kBg = Color(0xFFF1F1EF);
 
-class HomeScreen extends StatelessWidget {
+class _Tab {
+  final String name;
+  final IconData icon;
+  final Color? color; // null = default white theme
+  const _Tab(this.name, this.icon, this.color);
+}
+
+const _tabs = [
+  _Tab('All', LucideIcons.layoutGrid, null),
+  _Tab('Electronics', LucideIcons.headphones, Color(0xFFD5418E)),
+  _Tab('Grocery', LucideIcons.carrot, Color(0xFF43A047)),
+  _Tab('Food', LucideIcons.utensils, Color(0xFFFF8A3D)),
+  _Tab('Gifts', LucideIcons.gift, Color(0xFF9C6ADE)),
+];
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<List<Product>> _future = loadCatalog();
+  int _tab = 0;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = _tabs[_tab].color;
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-              children: [
-                const _TopBar(),
-                const SizedBox(height: 20),
-                const _SearchBar(),
-                const SizedBox(height: 12),
-                const _TabBar(),
-                const SizedBox(height: 12),
-                const _PromoBanner(),
-                const SizedBox(height: 24),
-                const _SectionHeader(title: 'Categories'),
-                const SizedBox(height: 12),
-                const _CategoryRow(),
-                const SizedBox(height: 24),
-                const _SectionHeader(title: 'New Arrival'),
-                const SizedBox(height: 12),
-                GridView.builder(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.68,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (_, i) => ProductCard(product: products[i]),
-                ),
-              ],
-            ),
-            const Align(alignment: Alignment.bottomCenter, child: _BottomNav()),
-          ],
+      backgroundColor: kBg,
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 350),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: const [0, 0.45],
+            colors: [theme?.withValues(alpha: 0.28) ?? kBg, kBg],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              FutureBuilder<List<Product>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const LoadingView();
+                  }
+                  if (snap.hasError) {
+                    return ErrorView(
+                      onRetry: () =>
+                          setState(() => _future = loadCatalog()),
+                    );
+                  }
+                  return _content(snap.data!);
+                },
+              ),
+              const Align(
+                  alignment: Alignment.bottomCenter, child: _BottomNav()),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _content(List<Product> items) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+      children: [
+        const _TopBar(),
+        const SizedBox(height: 20),
+        const _SearchBar(),
+        const SizedBox(height: 12),
+        _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
+        const SizedBox(height: 12),
+        const _PromoBanner(),
+        const SizedBox(height: 24),
+        const _SectionHeader(title: 'New Arrival'),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.68,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) => ProductCard(product: items[i]),
+        ),
+      ],
     );
   }
 }
@@ -119,6 +173,56 @@ class _SearchBar extends StatelessWidget {
           const SizedBox(width: 12),
           const Icon(LucideIcons.slidersHorizontal, size: 20, color: kInk),
         ],
+      ),
+    );
+  }
+}
+
+class _TabBar extends StatelessWidget {
+  final int active;
+  final ValueChanged<int> onTap;
+  const _TabBar({required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _tabs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 30),
+        itemBuilder: (_, i) {
+          final tab = _tabs[i];
+          final isActive = i == active;
+          final activeColor = tab.color ?? kInk;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onTap(i),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(tab.icon,
+                    size: 22, color: isActive ? activeColor : kInk),
+                const SizedBox(height: 4),
+                Text(tab.name,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isActive ? activeColor : kInk,
+                        fontWeight:
+                            isActive ? FontWeight.w800 : FontWeight.w500)),
+                const SizedBox(height: 4),
+                Container(
+                  height: 3,
+                  width: 34,
+                  decoration: BoxDecoration(
+                    color: isActive ? activeColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -216,68 +320,6 @@ class _PromoBanner extends StatelessWidget {
   }
 }
 
-class _TabBar extends StatefulWidget {
-  const _TabBar();
-
-  @override
-  State<_TabBar> createState() => _TabBarState();
-}
-
-class _TabBarState extends State<_TabBar> {
-  static const _icons = [
-    LucideIcons.layoutGrid,
-    LucideIcons.umbrella,
-    LucideIcons.headphones,
-    LucideIcons.brush,
-    LucideIcons.lamp,
-  ];
-
-  int _active =
-      0; // ponytail: selection only; wire to filtering when tabs have content
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 64,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: tabNames.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 30),
-        itemBuilder: (_, i) {
-          final active = i == _active;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _active = i),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(_icons[i], size: 22, color: kInk),
-                const SizedBox(height: 4),
-                Text(
-                  tabNames[i],
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  height: 3,
-                  width: 34,
-                  decoration: BoxDecoration(
-                    color: active ? kInk : Colors.transparent,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _SectionHeader extends StatelessWidget {
   final String title;
   const _SectionHeader({required this.title});
@@ -287,62 +329,11 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        const Text(
-          'See all',
-          style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E)),
-        ),
+        Text(title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const Text('See all',
+            style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E))),
       ],
-    );
-  }
-}
-
-class _CategoryRow extends StatelessWidget {
-  const _CategoryRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 64,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) {
-          final c = categories[i];
-          return Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: NetImage(url: c.imageUrl),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  c.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }
@@ -379,10 +370,9 @@ class _BottomNav extends StatelessWidget {
               children: [
                 Icon(LucideIcons.house, size: 20, color: kInk),
                 SizedBox(width: 8),
-                Text(
-                  'Home',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
+                Text('Home',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               ],
             ),
           ),
