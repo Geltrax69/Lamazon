@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
 
@@ -144,6 +145,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                 Text('Sold by ${p.store}',
                     style: const TextStyle(
                         fontSize: 12, color: Color(0xFF9A9A9A))),
+                ..._compareSection(p),
               ],
             ),
           ),
@@ -173,6 +175,84 @@ class _DetailsScreenState extends State<DetailsScreen> {
       ),
     );
   }
+}
+
+/// "Compare from other shops": similar items in the same category tab from
+/// different stores, with the price difference against this product.
+List<Widget> _compareSection(Product p) {
+  final others = products
+      .where((o) => o.tab == p.tab && o.id != p.id && o.store != p.store)
+      .take(3)
+      .toList();
+  if (others.isEmpty) return const [];
+  return [
+    const SizedBox(height: 22),
+    const Text('Compare from other shops',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+    const SizedBox(height: 10),
+    for (final o in others)
+      Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                  width: 46, height: 46, child: NetImage(url: o.imageUrl)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(o.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(o.store,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9A9A9A))),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('₹${o.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                _diffBadge(o.price - p.price),
+              ],
+            ),
+          ],
+        ),
+      ),
+  ];
+}
+
+Widget _diffBadge(double diff) {
+  final String label;
+  final Color color;
+  if (diff > 0) {
+    label = '₹${diff.toStringAsFixed(0)} more';
+    color = const Color(0xFFD32F2F);
+  } else if (diff < 0) {
+    label = '₹${(-diff).toStringAsFixed(0)} less';
+    color = const Color(0xFF2E7D32);
+  } else {
+    label = 'Same price';
+    color = const Color(0xFF9A9A9A);
+  }
+  return Text(label,
+      style:
+          TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color));
 }
 
 class _Hero extends StatelessWidget {

@@ -6,7 +6,9 @@ import '../models/product.dart';
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
-  const ProductCard({super.key, required this.product, this.onTap});
+  final bool showAddToCart; // quick-add only for food & grocery
+  const ProductCard(
+      {super.key, required this.product, this.onTap, this.showAddToCart = false});
 
   @override
   Widget build(BuildContext context) {
@@ -63,30 +65,70 @@ class ProductCard extends StatelessWidget {
                   ],
                 ),
               ),
-              GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(
-                      content: Text('${product.name} added to cart'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 1),
-                    ));
-                },
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1A1A1A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(LucideIcons.plus,
-                      size: 16, color: Colors.white),
-                ),
-              ),
+              if (showAddToCart) CartButton(product: product),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Animated quick-add button: cart icon pops into a green check when tapped.
+class CartButton extends StatefulWidget {
+  final Product product;
+  const CartButton({super.key, required this.product});
+
+  @override
+  State<CartButton> createState() => _CartButtonState();
+}
+
+class _CartButtonState extends State<CartButton> {
+  bool _added = false;
+
+  void _add() {
+    if (_added) return;
+    setState(() => _added = true);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('${widget.product.name} added to cart'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+      ));
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _added = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _add,
+      child: AnimatedScale(
+        scale: _added ? 1.18 : 1,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutBack,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: _added ? const Color(0xFF43A047) : const Color(0xFF1A1A1A),
+            shape: BoxShape.circle,
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, anim) =>
+                ScaleTransition(scale: anim, child: child),
+            child: Icon(
+              _added ? LucideIcons.check : LucideIcons.shoppingCart,
+              key: ValueKey(_added),
+              size: 15,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }

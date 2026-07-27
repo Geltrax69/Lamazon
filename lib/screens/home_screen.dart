@@ -116,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
           itemCount: shownProducts.length,
           itemBuilder: (_, i) => ProductCard(
             product: shownProducts[i],
+            showAddToCart: shownProducts[i].tab == 'Food' ||
+                shownProducts[i].tab == 'Grocery',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
