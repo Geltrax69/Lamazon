@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 import '../data/cart.dart';
 import '../data/catalog.dart';
@@ -128,7 +129,34 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        const Center(child: _VersionBadge()),
       ],
+    );
+  }
+}
+
+/// Shows which OTA patch is running, so update delivery is visible on-device.
+class _VersionBadge extends StatelessWidget {
+  const _VersionBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final updater = ShorebirdUpdater();
+    if (!updater.isAvailable) {
+      // Debug builds and platforms without the Shorebird engine.
+      return const Text('dev build — no OTA',
+          style: TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)));
+    }
+    return FutureBuilder<Patch?>(
+      future: updater.readCurrentPatch(),
+      builder: (context, snap) {
+        final n = snap.data?.number;
+        return Text(
+          n == null ? 'v1.0.1 • base release' : 'v1.0.1 • patch #$n',
+          style: const TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)),
+        );
+      },
     );
   }
 }
