@@ -81,8 +81,10 @@ class _CircleButton extends StatelessWidget {
     return Container(
       width: 46,
       height: 46,
-      decoration:
-          const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
       child: Icon(icon, size: 20, color: kInk),
     );
   }
@@ -142,8 +144,10 @@ class _PromoBanner extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: kInk,
                     borderRadius: BorderRadius.circular(20),
@@ -164,8 +168,10 @@ class _PromoBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: kInk,
                     borderRadius: BorderRadius.circular(24),
@@ -173,14 +179,20 @@ class _PromoBanner extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Shop Now',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13)),
+                      Text(
+                        'Shop Now',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
                       SizedBox(width: 6),
-                      Icon(LucideIcons.arrowUpRight,
-                          color: Colors.white, size: 15),
+                      Icon(
+                        LucideIcons.arrowUpRight,
+                        color: Colors.white,
+                        size: 15,
+                      ),
                     ],
                   ),
                 ),
@@ -204,9 +216,14 @@ class _PromoBanner extends StatelessWidget {
   }
 }
 
-class _TabBar extends StatelessWidget {
+class _TabBar extends StatefulWidget {
   const _TabBar();
 
+  @override
+  State<_TabBar> createState() => _TabBarState();
+}
+
+class _TabBarState extends State<_TabBar> {
   static const _icons = [
     LucideIcons.layoutGrid,
     LucideIcons.umbrella,
@@ -214,6 +231,9 @@ class _TabBar extends StatelessWidget {
     LucideIcons.brush,
     LucideIcons.lamp,
   ];
+
+  int _active =
+      0; // ponytail: selection only; wire to filtering when tabs have content
 
   @override
   Widget build(BuildContext context) {
@@ -224,26 +244,33 @@ class _TabBar extends StatelessWidget {
         itemCount: tabNames.length,
         separatorBuilder: (_, _) => const SizedBox(width: 30),
         itemBuilder: (_, i) {
-          final active = i == 0; // ponytail: static tab; state when tabs filter
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_icons[i], size: 22, color: kInk),
-              const SizedBox(height: 4),
-              Text(tabNames[i],
+          final active = i == _active;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _active = i),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(_icons[i], size: 22, color: kInk),
+                const SizedBox(height: 4),
+                Text(
+                  tabNames[i],
                   style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w500)),
-              const SizedBox(height: 4),
-              Container(
-                height: 3,
-                width: 34,
-                decoration: BoxDecoration(
-                  color: active ? kInk : Colors.transparent,
-                  borderRadius: BorderRadius.circular(2),
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Container(
+                  height: 3,
+                  width: 34,
+                  decoration: BoxDecoration(
+                    color: active ? kInk : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -260,10 +287,14 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        const Text('See all',
-            style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E))),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        const Text(
+          'See all',
+          style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E)),
+        ),
       ],
     );
   }
@@ -293,12 +324,19 @@ class _CategoryRow extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: SizedBox(
-                      width: 48, height: 48, child: NetImage(url: c.imageUrl)),
+                    width: 48,
+                    height: 48,
+                    child: NetImage(url: c.imageUrl),
+                  ),
                 ),
                 const SizedBox(width: 10),
-                Text(c.name,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  c.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(width: 6),
               ],
             ),
@@ -341,9 +379,10 @@ class _BottomNav extends StatelessWidget {
               children: [
                 Icon(LucideIcons.house, size: 20, color: kInk),
                 SizedBox(width: 8),
-                Text('Home',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  'Home',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
               ],
             ),
           ),
