@@ -28,9 +28,13 @@ jobs:
       - uses: shorebirdtech/setup-shorebird@v1
       # ponytail: patch the current release; if none exists for this version
       # (first run / version bump), create a full release instead.
+      # --no-tree-shake-icons ships the full icon fonts so adding new icons
+      # stays patchable. If a patch fails on OTHER asset changes (new bundled
+      # images/fonts), bump version in pubspec.yaml to force a fresh release.
       - name: Patch or release
         run: |
-          shorebird patch android || shorebird release android --artifact apk
+          shorebird patch android -- --no-tree-shake-icons \
+            || shorebird release android --artifact apk -- --no-tree-shake-icons
       # On release runs an APK is produced; keep the README download link fresh.
       # On patch runs nothing matches — old APK stays valid and self-patches on launch.
       - uses: softprops/action-gh-release@v2
