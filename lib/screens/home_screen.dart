@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
+import 'cart_screen.dart';
 import 'details_screen.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
@@ -20,7 +22,7 @@ class _Tab {
 
 const _tabs = [
   _Tab('All', LucideIcons.layoutGrid, null),
-  _Tab('Electronics', LucideIcons.headphones, Color(0xFFD5418E)),
+  _Tab('Electronics', LucideIcons.headphones, Color(0xFF2F6FED)),
   _Tab('Grocery', LucideIcons.carrot, Color(0xFF43A047)),
   _Tab('Food', LucideIcons.utensils, Color(0xFFFF8A3D)),
   _Tab('Gifts', LucideIcons.gift, Color(0xFF9C6ADE)),
@@ -360,9 +362,44 @@ class _BottomNav extends StatelessWidget {
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Icon(LucideIcons.shoppingCart, size: 22, color: kInk),
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CartScreen())),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ListenableBuilder(
+                listenable: Cart.instance,
+                builder: (context, _) {
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(LucideIcons.shoppingCart,
+                          size: 22, color: kInk),
+                      if (Cart.instance.count > 0)
+                        Positioned(
+                          top: -6,
+                          right: -8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD32F2F),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${Cart.instance.count}',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),

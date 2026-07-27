@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
+import '../widgets/status_views.dart';
+import 'cart_screen.dart';
 
 const _hero = Color(0xFFF3A952); // warm orange hero, from the design
 const _ink = Color(0xFF1A1A1A);
@@ -28,14 +31,15 @@ class _DetailsScreenState extends State<DetailsScreen> {
     Color(0xFFC9D4DC),
   ];
 
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ));
+  void _addToCart() {
+    Cart.instance.add(widget.product, _qty);
+    showAddedToast(context, widget.product);
+  }
+
+  void _buyNow() {
+    Cart.instance.add(widget.product, _qty);
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const CartScreen()));
   }
 
   @override
@@ -159,7 +163,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
               child: _PillButton(
                 label: 'Add to Cart',
                 background: Colors.white,
-                onTap: () => _toast('Added $_qty to cart'),
+                onTap: _addToCart,
               ),
             ),
             const SizedBox(width: 12),
@@ -167,7 +171,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
               child: _PillButton(
                 label: 'Buy Now',
                 background: _hero,
-                onTap: () => _toast('Order placed (demo)'),
+                onTap: _buyNow,
               ),
             ),
           ],

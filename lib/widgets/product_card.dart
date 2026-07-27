@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/cart.dart';
 import '../models/product.dart';
+import 'status_views.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -89,13 +91,8 @@ class _CartButtonState extends State<CartButton> {
   void _add() {
     if (_added) return;
     setState(() => _added = true);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('${widget.product.name} added to cart'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ));
+    Cart.instance.add(widget.product);
+    showAddedToast(context, widget.product);
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (mounted) setState(() => _added = false);
     });
