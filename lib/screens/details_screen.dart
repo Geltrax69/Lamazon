@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
-import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
@@ -181,46 +180,50 @@ class _DetailsScreenState extends State<DetailsScreen> {
   }
 }
 
-/// "Compare from other shops": similar items in the same category tab from
-/// different stores, with the price difference against this product.
+/// "Same product at other shops": this exact item's price elsewhere, with
+/// the difference against the current shop's price.
 List<Widget> _compareSection(Product p) {
-  final others = products
-      .where((o) => o.tab == p.tab && o.id != p.id && o.store != p.store)
-      .take(3)
-      .toList();
-  if (others.isEmpty) return const [];
+  if (p.offers.isEmpty) return const [];
   return [
     const SizedBox(height: 22),
-    const Text('Compare from other shops',
-        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+    Text('${p.name} at other shops',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+    const SizedBox(height: 2),
+    Text('Compared with ₹${p.price.toStringAsFixed(0)} at ${p.store}',
+        style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A))),
     const SizedBox(height: 10),
-    for (final o in others)
+    for (final o in p.offers)
       Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                  width: 46, height: 46, child: NetImage(url: o.imageUrl)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F1EF),
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(LucideIcons.store, size: 18, color: _ink),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(o.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
                   Text(o.store,
                       style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                  const Text('Same product',
+                      style: TextStyle(
                           fontSize: 11, color: Color(0xFF9A9A9A))),
                 ],
               ),

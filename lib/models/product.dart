@@ -9,6 +9,7 @@ class Product {
   final String description;
   final List<String> sizes;
   final List<String> extraImages;
+  final List<ShopOffer> offers; // same product priced at other shops
 
   const Product({
     required this.id,
@@ -18,12 +19,17 @@ class Product {
     required this.price,
     required this.imageUrl,
     this.store = 'Lamazon Store',
-    this.description =
-        'Crafted with premium materials for everyday comfort and style. '
-        'Quality checked and delivered fresh from the store to your door.',
+    required this.description,
     this.sizes = const [],
     this.extraImages = const [],
+    this.offers = const [],
   });
+}
+
+class ShopOffer {
+  final String store;
+  final double price;
+  const ShopOffer(this.store, this.price);
 }
 
 class Shop {
