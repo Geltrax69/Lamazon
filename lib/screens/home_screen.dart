@@ -71,8 +71,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _content(snap.data!);
                 },
               ),
-              const Align(
-                  alignment: Alignment.bottomCenter, child: _BottomNav()),
+              Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _BottomNav(theme: theme)),
             ],
           ),
         ),
@@ -81,6 +82,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _content(List<Product> items) {
+    final tabName = _tabs[_tab].name;
+    final shownShops =
+        shops.where((s) => _tab == 0 || s.tab == tabName).toList();
+    final shownProducts =
+        items.where((p) => _tab == 0 || p.tab == tabName).toList();
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
       children: [
@@ -90,7 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
-        const _PromoBanner(),
+        const _SectionHeader(title: 'Shop By Shop'),
+        const SizedBox(height: 12),
+        _ShopRow(shops: shownShops),
         const SizedBox(height: 24),
         const _SectionHeader(title: 'New Arrival'),
         const SizedBox(height: 12),
@@ -104,8 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisSpacing: 16,
             childAspectRatio: 0.68,
           ),
-          itemCount: items.length,
-          itemBuilder: (_, i) => ProductCard(product: items[i]),
+          itemCount: shownProducts.length,
+          itemBuilder: (_, i) => ProductCard(product: shownProducts[i]),
         ),
       ],
     );
@@ -170,9 +178,6 @@ class _SearchBar extends StatelessWidget {
               ),
             ),
           ),
-          Container(width: 1, height: 24, color: Colors.grey.shade300),
-          const SizedBox(width: 12),
-          const Icon(LucideIcons.slidersHorizontal, size: 20, color: kInk),
         ],
       ),
     );
@@ -229,93 +234,64 @@ class _TabBar extends StatelessWidget {
   }
 }
 
-class _PromoBanner extends StatelessWidget {
-  const _PromoBanner();
+/// Horizontal carousel of promoted shops for the selected category.
+class _ShopRow extends StatelessWidget {
+  final List<Shop> shops;
+  const _ShopRow({required this.shops});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 170,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: kAccent,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Row(
-        children: [
-          Expanded(
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: shops.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (_, i) {
+          final shop = shops[i];
+          return Container(
+            width: 230,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kInk,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Limited Offer',
-                    style: TextStyle(color: Colors.white, fontSize: 11),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'First Purchase Enjoy\na Special Offer',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kInk,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+                Expanded(child: NetImage(url: shop.imageUrl)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: Row(
                     children: [
-                      Text(
-                        'Shop Now',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(shop.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                            Text(shop.tagline,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF6B6B6B))),
+                          ],
                         ),
                       ),
-                      SizedBox(width: 6),
-                      Icon(
-                        LucideIcons.arrowUpRight,
-                        color: Colors.white,
-                        size: 15,
-                      ),
+                      const Icon(LucideIcons.arrowUpRight,
+                          size: 18, color: kInk),
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: const SizedBox(
-              width: 110,
-              height: 130,
-              child: NetImage(
-                url:
-                    'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400',
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -340,7 +316,8 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav();
+  final Color? theme; // selected tab color; null = default green
+  const _BottomNav({this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -361,10 +338,11 @@ class _BottomNav extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(
-              color: kAccent.withValues(alpha: 0.35),
+              color: (theme ?? kAccent).withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(28),
             ),
             child: const Row(
