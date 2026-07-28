@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shorebird_code_push/shorebird_code_push.dart';
 
+import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
+import 'addresses_screen.dart';
 import 'cart_screen.dart';
 import 'details_screen.dart';
 import 'profile_screen.dart';
@@ -173,34 +175,55 @@ class _TopBar extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Location + how fast the porter reaches this address.
+        // Location + how fast the porter reaches this address. Tapping opens
+        // the saved addresses so the delivery point can be switched.
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Delivery in $deliveryEta',
-                  style:
-                      TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  const Icon(LucideIcons.mapPin,
-                      size: 13, color: Color(0xFF6B6B6B)),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text('$userLocation • $storeDistance',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B6B6B))),
-                  ),
-                  const Icon(LucideIcons.chevronDown,
-                      size: 15, color: Color(0xFF6B6B6B)),
-                ],
-              ),
-            ],
+          child: ListenableBuilder(
+            listenable: AddressBook.instance,
+            builder: (context, _) {
+              final a = AddressBook.instance.selected;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AddressesScreen())),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Delivery in $deliveryEta',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          a == null
+                              ? LucideIcons.mapPin
+                              : AddressesScreen.iconFor(a.label),
+                          size: 13,
+                          color: const Color(0xFF6B6B6B),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            a == null
+                                ? 'Set delivery location'
+                                : '${a.label.title} • ${a.city} • $storeDistance',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF6B6B6B)),
+                          ),
+                        ),
+                        const Icon(LucideIcons.chevronDown,
+                            size: 15, color: Color(0xFF6B6B6B)),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(width: 12),

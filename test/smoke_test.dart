@@ -3,7 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/main.dart';
+import 'package:lamazon/data/addresses.dart';
+import 'package:lamazon/data/orders.dart';
 import 'package:lamazon/data/wishlist.dart';
+import 'package:lamazon/screens/location_screen.dart';
+import 'package:lamazon/screens/orders_screen.dart';
 import 'package:lamazon/screens/cart_screen.dart';
 import 'package:lamazon/screens/compare_screen.dart';
 import 'package:lamazon/screens/details_screen.dart';
@@ -80,6 +84,56 @@ void main() {
       // Cheapest vendor wins the badge and the savings banner.
       expect(find.text('Add from FreshMart'), findsOneWidget);
       expect(find.textContaining('Save ₹4'), findsOneWidget);
+    });
+  });
+
+  test('serviceability check is case and space tolerant', () {
+    expect(isServiceable('Jalandhar'), isTrue);
+    expect(isServiceable('  ludhiana '), isTrue);
+    expect(isServiceable('Mumbai'), isFalse);
+    expect(isServiceable(''), isFalse);
+  });
+
+  testWidgets('location screen blocks unserved city, saves served one',
+      (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(const MaterialApp(home: LocationScreen()));
+
+      // Fill an address in a city we do not cover.
+      await tester.enterText(
+          find.widgetWithText(TextField, 'House / Flat, street, area'),
+          '5 MG Road');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'City'), 'Mumbai');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Pincode'), '400001');
+      await tester.pump();
+
+      await tester.tap(find.text('Check availability'));
+      await tester.pump();
+      expect(find.text('Not available in your location'), findsOneWidget);
+
+      // Switch to a covered city and it becomes saveable.
+      await tester.enterText(
+          find.widgetWithText(TextField, 'City'), 'Amritsar');
+      await tester.pump();
+      await tester.tap(find.text('Check availability'));
+      await tester.pump();
+      expect(find.text('We deliver here'), findsOneWidget);
+      expect(find.text('Save address'), findsOneWidget);
+    });
+  });
+
+  testWidgets('orders list and tracking render', (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(const MaterialApp(home: OrdersScreen()));
+      expect(find.text('LMZ-10234'), findsOneWidget);
+      expect(find.text('On the way'), findsOneWidget);
+
+      await tester.pumpWidget(MaterialApp(
+          home: OrderDetailScreen(order: sampleOrders.first)));
+      expect(find.text('Packed'), findsOneWidget);
+      expect(find.text('Delivery address'), findsOneWidget);
     });
   });
 

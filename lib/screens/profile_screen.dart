@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'addresses_screen.dart';
+import 'orders_screen.dart';
+
 const _ink = Color(0xFF1A1A1A);
 
 class ProfileScreen extends StatelessWidget {
@@ -85,6 +88,16 @@ class ProfileScreen extends StatelessWidget {
                       trailing: const Icon(LucideIcons.chevronRight,
                           size: 16, color: Color(0xFF9A9A9A)),
                       onTap: () {
+                        final screen = switch (_items[i].$2) {
+                          'My Orders' => const OrdersScreen(),
+                          'Saved Addresses' => const AddressesScreen(),
+                          _ => null,
+                        };
+                        if (screen != null) {
+                          Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => screen));
+                          return;
+                        }
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(SnackBar(
