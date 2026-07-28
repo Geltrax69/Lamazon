@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
+import '../data/wishlist.dart';
 import '../models/product.dart';
 import 'status_views.dart';
 
@@ -31,14 +32,7 @@ class ProductCard extends StatelessWidget {
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(LucideIcons.heart, size: 16),
-                  ),
+                  child: WishlistHeart(productId: product.id),
                 ),
               ],
             ),
@@ -72,6 +66,37 @@ class ProductCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Tappable heart that toggles the product in the global wishlist.
+class WishlistHeart extends StatelessWidget {
+  final String productId;
+  const WishlistHeart({super.key, required this.productId});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Wishlist.instance,
+      builder: (context, _) {
+        final liked = Wishlist.instance.contains(productId);
+        return GestureDetector(
+          onTap: () => Wishlist.instance.toggle(productId),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              LucideIcons.heart,
+              size: 16,
+              color: liked ? const Color(0xFFE53935) : const Color(0xFF1A1A1A),
+            ),
+          ),
+        );
+      },
     );
   }
 }

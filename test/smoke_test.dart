@@ -3,8 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/main.dart';
+import 'package:lamazon/data/wishlist.dart';
 import 'package:lamazon/screens/cart_screen.dart';
+import 'package:lamazon/screens/compare_screen.dart';
 import 'package:lamazon/screens/details_screen.dart';
+import 'package:lamazon/screens/profile_screen.dart';
+import 'package:lamazon/screens/search_screen.dart';
+import 'package:lamazon/screens/shop_screen.dart';
+import 'package:lamazon/screens/wishlist_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 void main() {
@@ -31,6 +37,49 @@ void main() {
       expect(find.text('Add to Cart'), findsOneWidget);
       expect(find.text('Buy Now'), findsOneWidget);
       expect(find.text('Select Size'), findsOneWidget);
+    });
+  });
+
+  testWidgets('search filters, wishlist toggles, profile renders',
+      (tester) async {
+    await mockNetworkImagesFor(() async {
+      // Search
+      await tester.pumpWidget(const MaterialApp(home: SearchScreen()));
+      await tester.enterText(find.byType(TextField), 'milk');
+      await tester.pump();
+      expect(find.text('Fresh Milk 1L'), findsOneWidget);
+
+      // Wishlist state
+      Wishlist.instance.toggle(products.first.id);
+      expect(Wishlist.instance.contains(products.first.id), isTrue);
+      await tester.pumpWidget(const MaterialApp(home: WishlistScreen()));
+      expect(find.text(products.first.name), findsOneWidget);
+      Wishlist.instance.toggle(products.first.id);
+      await tester.pump();
+      expect(find.text('Nothing saved yet'), findsOneWidget);
+
+      // Profile
+      await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+      expect(find.text('My Orders'), findsOneWidget);
+
+      // Shop screen shows that vendor's products
+      await tester.pumpWidget(MaterialApp(
+          home: ShopScreen(shop: shops.firstWhere((s) => s.name == 'GadgetHub'))));
+      expect(find.text('Wireless Headphones'), findsOneWidget);
+    });
+  });
+
+  testWidgets('compare screen ranks vendors cheapest first', (tester) async {
+    await mockNetworkImagesFor(() async {
+      // Milk: ₹68 at Nature Fresh, ₹66 FreshMart, ₹70 Daily Basket.
+      final milk = products.firstWhere((p) => p.name == 'Fresh Milk 1L');
+      await tester.pumpWidget(MaterialApp(home: CompareScreen(product: milk)));
+
+      expect(find.text('3 local vendors'), findsOneWidget);
+      expect(find.text('BEST PRICE'), findsOneWidget);
+      // Cheapest vendor wins the badge and the savings banner.
+      expect(find.text('Add from FreshMart'), findsOneWidget);
+      expect(find.textContaining('Save ₹4'), findsOneWidget);
     });
   });
 

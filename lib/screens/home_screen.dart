@@ -9,6 +9,10 @@ import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
 import 'cart_screen.dart';
 import 'details_screen.dart';
+import 'profile_screen.dart';
+import 'search_screen.dart';
+import 'shop_screen.dart';
+import 'wishlist_screen.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
@@ -229,27 +233,24 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-      ),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.search, size: 20, color: Colors.grey),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'what are you looking for?',
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const SearchScreen())),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+        ),
+        child: const Row(
+          children: [
+            Icon(LucideIcons.search, size: 20, color: Colors.grey),
+            SizedBox(width: 10),
+            Text('what are you looking for?',
+                style: TextStyle(color: Colors.grey, fontSize: 14)),
+          ],
+        ),
       ),
     );
   }
@@ -318,9 +319,12 @@ class _ShopRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: shops.length,
         separatorBuilder: (_, _) => const SizedBox(width: 16),
-        itemBuilder: (_, i) {
+        itemBuilder: (context, i) {
           final shop = shops[i];
-          return SizedBox(
+          return GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => ShopScreen(shop: shop))),
+            child: SizedBox(
             width: 150,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -346,6 +350,7 @@ class _ShopRow extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 11, color: Color(0xFF6B6B6B))),
               ],
+            ),
             ),
           );
         },
@@ -459,13 +464,21 @@ class _BottomNav extends StatelessWidget {
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Icon(LucideIcons.heart, size: 22, color: kInk),
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const WishlistScreen())),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Icon(LucideIcons.heart, size: 22, color: kInk),
+            ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Icon(LucideIcons.user, size: 22, color: kInk),
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Icon(LucideIcons.user, size: 22, color: kInk),
+            ),
           ),
         ],
       ),

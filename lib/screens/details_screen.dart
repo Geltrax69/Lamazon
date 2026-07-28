@@ -6,6 +6,7 @@ import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
 import 'cart_screen.dart';
+import 'compare_screen.dart';
 
 const _hero = Color(0xFFF3A952); // warm orange hero, from the design
 const _ink = Color(0xFF1A1A1A);
@@ -148,7 +149,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                 Text('Sold by ${p.store}',
                     style: const TextStyle(
                         fontSize: 12, color: Color(0xFF9A9A9A))),
-                ..._compareSection(p),
+                ..._compareSection(context, p),
               ],
             ),
           ),
@@ -182,14 +183,35 @@ class _DetailsScreenState extends State<DetailsScreen> {
 
 /// "Same product at other shops": this exact item's price elsewhere, with
 /// the difference against the current shop's price.
-List<Widget> _compareSection(Product p) {
+List<Widget> _compareSection(BuildContext context, Product p) {
   if (p.offers.isEmpty) return const [];
   return [
     const SizedBox(height: 22),
-    Text('${p.name} at other shops',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Flexible(
+          child: Text('Local vendors',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        ),
+        GestureDetector(
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => CompareScreen(product: p))),
+          child: const Row(
+            children: [
+              Text('Compare all',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2E7D32))),
+              SizedBox(width: 2),
+              Icon(LucideIcons.chevronRight,
+                  size: 15, color: Color(0xFF2E7D32)),
+            ],
+          ),
+        ),
+      ],
+    ),
     const SizedBox(height: 2),
     Text('Compared with ₹${p.price.toStringAsFixed(0)} at ${p.store}',
         style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A))),
