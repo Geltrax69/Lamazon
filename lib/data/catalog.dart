@@ -8,6 +8,40 @@ Future<List<Product>> loadCatalog() async {
   return products;
 }
 
+/// Everything a shop sells: its own listings, plus items it stocks that are
+/// listed elsewhere — each priced at this shop's price.
+List<Product> productsAtShop(String shopName) {
+  final out = <Product>[];
+  for (final p in products) {
+    if (p.store == shopName) {
+      out.add(p);
+      continue;
+    }
+    for (final o in p.offers) {
+      if (o.store != shopName) continue;
+      out.add(Product(
+        id: '${p.id}@$shopName',
+        name: p.name,
+        category: p.category,
+        tab: p.tab,
+        price: o.price,
+        imageUrl: p.imageUrl,
+        store: shopName,
+        description: p.description,
+        sizes: p.sizes,
+        extraImages: p.extraImages,
+        // Compare against the original listing and the other vendors.
+        offers: [
+          ShopOffer(p.store, p.price),
+          ...p.offers.where((x) => x.store != shopName),
+        ],
+      ));
+      break;
+    }
+  }
+  return out;
+}
+
 // ponytail: static location/ETA. Wire to geolocation + a delivery API when
 // one exists; only these three strings change.
 const deliveryEta = '12 mins';

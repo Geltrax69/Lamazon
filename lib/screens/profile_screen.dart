@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'addresses_screen.dart';
+import 'help_screen.dart';
+import 'notifications_screen.dart';
 import 'orders_screen.dart';
+import 'settings_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 
@@ -91,6 +94,9 @@ class ProfileScreen extends StatelessWidget {
                         final screen = switch (_items[i].$2) {
                           'My Orders' => const OrdersScreen(),
                           'Saved Addresses' => const AddressesScreen(),
+                          'Notifications' => const NotificationsScreen(),
+                          'Help & Support' => const HelpScreen(),
+                          'Settings' => const SettingsScreen(),
                           _ => null,
                         };
                         if (screen != null) {

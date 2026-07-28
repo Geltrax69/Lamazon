@@ -13,7 +13,7 @@ class ShopScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = products.where((p) => p.store == shop.name).toList();
+    final items = productsAtShop(shop.name);
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: SafeArea(

@@ -11,6 +11,9 @@ import 'package:lamazon/screens/orders_screen.dart';
 import 'package:lamazon/screens/cart_screen.dart';
 import 'package:lamazon/screens/compare_screen.dart';
 import 'package:lamazon/screens/details_screen.dart';
+import 'package:lamazon/screens/help_screen.dart';
+import 'package:lamazon/screens/notifications_screen.dart';
+import 'package:lamazon/screens/settings_screen.dart';
 import 'package:lamazon/screens/profile_screen.dart';
 import 'package:lamazon/screens/search_screen.dart';
 import 'package:lamazon/screens/shop_screen.dart';
@@ -155,6 +158,41 @@ void main() {
       Cart.instance.remove(p.id);
       await tester.pump();
       expect(find.text('Your cart is empty'), findsOneWidget);
+    });
+  });
+
+  test('shop storefront includes items it stocks at its own price', () {
+    // Fresh Milk is listed by Nature Fresh; FreshMart stocks it cheaper.
+    final milk = products.firstWhere((p) => p.name == 'Fresh Milk 1L');
+    final freshMartPrice =
+        milk.offers.firstWhere((o) => o.store == 'FreshMart').price;
+
+    final stock = productsAtShop('FreshMart');
+    final listed = stock.firstWhere((p) => p.name == 'Fresh Milk 1L');
+
+    expect(listed.price, freshMartPrice);
+    expect(listed.store, 'FreshMart');
+    // It still compares against the original vendor.
+    expect(listed.offers.any((o) => o.store == milk.store), isTrue);
+  });
+
+  testWidgets('notifications, help and settings render', (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+      expect(find.text('Notifications'), findsOneWidget);
+
+      await tester.pumpWidget(const MaterialApp(home: HelpScreen()));
+      expect(find.text('Help & Support'), findsOneWidget);
+      expect(find.text('Where is my order?'), findsOneWidget);
+
+      await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
+      expect(find.text('Settings'), findsOneWidget);
+      final toggle = find.byType(Switch).first;
+      final before = tester.widget<Switch>(toggle).value;
+      await tester.tap(toggle);
+      await tester.pump();
+      expect(tester.widget<Switch>(find.byType(Switch).first).value,
+          isNot(before));
     });
   });
 }
