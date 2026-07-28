@@ -15,7 +15,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressScale(
+    return GestureDetector(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -24,12 +24,9 @@ class ProductCard extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Hero(
-                    tag: 'product-${product.id}',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: NetImage(url: product.imageUrl),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: NetImage(url: product.imageUrl),
                   ),
                 ),
                 Positioned(

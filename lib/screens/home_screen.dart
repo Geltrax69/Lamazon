@@ -226,27 +226,7 @@ class _TopBar extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(width: 12),
-        const _CircleButton(icon: LucideIcons.user),
       ],
-    );
-  }
-}
-
-class _CircleButton extends StatelessWidget {
-  final IconData icon;
-  const _CircleButton({required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 46,
-      height: 46,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 20, color: kInk),
     );
   }
 }
