@@ -167,45 +167,40 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const _CircleButton(icon: LucideIcons.menu),
-        const SizedBox(width: 12),
         // Location + how fast the porter reaches this address.
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: const [
-                  Icon(LucideIcons.timer, size: 14, color: kInk),
-                  SizedBox(width: 4),
-                  Text('Delivery in $deliveryEta',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800)),
-                ],
-              ),
+              const Text('Delivery in $deliveryEta',
+                  style:
+                      TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
               Row(
                 children: [
                   const Icon(LucideIcons.mapPin,
-                      size: 12, color: Color(0xFF6B6B6B)),
+                      size: 13, color: Color(0xFF6B6B6B)),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text('$userLocation • $storeDistance',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF6B6B6B))),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF6B6B6B))),
                   ),
                   const Icon(LucideIcons.chevronDown,
-                      size: 14, color: Color(0xFF6B6B6B)),
+                      size: 15, color: Color(0xFF6B6B6B)),
                 ],
               ),
             ],
           ),
         ),
         const SizedBox(width: 12),
-        const _CircleButton(icon: LucideIcons.shoppingBag),
+        const _CircleButton(icon: LucideIcons.user),
       ],
     );
   }
