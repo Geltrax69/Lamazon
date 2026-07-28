@@ -167,10 +167,45 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: const [
-        _CircleButton(icon: LucideIcons.menu),
-        _CircleButton(icon: LucideIcons.shoppingBag),
+      children: [
+        const _CircleButton(icon: LucideIcons.menu),
+        const SizedBox(width: 12),
+        // Location + how fast the porter reaches this address.
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: const [
+                  Icon(LucideIcons.timer, size: 14, color: kInk),
+                  SizedBox(width: 4),
+                  Text('Delivery in $deliveryEta',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(LucideIcons.mapPin,
+                      size: 12, color: Color(0xFF6B6B6B)),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text('$userLocation • $storeDistance',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6B6B6B))),
+                  ),
+                  const Icon(LucideIcons.chevronDown,
+                      size: 14, color: Color(0xFF6B6B6B)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        const _CircleButton(icon: LucideIcons.shoppingBag),
       ],
     );
   }
