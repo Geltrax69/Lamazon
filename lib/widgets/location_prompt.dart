@@ -21,75 +21,80 @@ class _LocationPromptDialog extends StatelessWidget {
       backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 28),
-          const _SlashedPin(),
-          const SizedBox(height: 22),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Location permission not enabled',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: _ink,
+      // A dialog only pads its insets, so on a wide window it would run the
+      // full width of the screen. Cap it at a card.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 28),
+            const _SlashedPin(),
+            const SizedBox(height: 22),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Location permission not enabled',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28),
-            child: Text(
-              'Please enable location permission for a better delivery '
-              'experience',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: Color(0xFF6B6B6B),
+            const SizedBox(height: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 28),
+              child: Text(
+                'Please enable location permission for a better delivery '
+                'experience',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: Color(0xFF6B6B6B),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 22),
-          const Divider(height: 1, color: Color(0xFFEDEDEA)),
-          _Action(
-            label: 'Enable device location',
-            color: _green,
-            onTap: () {
-              AddressBook.instance.enableLocation();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AddressBook.instance.selected == null
-                          ? 'Location on — add an address to start ordering'
-                          : 'Location on • delivering to '
-                                '${AddressBook.instance.selected!.city}',
+            const SizedBox(height: 22),
+            const Divider(height: 1, color: Color(0xFFEDEDEA)),
+            _Action(
+              label: 'Enable device location',
+              color: _green,
+              onTap: () {
+                AddressBook.instance.enableLocation();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        AddressBook.instance.selected == null
+                            ? 'Location on — add an address to start ordering'
+                            : 'Location on • delivering to '
+                                  '${AddressBook.instance.selected!.city}',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
                     ),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
+                  );
+              },
+            ),
+            const Divider(height: 1, color: Color(0xFFEDEDEA)),
+            _Action(
+              label: 'Select location manually',
+              color: _ink,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LocationScreen()),
                 );
-            },
-          ),
-          const Divider(height: 1, color: Color(0xFFEDEDEA)),
-          _Action(
-            label: 'Select location manually',
-            color: _ink,
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LocationScreen()),
-              );
-            },
-          ),
-        ],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
