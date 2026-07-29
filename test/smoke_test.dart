@@ -18,7 +18,6 @@ import 'package:lamazon/screens/notifications_screen.dart';
 import 'package:lamazon/screens/settings_screen.dart';
 import 'package:lamazon/screens/profile_screen.dart';
 import 'package:lamazon/screens/search_screen.dart';
-import 'package:lamazon/screens/seller_dashboard_screen.dart';
 import 'package:lamazon/screens/seller_onboarding_screen.dart';
 import 'package:lamazon/screens/shop_screen.dart';
 import 'package:lamazon/screens/wishlist_screen.dart';
@@ -134,7 +133,9 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.text('Create store'));
+      // Let the route transition finish so only the dashboard is on screen.
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(Seller.instance.hasStore, isTrue);
       expect(Seller.instance.store!.categories, ['Food']);
 
@@ -146,7 +147,6 @@ void main() {
         category: 'Food',
         price: 60,
         stock: 10,
-        imageUrl: 'https://example.com/a.png',
       ));
       Seller.instance.addItem(InventoryItem(
         id: 'i2',
@@ -155,7 +155,6 @@ void main() {
         category: 'Food',
         price: 40,
         stock: 3,
-        imageUrl: 'https://example.com/b.png',
       ));
       expect(Seller.instance.skuCount, 2);
       expect(Seller.instance.inventoryValue, 60 * 10 + 40 * 3);
@@ -172,6 +171,22 @@ void main() {
       await tester.pump();
       expect(find.text('Campus Snacks'), findsOneWidget);
       expect(find.text('Inventory value'), findsOneWidget);
+
+      // The first product brings demo orders: one new, one accepted.
+      expect(Seller.instance.countAt(OrderStage.received), 1);
+      expect(Seller.instance.countAt(OrderStage.accepted), 1);
+      expect(Seller.instance.openOrders, 2);
+
+      // Accepting then delivering takes the units out of stock.
+      final before =
+          Seller.instance.items.firstWhere((i) => i.id == 'i1').stock;
+      Seller.instance.acceptOrder('o1');
+      expect(Seller.instance.countAt(OrderStage.accepted), 2);
+      Seller.instance.deliverOrder('o1');
+      expect(Seller.instance.countAt(OrderStage.delivered), 1);
+      expect(Seller.instance.items.firstWhere((i) => i.id == 'i1').stock,
+          before - 2);
+      expect(Seller.instance.openOrders, 1);
 
       // The stock lines sit below the store header and stats.
       await tester.drag(find.byType(ListView).last, const Offset(0, -500));

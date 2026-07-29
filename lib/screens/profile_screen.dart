@@ -11,6 +11,7 @@ import 'orders_screen.dart';
 import 'seller_dashboard_screen.dart';
 import 'seller_onboarding_screen.dart';
 import 'settings_screen.dart';
+import 'wishlist_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -128,6 +129,12 @@ class ProfileScreen extends StatelessWidget {
                     label: 'Address book',
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const AddressesScreen())),
+                  ),
+                  _Row(
+                    icon: LucideIcons.heart,
+                    label: 'Saved items',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const WishlistScreen())),
                   ),
                   _Row(
                     icon: LucideIcons.bell,

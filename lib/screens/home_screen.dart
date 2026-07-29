@@ -5,6 +5,7 @@ import 'package:shorebird_code_push/shorebird_code_push.dart';
 import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
+import '../data/seller.dart';
 import '../models/product.dart';
 import '../widgets/image_marquee.dart';
 import '../widgets/location_prompt.dart';
@@ -15,6 +16,7 @@ import 'cart_screen.dart';
 import 'details_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
+import 'seller_dashboard_screen.dart';
 import 'shop_screen.dart';
 import 'wishlist_screen.dart';
 
@@ -577,13 +579,52 @@ class _BottomNav extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const WishlistScreen())),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Icon(LucideIcons.heart, size: 22, color: kInk),
-            ),
+          // Sellers get their store here instead of the wishlist — stock is
+          // what they open the app for. Saved items move to the account
+          // screen for them.
+          ListenableBuilder(
+            listenable: Seller.instance,
+            builder: (context, _) {
+              final selling = Seller.instance.hasStore;
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => selling
+                        ? const SellerDashboardScreen()
+                        : const WishlistScreen(),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(selling ? LucideIcons.store : LucideIcons.heart,
+                          size: 22, color: kInk),
+                      if (selling && Seller.instance.openOrders > 0)
+                        Positioned(
+                          top: -6,
+                          right: -8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF6C00),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('${Seller.instance.openOrders}',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           GestureDetector(
             onTap: () => Navigator.push(context,

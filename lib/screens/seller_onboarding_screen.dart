@@ -1,17 +1,20 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
 import '../data/seller.dart';
-import '../widgets/product_card.dart';
+import '../widgets/photo_picker.dart';
 import '../widgets/screen_header.dart';
+import '../widgets/seller_form.dart';
 import 'seller_dashboard_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
 const _green = Color(0xFF2E7D32);
 
-/// Opens a seller's store: business name, image, location, what they sell.
+/// Opens a seller's store: business name, photo, location, what they sell.
 class SellerOnboardingScreen extends StatefulWidget {
   const SellerOnboardingScreen({super.key});
 
@@ -21,30 +24,35 @@ class SellerOnboardingScreen extends StatefulWidget {
 
 class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
   final _name = TextEditingController();
-  final _image = TextEditingController();
   final _location = TextEditingController();
   final _city = TextEditingController(text: serviceableCities.first);
   final _picked = <String>{};
+  Uint8List? _photo;
 
   @override
   void dispose() {
     _name.dispose();
-    _image.dispose();
     _location.dispose();
     _city.dispose();
     super.dispose();
   }
 
-  bool get _complete =>
-      _name.text.trim().isNotEmpty &&
-      _location.text.trim().isNotEmpty &&
-      isServiceable(_city.text) &&
-      _picked.isNotEmpty;
+  /// What is still missing, so the button can say so instead of just sitting
+  /// there greyed out.
+  String? get _blocker {
+    if (_name.text.trim().isEmpty) return 'Add your business name';
+    if (_location.text.trim().isEmpty) return 'Add your store location';
+    if (!isServiceable(_city.text)) {
+      return 'We only deliver around ${serviceableCities.first}';
+    }
+    if (_picked.isEmpty) return 'Pick at least one category';
+    return null;
+  }
 
   void _create() {
     Seller.instance.openStore(SellerStore(
       name: _name.text.trim(),
-      imageUrl: _image.text.trim().isEmpty ? _defaultStoreImage : _image.text.trim(),
+      photo: _photo,
       location: _location.text.trim(),
       city: _city.text.trim(),
       categories: _picked.toList(),
@@ -55,7 +63,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final image = _image.text.trim();
+    final blocker = _blocker;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: SafeArea(
@@ -70,42 +78,38 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                     'Sell to everyone ordering on campus. Takes a minute.',
                     style: TextStyle(fontSize: 13.5, color: _muted),
                   ),
-                  const SizedBox(height: 18),
-                  _Label('Business name'),
-                  _Field(
+                  const SizedBox(height: 20),
+                  const SellerSection(
+                    title: 'Store photo',
+                    hint: 'Your shopfront, counter or logo',
+                  ),
+                  PhotoTile(
+                    photo: _photo,
+                    emptyLabel: 'Upload store photo',
+                    emptyHint: 'Tap to choose from your device',
+                    onChanged: (p) => setState(() => _photo = p),
+                  ),
+                  const SizedBox(height: 22),
+                  const SellerSection(title: 'Business name'),
+                  SellerField(
                     controller: _name,
                     icon: LucideIcons.store,
                     hint: 'e.g. Campus Snacks Corner',
                     onChanged: () => setState(() {}),
                   ),
-                  const SizedBox(height: 16),
-                  _Label('Store image'),
-                  _Field(
-                    controller: _image,
-                    icon: LucideIcons.image,
-                    hint: 'Paste an image link (optional)',
-                    onChanged: () => setState(() {}),
+                  const SizedBox(height: 22),
+                  const SellerSection(
+                    title: 'Store location',
+                    hint: 'Where buyers collect or you hand over',
                   ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: SizedBox(
-                      height: 130,
-                      width: double.infinity,
-                      child: NetImage(
-                          url: image.isEmpty ? _defaultStoreImage : image),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _Label('Store location'),
-                  _Field(
+                  SellerField(
                     controller: _location,
                     icon: LucideIcons.mapPin,
                     hint: 'Block / shop number, area',
                     onChanged: () => setState(() {}),
                   ),
                   const SizedBox(height: 10),
-                  _Field(
+                  SellerField(
                     controller: _city,
                     icon: LucideIcons.building2,
                     hint: 'Campus / city',
@@ -120,56 +124,32 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                           fontSize: 12, color: Color(0xFFD32F2F)),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  _Label('What will you sell?'),
+                  const SizedBox(height: 22),
+                  const SellerSection(
+                    title: 'What will you sell?',
+                    hint: 'Pick every category that applies',
+                  ),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       for (final c in sellCategories)
-                        GestureDetector(
-                          onTap: () => setState(() =>
-                              _picked.contains(c) ? _picked.remove(c) : _picked.add(c)),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _picked.contains(c) ? _ink : Colors.white,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Text(c,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _picked.contains(c)
-                                      ? Colors.white
-                                      : _ink,
-                                )),
-                          ),
+                        _CategoryChip(
+                          label: c,
+                          selected: _picked.contains(c),
+                          onTap: () => setState(() => _picked.contains(c)
+                              ? _picked.remove(c)
+                              : _picked.add(c)),
                         ),
                     ],
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _green,
-                    disabledBackgroundColor: const Color(0xFFDDDDD9),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28)),
-                  ),
-                  onPressed: _complete ? _create : null,
-                  child: const Text('Create store',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                ),
-              ),
+            SellerSubmitBar(
+              label: 'Create store',
+              blocker: blocker,
+              onSubmit: _create,
             ),
           ],
         ),
@@ -178,111 +158,41 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
   }
 }
 
-const _defaultStoreImage =
-    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600';
-
-class _Label extends StatelessWidget {
-  final String text;
-  const _Label(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 8),
-      child: Text(text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final IconData icon;
-  final String hint;
-  final VoidCallback onChanged;
-  final TextInputType? keyboard;
-  final int maxLines;
-  const _Field({
-    required this.controller,
-    required this.icon,
-    required this.hint,
-    required this.onChanged,
-    this.keyboard,
-    this.maxLines = 1,
-  });
+/// Selectable pill with a tick once it is on.
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _CategoryChip(
+      {required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Icon(icon, size: 18, color: _muted),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: keyboard,
-              maxLines: maxLines,
-              onChanged: (_) => onChanged(),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: hint,
-                hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              style:
-                  const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _green : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(LucideIcons.check, size: 14, color: Colors.white),
+              const SizedBox(width: 6),
+            ],
+            Text(label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : _ink,
+                )),
+          ],
+        ),
       ),
     );
   }
-}
-
-/// Shared by the product form so both screens look the same.
-class SellerField extends StatelessWidget {
-  final TextEditingController controller;
-  final IconData icon;
-  final String hint;
-  final VoidCallback onChanged;
-  final TextInputType? keyboard;
-  final int maxLines;
-  const SellerField({
-    super.key,
-    required this.controller,
-    required this.icon,
-    required this.hint,
-    required this.onChanged,
-    this.keyboard,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) => _Field(
-        controller: controller,
-        icon: icon,
-        hint: hint,
-        onChanged: onChanged,
-        keyboard: keyboard,
-        maxLines: maxLines,
-      );
-}
-
-/// Shared section label.
-class SellerLabel extends StatelessWidget {
-  final String text;
-  const SellerLabel(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) => _Label(text);
 }

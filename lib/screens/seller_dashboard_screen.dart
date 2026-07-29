@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/seller.dart';
-import '../widgets/product_card.dart';
+import '../widgets/photo_picker.dart';
 import '../widgets/screen_header.dart';
 import 'seller_product_screen.dart';
 
@@ -40,7 +40,14 @@ class SellerDashboardScreen extends StatelessWidget {
                         child: SizedBox(
                           height: 140,
                           width: double.infinity,
-                          child: NetImage(url: store.imageUrl),
+                          child: store.photo == null
+                              ? Container(
+                                  color: const Color(0xFFE8E8E4),
+                                  alignment: Alignment.center,
+                                  child: const Icon(LucideIcons.store,
+                                      size: 36, color: Colors.grey),
+                                )
+                              : Image.memory(store.photo!, fit: BoxFit.cover),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -127,6 +134,47 @@ class SellerDashboardScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 22),
+                      const Text('Orders',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _Stat(
+                            label: 'Received',
+                            value: '${Seller.instance.countAt(OrderStage.received)}',
+                            color: Seller.instance.countAt(OrderStage.received) > 0
+                                ? _amber
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          _Stat(
+                              label: 'Accepted',
+                              value:
+                                  '${Seller.instance.countAt(OrderStage.accepted)}'),
+                          const SizedBox(width: 10),
+                          _Stat(
+                              label: 'Delivered',
+                              value:
+                                  '${Seller.instance.countAt(OrderStage.delivered)}'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (Seller.instance.orders.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 18),
+                          child: Center(
+                            child: Text('No orders yet',
+                                style:
+                                    TextStyle(fontSize: 13.5, color: _muted)),
+                          ),
+                        )
+                      else
+                        for (final order in Seller.instance.orders) ...[
+                          _OrderRow(order: order),
+                          const SizedBox(height: 10),
+                        ],
+                      const SizedBox(height: 22),
                       Text('Inventory (${items.length})',
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w700)),
@@ -170,6 +218,88 @@ class SellerDashboardScreen extends StatelessWidget {
         icon: const Icon(LucideIcons.plus, size: 18),
         label: const Text('Add product',
             style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+/// One incoming order, with the single action it is waiting on.
+class _OrderRow extends StatelessWidget {
+  final SellerOrder order;
+  const _OrderRow({required this.order});
+
+  Color get _stageColor => switch (order.stage) {
+        OrderStage.received => _amber,
+        OrderStage.accepted => const Color(0xFF2F6FED),
+        OrderStage.delivered => _green,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _stageColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(order.stage.label,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _stageColor)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('#${order.id.toUpperCase()}',
+                        style: const TextStyle(
+                            fontSize: 11.5, color: Color(0xFF9A9A9A))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('${order.units} × ${order.itemTitle}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text('₹${order.amount.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 12.5, color: _muted)),
+              ],
+            ),
+          ),
+          if (order.stage != OrderStage.delivered)
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    order.stage == OrderStage.received ? _ink : _green,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+              ),
+              onPressed: () => order.stage == OrderStage.received
+                  ? Seller.instance.acceptOrder(order.id)
+                  : Seller.instance.deliverOrder(order.id),
+              child: Text(
+                  order.stage == OrderStage.received ? 'Accept' : 'Delivered',
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+            ),
+        ],
       ),
     );
   }
@@ -233,11 +363,7 @@ class _ItemRow extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                    width: 64, height: 64, child: NetImage(url: item.imageUrl)),
-              ),
+              PhotoOrPlaceholder(photo: item.cover, size: 64),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -249,7 +375,9 @@ class _ItemRow extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 14.5, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
-                    Text('₹${item.price.toStringAsFixed(0)} · ${item.category}',
+                    Text(
+                        '₹${item.price.toStringAsFixed(0)} · ${item.category}'
+                        '${item.photos.length > 1 ? " · ${item.photos.length} photos" : ""}',
                         style:
                             const TextStyle(fontSize: 12.5, color: _muted)),
                     const SizedBox(height: 6),
