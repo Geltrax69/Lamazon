@@ -36,10 +36,19 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Shop By Shop'), findsOneWidget);
+      expect(find.text('Shop By Category'), findsOneWidget);
+      expect(find.text('Stores near you'), findsOneWidget);
       expect(find.text('New Arrival'), findsOneWidget);
       expect(find.text('Electronics'), findsOneWidget);
       expect(find.text('Home'), findsOneWidget);
+      // The location prompt covers home until it is answered.
+      await tester.tap(find.text('Enable device location'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Prices sit below the fold now, so scroll the product grid into view.
+      await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+      await tester.pump();
       expect(find.textContaining('₹'), findsWidgets);
     });
   });

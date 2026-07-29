@@ -6,6 +6,7 @@ import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../models/product.dart';
+import '../widgets/image_marquee.dart';
 import '../widgets/location_prompt.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
@@ -118,9 +119,13 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
-        const _SectionHeader(title: 'Shop By Shop', serif: true),
+        const _SectionHeader(title: 'Shop By Category', serif: true),
         const SizedBox(height: 12),
-        _ShopRow(shops: shownShops),
+        _CategoryRow(products: shownProducts),
+        const SizedBox(height: 22),
+        const _SectionHeader(title: 'Stores near you'),
+        const SizedBox(height: 12),
+        _ShopAds(shops: shownShops),
         const SizedBox(height: 24),
         const _SectionHeader(title: 'New Arrival'),
         const SizedBox(height: 12),
@@ -321,54 +326,147 @@ class _TabBar extends StatelessWidget {
   }
 }
 
-/// Horizontal carousel of promoted shops for the selected category.
-class _ShopRow extends StatelessWidget {
-  final List<Shop> shops;
-  const _ShopRow({required this.shops});
+/// Product categories in the current tab, each opening a filtered search.
+class _CategoryRow extends StatelessWidget {
+  final List<Product> products;
+  const _CategoryRow({required this.products});
 
   @override
   Widget build(BuildContext context) {
+    // One tile per category present, illustrated by the first product in it.
+    final seen = <String, Product>{};
+    for (final p in products) {
+      seen.putIfAbsent(p.category, () => p);
+    }
+    final entries = seen.entries.toList();
     return SizedBox(
-      height: 208,
+      height: 124,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: shops.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 16),
+        itemCount: entries.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, i) {
-          final shop = shops[i];
+          final name = entries[i].key;
           return GestureDetector(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => ShopScreen(shop: shop))),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => SearchScreen(initialQuery: name))),
             child: SizedBox(
-            width: 150,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: NetImage(url: shop.imageUrl),
+              width: 82,
+              child: Column(
+                children: [
+                  Container(
+                    width: 78,
+                    height: 78,
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
+                    padding: const EdgeInsets.all(5),
+                    child: ClipOval(
+                        child: NetImage(url: entries[i].value.imageUrl)),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(shop.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(shop.tagline,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF6B6B6B))),
-              ],
-            ),
+                  const SizedBox(height: 8),
+                  Text(name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Promoted shops drifting past like running ads; tap one to open it.
+class _ShopAds extends StatelessWidget {
+  final List<Shop> shops;
+  const _ShopAds({required this.shops});
+
+  @override
+  Widget build(BuildContext context) {
+    if (shops.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 96,
+      child: MarqueeStrip(
+        itemWidth: 246 + 14,
+        period: Duration(seconds: 6 * shops.length),
+        children: [
+          for (final shop in shops)
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: _ShopAd(shop: shop),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShopAd extends StatelessWidget {
+  final Shop shop;
+  const _ShopAd({required this.shop});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => ShopScreen(shop: shop))),
+      child: Container(
+        width: 246,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                  width: 76, height: 76, child: NetImage(url: shop.imageUrl)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(shop.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(shop.tagline,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11.5,
+                          height: 1.3,
+                          color: Color(0xFF6B6B6B))),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: const [
+                      Icon(LucideIcons.timer,
+                          size: 12, color: Color(0xFF6B6B6B)),
+                      SizedBox(width: 4),
+                      Text(deliveryEta,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6B6B6B))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

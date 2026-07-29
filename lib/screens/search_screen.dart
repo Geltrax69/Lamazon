@@ -7,14 +7,23 @@ import '../widgets/product_card.dart';
 import 'details_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  /// Pre-filled query, used when arriving from a category tile.
+  final String initialQuery;
+  const SearchScreen({super.key, this.initialQuery = ''});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  String _query = '';
+  late String _query = widget.initialQuery;
+  late final _controller = TextEditingController(text: widget.initialQuery);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +72,8 @@ class _SearchScreenState extends State<SearchScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: TextField(
-                              autofocus: true,
+                              controller: _controller,
+                              autofocus: widget.initialQuery.isEmpty,
                               onChanged: (v) => setState(() => _query = v),
                               decoration: const InputDecoration(
                                 hintText: 'Search products, shops...',

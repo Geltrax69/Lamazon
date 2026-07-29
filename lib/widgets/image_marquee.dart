@@ -2,26 +2,29 @@ import 'package:flutter/material.dart';
 
 import 'product_card.dart';
 
-/// Rows of product tiles drifting sideways, alternating direction per row —
-/// the moving backdrop behind the login screen.
-class ImageMarquee extends StatefulWidget {
-  final List<String> urls;
-  final int rows;
-  final double tile;
-  const ImageMarquee(
-      {super.key, required this.urls, this.rows = 3, this.tile = 104});
+/// One row of widgets drifting sideways forever, looping seamlessly.
+/// Used for the login backdrop and the running store ads on home.
+class MarqueeStrip extends StatefulWidget {
+  final List<Widget> children;
+  final double itemWidth; // including the gap after each item
+  final Duration period; // time for one full pass
+  final bool reverse;
+  const MarqueeStrip({
+    super.key,
+    required this.children,
+    required this.itemWidth,
+    this.period = const Duration(seconds: 40),
+    this.reverse = false,
+  });
 
   @override
-  State<ImageMarquee> createState() => _ImageMarqueeState();
+  State<MarqueeStrip> createState() => _MarqueeStripState();
 }
 
-class _ImageMarqueeState extends State<ImageMarquee>
+class _MarqueeStripState extends State<MarqueeStrip>
     with SingleTickerProviderStateMixin {
-  // One controller drives every row; each row reads it at its own speed.
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 40),
-  )..repeat();
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: widget.period)..repeat();
 
   @override
   void dispose() {
@@ -31,48 +34,63 @@ class _ImageMarqueeState extends State<ImageMarquee>
 
   @override
   Widget build(BuildContext context) {
-    final step = widget.tile + 12;
+    final span = widget.itemWidth * widget.children.length;
+    return ClipRect(
+      // The strip is far wider than the screen; let it overflow the viewport
+      // instead of being squeezed to fit.
+      child: OverflowBox(
+        maxWidth: double.infinity,
+        alignment: Alignment.centerLeft,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = (widget.reverse ? -_c.value : _c.value) % 1;
+            return Transform.translate(
+              offset: Offset(-t * span, 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                // Two copies: as the first scrolls off, the second fills in.
+                children: [
+                  for (var pass = 0; pass < 2; pass++) ...widget.children,
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Rows of product tiles drifting sideways, alternating direction per row —
+/// the moving backdrop behind the login screen.
+class ImageMarquee extends StatelessWidget {
+  final List<String> urls;
+  final int rows;
+  final double tile;
+  const ImageMarquee(
+      {super.key, required this.urls, this.rows = 3, this.tile = 104});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
-        for (var r = 0; r < widget.rows; r++) ...[
+        for (var r = 0; r < rows; r++) ...[
           if (r > 0) const SizedBox(height: 12),
           SizedBox(
-            height: widget.tile,
-            child: ClipRect(
-              // The strip is far wider than the screen; let it overflow the
-              // viewport instead of being squeezed to fit.
-              child: OverflowBox(
-                maxWidth: double.infinity,
-                alignment: Alignment.centerLeft,
-                child: AnimatedBuilder(
-                animation: _c,
-                builder: (context, _) {
-                  // Offset within one tile width, so the strip loops seamlessly.
-                  // Each row drifts the other way, at its own speed.
-                  final t =
-                      (_c.value * (1 + r * 0.4) * (r.isEven ? 1 : -1)) % 1;
-                  return Transform.translate(
-                    offset: Offset(-t * step * widget.urls.length, 0),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Two copies: as the first scrolls off, the second fills in.
-                        for (var pass = 0; pass < 2; pass++)
-                          for (var i = 0; i < widget.urls.length; i++)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: _Tile(
-                                url: widget.urls[
-                                    (i + r * 5) % widget.urls.length],
-                                size: widget.tile,
-                              ),
-                            ),
-                      ],
-                    ),
-                  );
-                },
-                ),
-              ),
+            height: tile,
+            child: MarqueeStrip(
+              itemWidth: tile + 12,
+              reverse: r.isOdd,
+              period: Duration(seconds: 40 - r * 8),
+              children: [
+                for (var i = 0; i < urls.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: _Tile(
+                        url: urls[(i + r * 5) % urls.length], size: tile),
+                  ),
+              ],
             ),
           ),
         ],
