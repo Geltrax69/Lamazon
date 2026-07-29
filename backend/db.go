@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -154,13 +155,25 @@ func (d *DB) shops(ctx context.Context) ([]Shop, error) {
 }
 
 // store reads one seller's store.
+//
+// database/sql cannot scan a text[] into []string, so the array is flattened
+// in SQL and split here. ponytail: two lines instead of an array-type
+// dependency for the one column that needs it.
 func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 	var s SellerStore
+	var categories string
 	err := d.sql.QueryRowContext(ctx, `
-		SELECT owner, name, location, city, categories
+		SELECT owner, name, location, city, array_to_string(categories, ',')
 		FROM seller_stores WHERE owner = $1`, owner).
-		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &s.Categories)
-	return s, err
+		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &categories)
+	if err != nil {
+		return s, err
+	}
+	s.Categories = []string{}
+	if categories != "" {
+		s.Categories = strings.Split(categories, ",")
+	}
+	return s, nil
 }
 
 // items reads a seller's inventory, newest first, with status derived here

@@ -157,6 +157,19 @@ func TestSellerLifecycle(t *testing.T) {
 		t.Fatalf("create store: want 201, got %d", code)
 	}
 
+	// Reading the store back must round-trip the categories array.
+	code, store := call(t, h, http.MethodGet, "/api/seller/store", nil)
+	if code != http.StatusOK {
+		t.Fatalf("get store: want 200, got %d (%v)", code, store["error"])
+	}
+	if store["name"] != "Campus Snacks" {
+		t.Fatalf("get store: want name Campus Snacks, got %v", store["name"])
+	}
+	cats := store["categories"].([]any)
+	if len(cats) != 1 || cats[0] != "Food" {
+		t.Fatalf("categories should round-trip, got %v", cats)
+	}
+
 	code, item := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{
 		"title": "Cold Coffee 300ml", "category": "Food", "price": 60, "stock": 10,
 	})
