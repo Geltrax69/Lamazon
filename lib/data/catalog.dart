@@ -42,6 +42,12 @@ List<Product> productsAtShop(String shopName) {
   return out;
 }
 
+/// Unsplash sizes images from the query string, so asking for a thumbnail
+/// costs a fraction of the full photo. ponytail: string swap, no image
+/// pipeline — works because every catalog URL carries ?w=.
+String thumb(String url, int width) =>
+    url.replaceFirst(RegExp(r'w=\d+'), 'w=$width');
+
 // ponytail: static location/ETA. Wire to geolocation + a delivery API when
 // one exists; only these three strings change.
 const deliveryEta = '12 mins';

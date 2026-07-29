@@ -51,7 +51,9 @@ class _LoginScreenState extends State<LoginScreen> {
     // The categories the app sells, drifting past behind the sign-in card.
     final urls = [
       for (final tab in ['Electronics', 'Grocery', 'Food', 'Gifts', 'Beauty'])
-        ...products.where((p) => p.tab == tab).map((p) => p.imageUrl),
+        // Thumbnails: the backdrop tiles are ~104px, so full photos would
+        // burn megabytes on first paint for no visible gain.
+        ...products.where((p) => p.tab == tab).map((p) => thumb(p.imageUrl, 200)),
     ];
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),

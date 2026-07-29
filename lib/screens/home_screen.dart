@@ -365,7 +365,8 @@ class _CategoryRow extends StatelessWidget {
                         color: Colors.white, shape: BoxShape.circle),
                     padding: const EdgeInsets.all(5),
                     child: ClipOval(
-                        child: NetImage(url: entries[i].value.imageUrl)),
+                        child: NetImage(
+                            url: thumb(entries[i].value.imageUrl, 160))),
                   ),
                   const SizedBox(height: 8),
                   Text(name,
@@ -430,7 +431,9 @@ class _ShopAd extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                  width: 76, height: 76, child: NetImage(url: shop.imageUrl)),
+                  width: 76,
+                  height: 76,
+                  child: NetImage(url: thumb(shop.imageUrl, 160))),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -485,14 +488,19 @@ class _SectionHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(title,
-            style: serif
-                ? const TextStyle(
-                    fontSize: 24,
-                    fontFamily: 'Georgia',
-                    fontWeight: FontWeight.w600)
-                : const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700)),
+        Expanded(
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: serif
+                  ? const TextStyle(
+                      fontSize: 24,
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w600)
+                  : const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(width: 10),
         const Text('See all',
             style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E))),
       ],

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'data/session.dart';
+import 'widgets/app_shell.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
@@ -34,6 +35,8 @@ class LamazonApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF1F1EF),
         colorScheme: ColorScheme.fromSeed(seedColor: kAccent),
       ),
+      // One place to keep every screen phone-shaped, however wide the window.
+      builder: (context, child) => AppShell(child: child!),
       home: Session.instance.onboarded
           ? const HomeScreen()
           : const LoginScreen(),
