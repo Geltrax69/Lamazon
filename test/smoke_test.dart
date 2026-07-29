@@ -110,6 +110,15 @@ void main() {
     });
   });
 
+  test('email validation accepts real addresses, rejects junk', () {
+    expect(Session.isValidEmail('lalit@example.com'), isTrue);
+    expect(Session.isValidEmail('  a.b+tag@mail.co.in '), isTrue);
+    expect(Session.isValidEmail('lalit@example'), isFalse);
+    expect(Session.isValidEmail('lalit.example.com'), isFalse);
+    expect(Session.isValidEmail('@example.com'), isFalse);
+    expect(Session.isValidEmail(''), isFalse);
+  });
+
   test('serviceability check is case and space tolerant', () {
     expect(isServiceable('Jalandhar'), isTrue);
     expect(isServiceable('  ludhiana '), isTrue);

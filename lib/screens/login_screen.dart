@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/catalog.dart';
 import '../data/session.dart';
@@ -10,8 +10,8 @@ const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
 const _yellow = Color(0xFFFFC220); // the logo's yellow
 
-/// Opening screen: drifting product tiles, the Lamazon mark, and a phone
-/// number sign-in that can be skipped.
+/// Opening screen: drifting product tiles, the Lamazon mark, and an email
+/// sign-in that can be skipped.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,21 +20,21 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phone = TextEditingController();
+  final _email = TextEditingController();
 
   @override
   void dispose() {
-    _phone.dispose();
+    _email.dispose();
     super.dispose();
   }
 
-  bool get _valid => _phone.text.trim().length == 10;
+  bool get _valid => Session.isValidEmail(_email.text);
 
   void _enter({required bool skip}) {
     if (skip) {
       Session.instance.skip();
     } else {
-      Session.instance.login(_phone.text.trim());
+      Session.instance.login(_email.text);
     }
     // Opened from the account screen: go back to it, now signed in. At app
     // launch there is nothing to go back to, so home takes over instead.
@@ -146,37 +146,31 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Row(
                             children: [
                               const Padding(
-                                padding: EdgeInsets.fromLTRB(16, 0, 10, 0),
-                                child: Text('+91',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700)),
+                                padding: EdgeInsets.fromLTRB(16, 0, 12, 0),
+                                child: Icon(LucideIcons.mail,
+                                    size: 18, color: _muted),
                               ),
-                              Container(
-                                  width: 1,
-                                  height: 24,
-                                  color: const Color(0xFFDCDEE3)),
                               Expanded(
                                 child: TextField(
-                                  controller: _phone,
-                                  keyboardType: TextInputType.phone,
-                                  maxLength: 10,
+                                  controller: _email,
+                                  keyboardType: TextInputType.emailAddress,
+                                  autocorrect: false,
                                   onChanged: (_) => setState(() {}),
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly
-                                  ],
+                                  onSubmitted: (_) {
+                                    if (_valid) _enter(skip: false);
+                                  },
                                   decoration: const InputDecoration(
-                                    counterText: '',
                                     border: InputBorder.none,
-                                    hintText: 'Enter phone number',
+                                    hintText: 'Enter email address',
                                     contentPadding:
-                                        EdgeInsets.symmetric(horizontal: 14),
+                                        EdgeInsets.symmetric(vertical: 16),
                                   ),
                                   style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600),
                                 ),
                               ),
+                              const SizedBox(width: 12),
                             ],
                           ),
                         ),
@@ -206,8 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'We only use your number to track orders and '
-                          'deliveries.',
+                          'We only use your email for order updates and receipts.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 11.5, color: _muted),
                         ),

@@ -1,29 +1,28 @@
 import 'package:flutter/foundation.dart';
 
 /// ponytail: in-memory sign-in state, same ChangeNotifier pattern as Cart.
-/// No OTP, no backend — swap login() for the real auth call when there is one.
+/// No password, no backend — swap login() for the real auth call when there
+/// is one.
 class Session extends ChangeNotifier {
   Session._();
   static final Session instance = Session._();
 
-  String? _phone;
+  String? _email;
   bool _skipped = false;
 
-  String? get phone => _phone;
-  bool get loggedIn => _phone != null;
+  String? get email => _email;
+  bool get loggedIn => _email != null;
 
   /// True once the user has either logged in or chosen to browse as a guest,
   /// so the login screen is not shown again.
   bool get onboarded => loggedIn || _skipped;
 
-  String get maskedPhone {
-    final p = _phone;
-    if (p == null || p.length < 4) return '';
-    return '${p.substring(0, p.length - 4)}XXXX';
-  }
+  /// Anything with a name, an @ and a dotted domain after it.
+  static bool isValidEmail(String value) =>
+      RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(value.trim());
 
-  void login(String phone) {
-    _phone = phone;
+  void login(String email) {
+    _email = email.trim();
     _skipped = false;
     notifyListeners();
   }
@@ -34,7 +33,7 @@ class Session extends ChangeNotifier {
   }
 
   void logout() {
-    _phone = null;
+    _email = null;
     _skipped = true;
     notifyListeners();
   }

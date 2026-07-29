@@ -64,7 +64,7 @@ class ProfileScreen extends StatelessWidget {
                 Center(
                   child: Text(
                     loggedIn
-                        ? '+91 ${Session.instance.maskedPhone}'
+                        ? Session.instance.email!
                         : 'Log in to view your complete profile',
                     style: const TextStyle(fontSize: 14, color: _muted),
                   ),
