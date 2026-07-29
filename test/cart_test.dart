@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/screens/cart_screen.dart';
@@ -33,6 +34,30 @@ void main() {
       Cart.instance.setQty(p.id, 1);
       await tester.pump();
       expect(find.text('₹${one.toStringAsFixed(0)}'), findsOneWidget);
+    });
+  });
+
+  testWidgets('tapping the plus button moves the order summary',
+      (tester) async {
+    await mockNetworkImagesFor(() async {
+      final p = products.first;
+      Cart.instance.add(p);
+      await tester.pumpWidget(const MaterialApp(home: CartScreen()));
+
+      // Drive the real control the user touches, not the model.
+      await tester.tap(find.byIcon(LucideIcons.plus));
+      await tester.pump();
+
+      expect(Cart.instance.count, 2);
+      final two = p.price * 2 + 15;
+      expect(find.text('₹${two.toStringAsFixed(0)}'), findsOneWidget,
+          reason: 'total should follow the plus button');
+
+      await tester.tap(find.byIcon(LucideIcons.minus));
+      await tester.pump();
+      final one = p.price + 15;
+      expect(find.text('₹${one.toStringAsFixed(0)}'), findsOneWidget,
+          reason: 'total should follow the minus button');
     });
   });
 
