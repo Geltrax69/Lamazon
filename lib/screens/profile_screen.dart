@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/seller.dart';
 import '../data/session.dart';
 import 'addresses_screen.dart';
 import 'help_screen.dart';
 import 'login_screen.dart';
 import 'notifications_screen.dart';
 import 'orders_screen.dart';
+import 'seller_dashboard_screen.dart';
+import 'seller_onboarding_screen.dart';
 import 'settings_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
@@ -22,7 +25,7 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF1F1EF),
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: Session.instance,
+          listenable: Listenable.merge([Session.instance, Seller.instance]),
           builder: (context, _) {
             final loggedIn = Session.instance.loggedIn;
             return ListView(
@@ -149,8 +152,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   _Row(
                     icon: LucideIcons.store,
-                    label: 'Sell on Lamazon',
-                    onTap: () => _soon(context, 'Seller sign-up'),
+                    label: Seller.instance.hasStore
+                        ? 'Your store'
+                        : 'Sell on Lamazon',
+                    onTap: () => _openSeller(context),
                   ),
                 ]),
                 if (loggedIn) ...[
@@ -187,6 +192,26 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Sellers must be signed in, so guests sign up first and land back here.
+/// With an account, an existing store goes to its dashboard and a new one
+/// starts at onboarding.
+Future<void> _openSeller(BuildContext context) async {
+  if (!Session.instance.loggedIn) {
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    if (!context.mounted || !Session.instance.loggedIn) return;
+  }
+  if (!context.mounted) return;
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => Seller.instance.hasStore
+          ? const SellerDashboardScreen()
+          : const SellerOnboardingScreen(),
+    ),
+  );
 }
 
 void _soon(BuildContext context, String what) {

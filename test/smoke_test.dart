@@ -5,6 +5,7 @@ import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/main.dart';
 import 'package:lamazon/data/addresses.dart';
 import 'package:lamazon/data/orders.dart';
+import 'package:lamazon/data/seller.dart';
 import 'package:lamazon/data/session.dart';
 import 'package:lamazon/data/wishlist.dart';
 import 'package:lamazon/screens/location_screen.dart';
@@ -17,6 +18,8 @@ import 'package:lamazon/screens/notifications_screen.dart';
 import 'package:lamazon/screens/settings_screen.dart';
 import 'package:lamazon/screens/profile_screen.dart';
 import 'package:lamazon/screens/search_screen.dart';
+import 'package:lamazon/screens/seller_dashboard_screen.dart';
+import 'package:lamazon/screens/seller_onboarding_screen.dart';
 import 'package:lamazon/screens/shop_screen.dart';
 import 'package:lamazon/screens/wishlist_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
@@ -107,6 +110,74 @@ void main() {
       // Cheapest vendor wins the badge and the savings banner.
       expect(find.text('Add from FreshMart'), findsOneWidget);
       expect(find.textContaining('Save ₹4'), findsOneWidget);
+    });
+  });
+
+  testWidgets('seller opens a store, then stocks and restocks it',
+      (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(
+          const MaterialApp(home: SellerOnboardingScreen()));
+
+      // Create is blocked until name, location, a served city and a
+      // category are all present.
+      await tester.enterText(
+          find.widgetWithText(TextField, 'e.g. Campus Snacks Corner'),
+          'Campus Snacks');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Block / shop number, area'),
+          'Block 32, Shop 4');
+      // The category chips sit below the fold in a test-sized window.
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pump();
+      await tester.tap(find.text('Food'));
+      await tester.pump();
+
+      await tester.tap(find.text('Create store'));
+      await tester.pump();
+      expect(Seller.instance.hasStore, isTrue);
+      expect(Seller.instance.store!.categories, ['Food']);
+
+      // Stock two lines and check the derived totals.
+      Seller.instance.addItem(InventoryItem(
+        id: 'i1',
+        title: 'Cold Coffee 300ml',
+        description: 'Chilled',
+        category: 'Food',
+        price: 60,
+        stock: 10,
+        imageUrl: 'https://example.com/a.png',
+      ));
+      Seller.instance.addItem(InventoryItem(
+        id: 'i2',
+        title: 'Veg Sandwich',
+        description: 'Grilled',
+        category: 'Food',
+        price: 40,
+        stock: 3,
+        imageUrl: 'https://example.com/b.png',
+      ));
+      expect(Seller.instance.skuCount, 2);
+      expect(Seller.instance.inventoryValue, 60 * 10 + 40 * 3);
+      expect(Seller.instance.lowOrOutCount, 1); // the sandwich is low
+
+      // Stock floors at zero rather than going negative.
+      Seller.instance.adjustStock('i2', -10);
+      expect(Seller.instance.items.firstWhere((i) => i.id == 'i2').stock, 0);
+      expect(
+          Seller.instance.items.firstWhere((i) => i.id == 'i2').status,
+          StockStatus.out);
+
+      // Creating the store already navigated to the dashboard.
+      await tester.pump();
+      expect(find.text('Campus Snacks'), findsOneWidget);
+      expect(find.text('Inventory value'), findsOneWidget);
+
+      // The stock lines sit below the store header and stats.
+      await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+      await tester.pump();
+      expect(find.text('Cold Coffee 300ml'), findsOneWidget);
+      expect(find.text('Sold out'), findsOneWidget);
     });
   });
 
