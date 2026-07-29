@@ -119,9 +119,11 @@ void main() {
     expect(Session.isValidEmail(''), isFalse);
   });
 
-  test('serviceability check is case and space tolerant', () {
-    expect(isServiceable('Jalandhar'), isTrue);
-    expect(isServiceable('  ludhiana '), isTrue);
+  test('only LPU is serviceable, case and alias tolerant', () {
+    expect(isServiceable('Lovely Professional University'), isTrue);
+    expect(isServiceable('  lpu '), isTrue);
+    expect(isServiceable('LPU, Phagwara'), isTrue);
+    expect(isServiceable('Jalandhar'), isFalse);
     expect(isServiceable('Mumbai'), isFalse);
     expect(isServiceable(''), isFalse);
   });
@@ -145,9 +147,8 @@ void main() {
       await tester.pump();
       expect(find.text('Not available in your location'), findsOneWidget);
 
-      // Switch to a covered city and it becomes saveable.
-      await tester.enterText(
-          find.widgetWithText(TextField, 'City'), 'Amritsar');
+      // Switch to the covered campus and it becomes saveable.
+      await tester.enterText(find.widgetWithText(TextField, 'City'), 'LPU');
       await tester.pump();
       await tester.tap(find.text('Check availability'));
       await tester.pump();

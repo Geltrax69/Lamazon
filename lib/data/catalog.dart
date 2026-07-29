@@ -45,8 +45,8 @@ List<Product> productsAtShop(String shopName) {
 // ponytail: static location/ETA. Wire to geolocation + a delivery API when
 // one exists; only these three strings change.
 const deliveryEta = '12 mins';
-const userLocation = 'Jalandhar, Punjab';
-const storeDistance = '2.4 km';
+const userLocation = 'Lovely Professional University, Punjab';
+const storeDistance = '900 m';
 
 // Promoted shops, shown in "Shop By Shop". Tag with a tab name to only
 // show them for that category; 'All' shows everywhere.

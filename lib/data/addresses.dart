@@ -28,18 +28,24 @@ class Address {
   String get full => '$line, $city $pincode';
 }
 
-/// Cities the porters currently cover. Everything else is out of service.
-const serviceableCities = [
-  'Jalandhar',
-  'Ludhiana',
-  'Amritsar',
-  'Chandigarh',
-  'Patiala',
-  'Delhi',
-];
+/// Where the porters currently deliver. ponytail: one campus for now —
+/// widen this list as coverage grows, nothing else changes.
+const serviceableCities = ['Lovely Professional University'];
 
-bool isServiceable(String city) => serviceableCities
-    .any((c) => c.toLowerCase() == city.trim().toLowerCase());
+/// Accepted shorthands for the places above, so "LPU" or "lpu, phagwara"
+/// still resolves.
+const _aliases = {
+  'lpu': 'Lovely Professional University',
+  'lovely professional university': 'Lovely Professional University',
+  'lpu phagwara': 'Lovely Professional University',
+  'lpu, phagwara': 'Lovely Professional University',
+};
+
+bool isServiceable(String city) {
+  final q = city.trim().toLowerCase();
+  return _aliases[q] != null ||
+      serviceableCities.any((c) => c.toLowerCase() == q);
+}
 
 /// ponytail: global address book, same ChangeNotifier pattern as Cart.
 class AddressBook extends ChangeNotifier {
@@ -50,9 +56,9 @@ class AddressBook extends ChangeNotifier {
     const Address(
       id: 'a1',
       label: AddressLabel.home,
-      line: '12 Green Avenue, Model Town',
-      city: 'Jalandhar',
-      pincode: '144003',
+      line: 'Block 34, Boys Hostel',
+      city: 'Lovely Professional University',
+      pincode: '144411',
     ),
   ];
 

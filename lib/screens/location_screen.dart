@@ -150,7 +150,7 @@ class _LocationScreenState extends State<LocationScreen> {
                                 '${serviceableCities.join(", ")}.',
                           ),
                   if (_checked) const SizedBox(height: 16),
-                  const Text('Cities we serve',
+                  const Text('Where we deliver',
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 10),
