@@ -57,7 +57,7 @@ class CartScreen extends StatelessWidget {
                                 _CartRow(item: cart.items[i]),
                           ),
                   ),
-                  if (!cart.isEmpty) const _CheckoutPanel(),
+                  if (!cart.isEmpty) _CheckoutPanel(cart: cart),
                 ],
               );
             },
@@ -217,11 +217,11 @@ class _QtyControls extends StatelessWidget {
 }
 
 class _CheckoutPanel extends StatelessWidget {
-  const _CheckoutPanel();
+  final Cart cart;
+  const _CheckoutPanel({required this.cart});
 
   @override
   Widget build(BuildContext context) {
-    final cart = Cart.instance;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: const BoxDecoration(
