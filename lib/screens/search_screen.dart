@@ -113,13 +113,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     ? const _NoResults()
                     : GridView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 0.68,
-                            ),
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: productTileMax,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 0.68,
+                        ),
                         itemCount: results.length,
                         itemBuilder: (_, i) => ProductCard(
                           product: results[i],

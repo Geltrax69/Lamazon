@@ -16,7 +16,9 @@ Future<List<Uint8List>> pickPhotos({required bool multiple}) async {
       ? await picker.pickMultiImage(imageQuality: 80)
       : [
           ?await picker.pickImage(
-              source: ImageSource.gallery, imageQuality: 80),
+            source: ImageSource.gallery,
+            imageQuality: 80,
+          ),
         ];
   return [for (final f in files) await f.readAsBytes()];
 }
@@ -55,12 +57,19 @@ class PhotoTile extends StatelessWidget {
           children: [
             const Icon(LucideIcons.imagePlus, size: 26, color: _muted),
             const SizedBox(height: 8),
-            Text(emptyLabel,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: _ink)),
+            Text(
+              emptyLabel,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(emptyHint,
-                style: const TextStyle(fontSize: 12, color: _muted)),
+            Text(
+              emptyHint,
+              style: const TextStyle(fontSize: 12, color: _muted),
+            ),
           ],
         ),
       );
@@ -122,13 +131,20 @@ class PhotoStrip extends StatelessWidget {
           children: const [
             Icon(LucideIcons.imagePlus, size: 26, color: _muted),
             SizedBox(height: 8),
-            Text('Add photos',
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: _ink)),
+            Text(
+              'Add photos',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+              ),
+            ),
             SizedBox(height: 2),
-            Text('Pick as many as you like — first one is the cover',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: _muted)),
+            Text(
+              'Pick as many as you like — first one is the cover',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: _muted),
+            ),
           ],
         ),
       );
@@ -150,8 +166,10 @@ class PhotoStrip extends StatelessWidget {
                 children: const [
                   Icon(LucideIcons.plus, size: 22, color: _muted),
                   SizedBox(height: 6),
-                  Text('Add more',
-                      style: TextStyle(fontSize: 12, color: _muted)),
+                  Text(
+                    'Add more',
+                    style: TextStyle(fontSize: 12, color: _muted),
+                  ),
                 ],
               ),
             );
@@ -172,16 +190,21 @@ class PhotoStrip extends StatelessWidget {
                     bottom: 6,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Text('Cover',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                      child: const Text(
+                        'Cover',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 Positioned(
@@ -190,8 +213,7 @@ class PhotoStrip extends StatelessWidget {
                   child: _OverlayButton(
                     icon: LucideIcons.x,
                     small: true,
-                    onTap: () =>
-                        onChanged([...photos]..removeAt(i)),
+                    onTap: () => onChanged([...photos]..removeAt(i)),
                   ),
                 ),
               ],
@@ -209,8 +231,12 @@ class PhotoOrPlaceholder extends StatelessWidget {
   final Uint8List? photo;
   final double size;
   final double radius;
-  const PhotoOrPlaceholder(
-      {super.key, required this.photo, required this.size, this.radius = 12});
+  const PhotoOrPlaceholder({
+    super.key,
+    required this.photo,
+    required this.size,
+    this.radius = 12,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -223,8 +249,11 @@ class PhotoOrPlaceholder extends StatelessWidget {
             ? Container(
                 color: const Color(0xFFE8E8E4),
                 alignment: Alignment.center,
-                child: Icon(LucideIcons.image,
-                    size: size * 0.34, color: Colors.grey),
+                child: Icon(
+                  LucideIcons.image,
+                  size: size * 0.34,
+                  color: Colors.grey,
+                ),
               )
             : Image.memory(photo!, fit: BoxFit.cover),
       ),
@@ -237,11 +266,12 @@ class _DashedBox extends StatelessWidget {
   final VoidCallback onTap;
   final double height;
   final double? width;
-  const _DashedBox(
-      {required this.child,
-      required this.onTap,
-      required this.height,
-      this.width});
+  const _DashedBox({
+    required this.child,
+    required this.onTap,
+    required this.height,
+    this.width,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -268,8 +298,12 @@ class _OverlayButton extends StatelessWidget {
   final String? label;
   final VoidCallback onTap;
   final bool small;
-  const _OverlayButton(
-      {required this.icon, required this.onTap, this.label, this.small = false});
+  const _OverlayButton({
+    required this.icon,
+    required this.onTap,
+    this.label,
+    this.small = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -281,18 +315,23 @@ class _OverlayButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: small ? 5 : 12, vertical: small ? 5 : 8),
+            horizontal: small ? 5 : 12,
+            vertical: small ? 5 : 8,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: small ? 13 : 15, color: Colors.white),
               if (label != null) ...[
                 const SizedBox(width: 6),
-                Text(label!,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
+                Text(
+                  label!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ],
           ),

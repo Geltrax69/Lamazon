@@ -10,8 +10,12 @@ class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
   final bool showAddToCart; // quick-add only for food & grocery
-  const ProductCard(
-      {super.key, required this.product, this.onTap, this.showAddToCart = false});
+  const ProductCard({
+    super.key,
+    required this.product,
+    this.onTap,
+    this.showAddToCart = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,13 +54,17 @@ class ProductCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '₹${product.price.toStringAsFixed(0)}',
                       style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
                   ],
                 ),
@@ -94,7 +102,8 @@ class WishlistHeart extends StatelessWidget {
               duration: const Duration(milliseconds: 220),
               transitionBuilder: (child, anim) => ScaleTransition(
                 scale: Tween(begin: 0.6, end: 1.0).animate(
-                    CurvedAnimation(parent: anim, curve: Curves.easeOutBack)),
+                  CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+                ),
                 child: child,
               ),
               // Lucide is outline-only, so the filled state uses Material's
@@ -103,8 +112,9 @@ class WishlistHeart extends StatelessWidget {
                 liked ? Icons.favorite : LucideIcons.heart,
                 key: ValueKey(liked),
                 size: liked ? 18 : 16,
-                color:
-                    liked ? const Color(0xFFE53935) : const Color(0xFF1A1A1A),
+                color: liked
+                    ? const Color(0xFFE53935)
+                    : const Color(0xFF1A1A1A),
               ),
             ),
           ),
@@ -181,9 +191,8 @@ class NetImage extends StatelessWidget {
     return Image.network(
       url,
       fit: fit,
-      loadingBuilder: (_, child, progress) => progress == null
-          ? child
-          : Container(color: const Color(0xFFE8E8E4)),
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : Container(color: const Color(0xFFE8E8E4)),
       errorBuilder: (_, error, _) {
         debugPrint('NetImage error [$url]: $error');
         return _fallback();

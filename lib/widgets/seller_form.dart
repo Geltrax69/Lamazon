@@ -17,13 +17,13 @@ class SellerSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14.5, fontWeight: FontWeight.w800)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+          ),
           if (hint != null) ...[
             const SizedBox(height: 2),
-            Text(hint!,
-                style: const TextStyle(fontSize: 12.5, color: _muted)),
+            Text(hint!, style: const TextStyle(fontSize: 12.5, color: _muted)),
           ],
         ],
       ),
@@ -71,9 +71,13 @@ class SellerField extends StatelessWidget {
           if (prefix != null)
             Padding(
               padding: const EdgeInsets.only(top: 14, right: 4),
-              child: Text(prefix!,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(
+                prefix!,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           Expanded(
             child: TextField(
@@ -87,8 +91,10 @@ class SellerField extends StatelessWidget {
                 hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              style:
-                  const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -117,15 +123,19 @@ class SellerSubmitBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F1EF),
-        border: Border(top: BorderSide(color: Colors.black.withValues(alpha: 0.06))),
+        border: Border(
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!ready) ...[
-            Text(blocker!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12.5, color: _muted)),
+            Text(
+              blocker!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12.5, color: _muted),
+            ),
             const SizedBox(height: 8),
           ],
           SizedBox(
@@ -137,12 +147,17 @@ class SellerSubmitBar extends StatelessWidget {
                 disabledForegroundColor: const Color(0xFF8E8E88),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28)),
+                  borderRadius: BorderRadius.circular(28),
+                ),
               ),
               onPressed: ready ? onSubmit : null,
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],
@@ -156,11 +171,12 @@ class SellerChoice extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const SellerChoice(
-      {super.key,
-      required this.label,
-      required this.selected,
-      required this.onTap});
+  const SellerChoice({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -173,12 +189,14 @@ class SellerChoice extends StatelessWidget {
           color: selected ? _ink : Colors.white,
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Text(label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : _ink,
-            )),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : _ink,
+          ),
+        ),
       ),
     );
   }

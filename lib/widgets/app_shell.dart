@@ -2,20 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Breakpoints. Phone is the base design; the rest widen it.
 const _tablet = 700.0;
-const _desktop = 1100.0;
 
 bool isWide(BuildContext context) =>
     MediaQuery.sizeOf(context).width >= _tablet;
 
-/// How many product columns fit without the cards turning into postage
-/// stamps or billboards.
-int gridColumns(BuildContext context) {
-  final w = MediaQuery.sizeOf(context).width;
-  if (w >= 1500) return 5;
-  if (w >= _desktop) return 4;
-  if (w >= _tablet) return 3;
-  return 2;
-}
+/// Widest a product card is allowed to get. Cards keep their size and the
+/// grid simply fits more of them in — a card that grows with the monitor
+/// reads as a billboard, which is what made the desktop view look wrong.
+const productTileMax = 230.0;
 
 /// Caps how wide the app content runs on a big monitor, and pads the sides
 /// once there is room. Content still fills the width — this is a page, not

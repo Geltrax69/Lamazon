@@ -139,8 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
           shrinkWrap: true,
           padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: gridColumns(context),
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: productTileMax,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             childAspectRatio: 0.68,

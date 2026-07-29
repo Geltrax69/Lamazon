@@ -20,14 +20,20 @@ class ScreenHeader extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: const BoxDecoration(
-                  color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(LucideIcons.arrowLeft,
-                  size: 18, color: Color(0xFF1A1A1A)),
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons.arrowLeft,
+                size: 18,
+                color: Color(0xFF1A1A1A),
+              ),
             ),
           ),
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
           SizedBox(width: 46, child: action),
         ],
       ),

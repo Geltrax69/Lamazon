@@ -9,10 +9,8 @@ const _green = Color(0xFF2E7D32);
 
 /// Asks for a delivery location when the app has none: enable the device's
 /// location, or type an address instead.
-Future<void> showLocationPrompt(BuildContext context) => showDialog(
-      context: context,
-      builder: (_) => const _LocationPromptDialog(),
-    );
+Future<void> showLocationPrompt(BuildContext context) =>
+    showDialog(context: context, builder: (_) => const _LocationPromptDialog());
 
 class _LocationPromptDialog extends StatelessWidget {
   const _LocationPromptDialog();
@@ -22,8 +20,7 @@ class _LocationPromptDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -36,7 +33,10 @@ class _LocationPromptDialog extends StatelessWidget {
               'Location permission not enabled',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 19, fontWeight: FontWeight.w800, color: _ink),
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: _ink,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -47,7 +47,10 @@ class _LocationPromptDialog extends StatelessWidget {
               'experience',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 14, height: 1.4, color: Color(0xFF6B6B6B)),
+                fontSize: 14,
+                height: 1.4,
+                color: Color(0xFF6B6B6B),
+              ),
             ),
           ),
           const SizedBox(height: 22),
@@ -60,14 +63,18 @@ class _LocationPromptDialog extends StatelessWidget {
               Navigator.pop(context);
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(
-                  content: Text(AddressBook.instance.selected == null
-                      ? 'Location on — add an address to start ordering'
-                      : 'Location on • delivering to '
-                          '${AddressBook.instance.selected!.city}'),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ));
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      AddressBook.instance.selected == null
+                          ? 'Location on — add an address to start ordering'
+                          : 'Location on • delivering to '
+                                '${AddressBook.instance.selected!.city}',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
             },
           ),
           const Divider(height: 1, color: Color(0xFFEDEDEA)),
@@ -76,8 +83,10 @@ class _LocationPromptDialog extends StatelessWidget {
             color: _ink,
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const LocationScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LocationScreen()),
+              );
             },
           ),
         ],
@@ -120,8 +129,11 @@ class _Action extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _Action(
-      {required this.label, required this.color, required this.onTap});
+  const _Action({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -131,9 +143,14 @@ class _Action extends StatelessWidget {
         height: 56,
         width: double.infinity,
         child: Center(
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600, color: color)),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ),
       ),
     );

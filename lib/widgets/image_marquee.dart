@@ -23,8 +23,10 @@ class MarqueeStrip extends StatefulWidget {
 
 class _MarqueeStripState extends State<MarqueeStrip>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: widget.period)..repeat();
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: widget.period,
+  )..repeat();
 
   @override
   void dispose() {
@@ -68,8 +70,12 @@ class ImageMarquee extends StatelessWidget {
   final List<String> urls;
   final int rows;
   final double tile;
-  const ImageMarquee(
-      {super.key, required this.urls, this.rows = 3, this.tile = 104});
+  const ImageMarquee({
+    super.key,
+    required this.urls,
+    this.rows = 3,
+    this.tile = 104,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +94,9 @@ class ImageMarquee extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: _Tile(
-                        url: urls[(i + r * 5) % urls.length], size: tile),
+                      url: urls[(i + r * 5) % urls.length],
+                      size: tile,
+                    ),
                   ),
               ],
             ),
