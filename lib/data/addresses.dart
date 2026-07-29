@@ -58,6 +58,16 @@ class AddressBook extends ChangeNotifier {
 
   String _selectedId = 'a1';
 
+  // ponytail: no geolocator dependency yet — this flag stands in for the OS
+  // permission. Wire enableLocation() to the real plugin when GPS is needed.
+  bool _locationEnabled = false;
+  bool get locationEnabled => _locationEnabled;
+
+  void enableLocation() {
+    _locationEnabled = true;
+    notifyListeners();
+  }
+
   List<Address> get addresses => List.unmodifiable(_addresses);
   Address? get selected =>
       _addresses.where((a) => a.id == _selectedId).firstOrNull;

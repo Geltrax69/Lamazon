@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'data/session.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 
 // ponytail: iOS 26 simulator breaks Dart TLS verify (CERTIFICATE_VERIFY_FAILED,
 // simulator-only). Debug-only bypass; remove when the Flutter engine fix ships.
@@ -32,7 +34,9 @@ class LamazonApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF1F1EF),
         colorScheme: ColorScheme.fromSeed(seedColor: kAccent),
       ),
-      home: const HomeScreen(),
+      home: Session.instance.onboarded
+          ? const HomeScreen()
+          : const LoginScreen(),
     );
   }
 }

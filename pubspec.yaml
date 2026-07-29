@@ -60,6 +60,8 @@ flutter:
   # the material Icons class.
   assets:
     - shorebird.yaml
+    - assets/logo.png
+    - assets/banner.png
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:

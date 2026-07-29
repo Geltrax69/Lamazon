@@ -6,6 +6,7 @@ import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../models/product.dart';
+import '../widgets/location_prompt.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
 import 'addresses_screen.dart';
@@ -46,6 +47,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Product>> _future = loadCatalog();
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ask for a delivery location once, on the first frame after launch.
+    if (!AddressBook.instance.locationEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showLocationPrompt(context);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

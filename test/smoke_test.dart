@@ -5,6 +5,7 @@ import 'package:lamazon/data/catalog.dart';
 import 'package:lamazon/main.dart';
 import 'package:lamazon/data/addresses.dart';
 import 'package:lamazon/data/orders.dart';
+import 'package:lamazon/data/session.dart';
 import 'package:lamazon/data/wishlist.dart';
 import 'package:lamazon/screens/location_screen.dart';
 import 'package:lamazon/screens/orders_screen.dart';
@@ -21,9 +22,17 @@ import 'package:lamazon/screens/wishlist_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 void main() {
-  testWidgets('home shows loading then content', (tester) async {
+  testWidgets('login screen skips into home, which loads then shows content',
+      (tester) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const LamazonApp());
+      expect(find.text('Local choice. Global experience.'), findsOneWidget);
+
+      // Not pumpAndSettle: the login backdrop animates forever.
+      await tester.tap(find.text('Skip login'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(Session.instance.onboarded, isTrue);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 1));
@@ -67,7 +76,9 @@ void main() {
 
       // Profile
       await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
-      expect(find.text('My Orders'), findsOneWidget);
+      expect(find.text('Your account'), findsOneWidget);
+      expect(find.text('Your orders'), findsOneWidget);
+      expect(find.text('Address book'), findsOneWidget);
 
       // Shop screen shows that vendor's products
       await tester.pumpWidget(MaterialApp(

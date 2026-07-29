@@ -89,10 +89,23 @@ class WishlistHeart extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              LucideIcons.heart,
-              size: 16,
-              color: liked ? const Color(0xFFE53935) : const Color(0xFF1A1A1A),
+            // Small pop each time the heart toggles, in both directions.
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, anim) => ScaleTransition(
+                scale: Tween(begin: 0.6, end: 1.0).animate(
+                    CurvedAnimation(parent: anim, curve: Curves.easeOutBack)),
+                child: child,
+              ),
+              // Lucide is outline-only, so the filled state uses Material's
+              // heart — solid red once the product is wishlisted.
+              child: Icon(
+                liked ? Icons.favorite : LucideIcons.heart,
+                key: ValueKey(liked),
+                size: liked ? 18 : 16,
+                color:
+                    liked ? const Color(0xFFE53935) : const Color(0xFF1A1A1A),
+              ),
             ),
           ),
         );
