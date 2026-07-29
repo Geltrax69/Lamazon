@@ -41,7 +41,11 @@ class ReadableBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    // Align with heightFactor 1 rather than Center: inside a bottom bar a
+    // Center would claim the whole height and squash the body to nothing.
+    return Align(
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: child,

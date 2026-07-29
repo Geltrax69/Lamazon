@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
@@ -49,158 +51,167 @@ class _DetailsScreenState extends State<DetailsScreen> {
     final p = widget.product;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F5F2),
-      body: Column(
-        children: [
-          _Hero(product: p),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        p.name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    _QtyStepper(
-                      qty: _qty,
-                      onChanged: (q) => setState(() => _qty = q),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(
-                            text: 'From: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B6B6B),
-                            ),
-                          ),
-                          TextSpan(
-                            text: '₹${p.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    for (var i = 0; i < _colors.length; i++)
-                      GestureDetector(
-                        onTap: () => setState(() => _color = i),
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: _colors[i],
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _color == i ? _ink : Colors.transparent,
-                              width: 2,
-                            ),
+      body: ReadableBody(
+        maxWidth: 760,
+        child: Column(
+          children: [
+            _Hero(product: p),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          p.name,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                  ],
-                ),
-                if (p.sizes.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Select Size',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      _QtyStepper(
+                        qty: _qty,
+                        onChanged: (q) => setState(() => _qty = q),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    height: 44,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: p.sizes.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 10),
-                      itemBuilder: (_, i) => GestureDetector(
-                        onTap: () => setState(() => _size = i),
-                        child: Container(
-                          width: 44,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: _size == i ? _hero : Colors.white,
-                            shape: BoxShape.circle,
+                  Row(
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'From: ',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6B6B6B),
+                              ),
+                            ),
+                            TextSpan(
+                              text: '₹${p.price.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      for (var i = 0; i < _colors.length; i++)
+                        GestureDetector(
+                          onTap: () => setState(() => _color = i),
+                          child: Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: _colors[i],
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _color == i ? _ink : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
                           ),
-                          child: Text(
-                            p.sizes[i],
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _size == i
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                        ),
+                    ],
+                  ),
+                  if (p.sizes.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Select Size',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 44,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: p.sizes.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (_, i) => GestureDetector(
+                          onTap: () => setState(() => _size = i),
+                          child: Container(
+                            width: 44,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _size == i ? _hero : Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              p.sizes[i],
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: _size == i
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
+                  ],
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Description',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    p.description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: Color(0xFF6B6B6B),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sold by ${p.store}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9A9A9A),
+                    ),
+                  ),
+                  ..._compareSection(context, p),
                 ],
-                const SizedBox(height: 18),
-                const Text(
-                  'Description',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  p.description,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    height: 1.5,
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sold by ${p.store}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9A9A9A),
-                  ),
-                ),
-                ..._compareSection(context, p),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: _PillButton(
-                label: 'Add to Cart',
-                background: Colors.white,
-                onTap: _addToCart,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _PillButton(
-                label: 'Buy Now',
-                background: _hero,
-                onTap: _buyNow,
               ),
             ),
           ],
+        ),
+      ),
+      bottomNavigationBar: ReadableBody(
+        maxWidth: 760,
+        child: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: _PillButton(
+                  label: 'Add to Cart',
+                  background: Colors.white,
+                  onTap: _addToCart,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PillButton(
+                  label: 'Buy Now',
+                  background: _hero,
+                  onTap: _buyNow,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
