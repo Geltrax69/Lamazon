@@ -48,6 +48,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   network_image_mock: ^2.1.1
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -94,3 +95,14 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icon generated from the brand mark: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: assets/logo.png
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+  macos:
+    generate: true
