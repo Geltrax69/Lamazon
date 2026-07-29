@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter && $HOME/flutter/bin/flutter pub get",
-  "buildCommand": "$HOME/flutter/bin/flutter build web --release",
-  "outputDirectory": "build/web",
+  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter && cd frontend && $HOME/flutter/bin/flutter pub get",
+  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release",
+  "outputDirectory": "frontend/build/web",
   "framework": null,
   "headers": [
     {
@@ -17,19 +17,35 @@
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=604800" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
       ]
     },
     {
       "source": "/(.*)\\.js",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=604800" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
       ]
     },
     {
       "source": "/index.html",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
     }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

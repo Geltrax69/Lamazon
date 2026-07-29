@@ -11,6 +11,10 @@ permissions:
 jobs:
   ship:
     runs-on: ubuntu-latest
+    # The Flutter app lives in frontend/ since the repo gained a Go backend.
+    defaults:
+      run:
+        working-directory: frontend
     env:
       SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
     steps:
@@ -42,4 +46,4 @@ jobs:
           tag_name: latest
           name: Latest build
           body: 'Auto-built from ${{ github.sha }}'
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: frontend/build/app/outputs/flutter-apk/app-release.apk
