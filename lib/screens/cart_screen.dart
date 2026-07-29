@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
@@ -15,44 +17,51 @@ class CartScreen extends StatelessWidget {
     final cart = Cart.instance;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: cart,
-          builder: (context, _) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _RoundIcon(
-                        icon: LucideIcons.arrowLeft,
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const Text('My Cart',
-                          style: TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.w700)),
-                      const _RoundIcon(icon: LucideIcons.shoppingCart),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: cart.isEmpty
-                      ? const _EmptyCart()
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                          itemCount: cart.items.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (_, i) =>
-                              _CartRow(item: cart.items[i]),
+      body: ReadableBody(
+        maxWidth: 700,
+        child: SafeArea(
+          child: ListenableBuilder(
+            listenable: cart,
+            builder: (context, _) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _RoundIcon(
+                          icon: LucideIcons.arrowLeft,
+                          onTap: () => Navigator.pop(context),
                         ),
-                ),
-                if (!cart.isEmpty) const _CheckoutPanel(),
-              ],
-            );
-          },
+                        const Text(
+                          'My Cart',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const _RoundIcon(icon: LucideIcons.shoppingCart),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: cart.isEmpty
+                        ? const _EmptyCart()
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                            itemCount: cart.items.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (_, i) =>
+                                _CartRow(item: cart.items[i]),
+                          ),
+                  ),
+                  if (!cart.isEmpty) const _CheckoutPanel(),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -70,8 +79,10 @@ class _EmptyCart extends StatelessWidget {
         children: [
           Icon(LucideIcons.shoppingBasket, size: 48, color: Colors.grey),
           SizedBox(height: 12),
-          Text('Your cart is empty',
-              style: TextStyle(fontSize: 15, color: Color(0xFF6B6B6B))),
+          Text(
+            'Your cart is empty',
+            style: TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
+          ),
         ],
       ),
     );
@@ -97,8 +108,11 @@ class _CartRow extends StatelessWidget {
           color: const Color(0xFFF8D7DA),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Icon(LucideIcons.trash2,
-            color: Color(0xFFD32F2F), size: 22),
+        child: const Icon(
+          LucideIcons.trash2,
+          color: Color(0xFFD32F2F),
+          size: 22,
+        ),
       ),
       child: Container(
         padding: const EdgeInsets.all(10),
@@ -111,25 +125,40 @@ class _CartRow extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: SizedBox(
-                  width: 74, height: 74, child: NetImage(url: p.imageUrl)),
+                width: 74,
+                height: 74,
+                child: NetImage(url: p.imageUrl),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(p.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
-                  Text(p.store,
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF9A9A9A))),
+                  Text(
+                    p.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    p.store,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9A9A9A),
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  Text('₹${(p.price * item.qty).toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800)),
+                  Text(
+                    '₹${(p.price * item.qty).toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -149,18 +178,23 @@ class _QtyControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _qtyBtn(LucideIcons.minus,
-            () => Cart.instance.setQty(item.product.id, item.qty - 1),
-            filled: false),
+        _qtyBtn(
+          LucideIcons.minus,
+          () => Cart.instance.setQty(item.product.id, item.qty - 1),
+          filled: false,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(item.qty.toString().padLeft(2, '0'),
-              style:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          child: Text(
+            item.qty.toString().padLeft(2, '0'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
         ),
-        _qtyBtn(LucideIcons.plus,
-            () => Cart.instance.setQty(item.product.id, item.qty + 1),
-            filled: true),
+        _qtyBtn(
+          LucideIcons.plus,
+          () => Cart.instance.setQty(item.product.id, item.qty + 1),
+          filled: true,
+        ),
       ],
     );
   }
@@ -174,8 +208,7 @@ class _QtyControls extends StatelessWidget {
         decoration: BoxDecoration(
           color: filled ? _green : Colors.white,
           shape: BoxShape.circle,
-          border:
-              filled ? null : Border.all(color: const Color(0xFFE3E3E0)),
+          border: filled ? null : Border.all(color: const Color(0xFFE3E3E0)),
         ),
         child: Icon(icon, size: 13, color: filled ? Colors.white : _ink),
       ),
@@ -210,25 +243,29 @@ class _CheckoutPanel extends StatelessWidget {
                   child: TextField(
                     decoration: InputDecoration(
                       hintText: 'Promo code',
-                      hintStyle:
-                          TextStyle(fontSize: 13, color: Colors.grey),
+                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
                       border: InputBorder.none,
                     ),
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 9),
+                    horizontal: 18,
+                    vertical: 9,
+                  ),
                   margin: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(
                     color: _green,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text('Apply',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Apply',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -236,9 +273,10 @@ class _CheckoutPanel extends StatelessWidget {
           const SizedBox(height: 14),
           const Align(
             alignment: Alignment.centerLeft,
-            child: Text('Order Summary',
-                style:
-                    TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            child: Text(
+              'Order Summary',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(height: 8),
           _summaryRow('Sub Total', cart.subtotal),
@@ -254,10 +292,12 @@ class _CheckoutPanel extends StatelessWidget {
             onTap: () {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(
-                  content: Text('Payment flow coming soon (demo)'),
-                  behavior: SnackBarBehavior.floating,
-                ));
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text('Payment flow coming soon (demo)'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
             },
             child: Container(
               height: 52,
@@ -266,11 +306,14 @@ class _CheckoutPanel extends StatelessWidget {
                 color: _green,
                 borderRadius: BorderRadius.circular(26),
               ),
-              child: const Text('Make a Payment',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700)),
+              child: const Text(
+                'Make a Payment',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],
@@ -306,8 +349,10 @@ class _RoundIcon extends StatelessWidget {
       child: Container(
         width: 42,
         height: 42,
-        decoration:
-            const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
         child: Icon(icon, size: 18, color: _ink),
       ),
     );

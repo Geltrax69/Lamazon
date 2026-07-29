@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/seller.dart';
@@ -21,203 +23,257 @@ class SellerDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: Seller.instance,
-          builder: (context, _) {
-            final store = Seller.instance.store;
-            if (store == null) return const SizedBox.shrink();
-            final items = Seller.instance.items;
-            return Column(
-              children: [
-                const ScreenHeader(title: 'Your store'),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: SizedBox(
-                          height: 140,
-                          width: double.infinity,
-                          child: store.photo == null
-                              ? Container(
-                                  color: const Color(0xFFE8E8E4),
-                                  alignment: Alignment.center,
-                                  child: const Icon(LucideIcons.store,
-                                      size: 36, color: Colors.grey),
-                                )
-                              : Image.memory(store.photo!, fit: BoxFit.cover),
+      body: ReadableBody(
+        maxWidth: 760,
+        child: SafeArea(
+          child: ListenableBuilder(
+            listenable: Seller.instance,
+            builder: (context, _) {
+              final store = Seller.instance.store;
+              if (store == null) return const SizedBox.shrink();
+              final items = Seller.instance.items;
+              return Column(
+                children: [
+                  const ScreenHeader(title: 'Your store'),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: SizedBox(
+                            height: 140,
+                            width: double.infinity,
+                            child: store.photo == null
+                                ? Container(
+                                    color: const Color(0xFFE8E8E4),
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      LucideIcons.store,
+                                      size: 36,
+                                      color: Colors.grey,
+                                    ),
+                                  )
+                                : Image.memory(store.photo!, fit: BoxFit.cover),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(store.name,
+                        const SizedBox(height: 14),
+                        Text(
+                          store.name,
                           style: const TextStyle(
-                              fontSize: 22,
-                              fontFamily: 'Georgia',
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(LucideIcons.mapPin,
-                              size: 13, color: _muted),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text('${store.location}, ${store.city}',
+                            fontSize: 22,
+                            fontFamily: 'Georgia',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              LucideIcons.mapPin,
+                              size: 13,
+                              color: _muted,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${store.location}, ${store.city}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 13, color: _muted)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final c in store.categories)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
+                                  fontSize: 13,
+                                  color: _muted,
+                                ),
                               ),
-                              child: Text(c,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          _Stat(
-                              label: 'Products',
-                              value: '${Seller.instance.skuCount}'),
-                          const SizedBox(width: 10),
-                          _Stat(
-                              label: 'Units',
-                              value: '${Seller.instance.unitsInStock}'),
-                          const SizedBox(width: 10),
-                          _Stat(
-                            label: 'Needs restock',
-                            value: '${Seller.instance.lowOrOutCount}',
-                            color: Seller.instance.lowOrOutCount > 0
-                                ? _amber
-                                : null,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Inventory value',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                            Text(
-                                '₹${Seller.instance.inventoryValue.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800)),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 22),
-                      const Text('Orders',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _Stat(
-                            label: 'Received',
-                            value: '${Seller.instance.countAt(OrderStage.received)}',
-                            color: Seller.instance.countAt(OrderStage.received) > 0
-                                ? _amber
-                                : null,
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final c in store.categories)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  c,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            _Stat(
+                              label: 'Products',
+                              value: '${Seller.instance.skuCount}',
+                            ),
+                            const SizedBox(width: 10),
+                            _Stat(
+                              label: 'Units',
+                              value: '${Seller.instance.unitsInStock}',
+                            ),
+                            const SizedBox(width: 10),
+                            _Stat(
+                              label: 'Needs restock',
+                              value: '${Seller.instance.lowOrOutCount}',
+                              color: Seller.instance.lowOrOutCount > 0
+                                  ? _amber
+                                  : null,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          const SizedBox(width: 10),
-                          _Stat(
-                              label: 'Accepted',
-                              value:
-                                  '${Seller.instance.countAt(OrderStage.accepted)}'),
-                          const SizedBox(width: 10),
-                          _Stat(
-                              label: 'Delivered',
-                              value:
-                                  '${Seller.instance.countAt(OrderStage.delivered)}'),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (Seller.instance.orders.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 18),
-                          child: Center(
-                            child: Text('No orders yet',
-                                style:
-                                    TextStyle(fontSize: 13.5, color: _muted)),
-                          ),
-                        )
-                      else
-                        for (final order in Seller.instance.orders) ...[
-                          _OrderRow(order: order),
-                          const SizedBox(height: 10),
-                        ],
-                      const SizedBox(height: 22),
-                      Text('Inventory (${items.length})',
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 12),
-                      if (items.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 30),
-                          child: Column(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(LucideIcons.packageOpen,
-                                  size: 44, color: Colors.grey),
-                              SizedBox(height: 12),
-                              Text('No products yet',
-                                  style: TextStyle(
-                                      fontSize: 15, color: _muted)),
-                              SizedBox(height: 4),
-                              Text('Add your first one to start selling',
-                                  style: TextStyle(
-                                      fontSize: 12.5, color: Color(0xFF9A9A9A))),
+                              const Text(
+                                'Inventory value',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '₹${Seller.instance.inventoryValue.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                             ],
                           ),
-                        )
-                      else
-                        for (final item in items) ...[
-                          _ItemRow(item: item),
-                          const SizedBox(height: 10),
-                        ],
-                    ],
+                        ),
+                        const SizedBox(height: 22),
+                        const Text(
+                          'Orders',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _Stat(
+                              label: 'Received',
+                              value:
+                                  '${Seller.instance.countAt(OrderStage.received)}',
+                              color:
+                                  Seller.instance.countAt(OrderStage.received) >
+                                      0
+                                  ? _amber
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            _Stat(
+                              label: 'Accepted',
+                              value:
+                                  '${Seller.instance.countAt(OrderStage.accepted)}',
+                            ),
+                            const SizedBox(width: 10),
+                            _Stat(
+                              label: 'Delivered',
+                              value:
+                                  '${Seller.instance.countAt(OrderStage.delivered)}',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (Seller.instance.orders.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 18),
+                            child: Center(
+                              child: Text(
+                                'No orders yet',
+                                style: TextStyle(fontSize: 13.5, color: _muted),
+                              ),
+                            ),
+                          )
+                        else
+                          for (final order in Seller.instance.orders) ...[
+                            _OrderRow(order: order),
+                            const SizedBox(height: 10),
+                          ],
+                        const SizedBox(height: 22),
+                        Text(
+                          'Inventory (${items.length})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (items.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 30),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  LucideIcons.packageOpen,
+                                  size: 44,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'No products yet',
+                                  style: TextStyle(fontSize: 15, color: _muted),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Add your first one to start selling',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFF9A9A9A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          for (final item in items) ...[
+                            _ItemRow(item: item),
+                            const SizedBox(height: 10),
+                          ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: _green,
         foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SellerProductScreen())),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SellerProductScreen()),
+        ),
         icon: const Icon(LucideIcons.plus, size: 18),
-        label: const Text('Add product',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        label: const Text(
+          'Add product',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -229,10 +285,10 @@ class _OrderRow extends StatelessWidget {
   const _OrderRow({required this.order});
 
   Color get _stageColor => switch (order.stage) {
-        OrderStage.received => _amber,
-        OrderStage.accepted => const Color(0xFF2F6FED),
-        OrderStage.delivered => _green,
-      };
+    OrderStage.received => _amber,
+    OrderStage.accepted => const Color(0xFF2F6FED),
+    OrderStage.delivered => _green,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -252,52 +308,74 @@ class _OrderRow extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: _stageColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(order.stage.label,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _stageColor)),
+                      child: Text(
+                        order.stage.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _stageColor,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Text('#${order.id.toUpperCase()}',
-                        style: const TextStyle(
-                            fontSize: 11.5, color: Color(0xFF9A9A9A))),
+                    Text(
+                      '#${order.id.toUpperCase()}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF9A9A9A),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('${order.units} × ${order.itemTitle}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(
+                  '${order.units} × ${order.itemTitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text('₹${order.amount.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 12.5, color: _muted)),
+                Text(
+                  '₹${order.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(fontSize: 12.5, color: _muted),
+                ),
               ],
             ),
           ),
           if (order.stage != OrderStage.delivered)
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor:
-                    order.stage == OrderStage.received ? _ink : _green,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                backgroundColor: order.stage == OrderStage.received
+                    ? _ink
+                    : _green,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               onPressed: () => order.stage == OrderStage.received
                   ? Seller.instance.acceptOrder(order.id)
                   : Seller.instance.deliverOrder(order.id),
               child: Text(
-                  order.stage == OrderStage.received ? 'Accept' : 'Delivered',
-                  style: const TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+                order.stage == OrderStage.received ? 'Accept' : 'Delivered',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
         ],
       ),
@@ -322,15 +400,20 @@ class _Stat extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: color ?? _ink)),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: color ?? _ink,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11.5, color: _muted)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11.5, color: _muted),
+            ),
           ],
         ),
       ),
@@ -343,10 +426,10 @@ class _ItemRow extends StatelessWidget {
   const _ItemRow({required this.item});
 
   Color get _statusColor => switch (item.status) {
-        StockStatus.inStock => _green,
-        StockStatus.low => _amber,
-        StockStatus.out => _red,
-      };
+    StockStatus.inStock => _green,
+    StockStatus.low => _amber,
+    StockStatus.out => _red,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -356,9 +439,11 @@ class _ItemRow extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => SellerProductScreen(existing: item))),
+          context,
+          MaterialPageRoute(
+            builder: (_) => SellerProductScreen(existing: item),
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -369,37 +454,47 @@ class _ItemRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 14.5, fontWeight: FontWeight.w700)),
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                        '₹${item.price.toStringAsFixed(0)} · ${item.category}'
-                        '${item.photos.length > 1 ? " · ${item.photos.length} photos" : ""}',
-                        style:
-                            const TextStyle(fontSize: 12.5, color: _muted)),
+                      '₹${item.price.toStringAsFixed(0)} · ${item.category}'
+                      '${item.photos.length > 1 ? " · ${item.photos.length} photos" : ""}',
+                      style: const TextStyle(fontSize: 12.5, color: _muted),
+                    ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(item.status.label,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: _statusColor)),
+                          child: Text(
+                            item.status.label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _statusColor,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        Text('${item.stock} left',
-                            style: const TextStyle(
-                                fontSize: 11.5, color: _muted)),
+                        Text(
+                          '${item.stock} left',
+                          style: const TextStyle(fontSize: 11.5, color: _muted),
+                        ),
                       ],
                     ),
                   ],

@@ -39,7 +39,9 @@ class _DetailsScreenState extends State<DetailsScreen> {
   void _buyNow() {
     Cart.instance.add(widget.product, _qty);
     Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const CartScreen()));
+      context,
+      MaterialPageRoute(builder: (_) => const CartScreen()),
+    );
   }
 
   @override
@@ -58,9 +60,13 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(p.name,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
+                      child: Text(
+                        p.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                     _QtyStepper(
                       qty: _qty,
@@ -71,16 +77,26 @@ class _DetailsScreenState extends State<DetailsScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Text.rich(TextSpan(children: [
-                      const TextSpan(
-                          text: 'From: ',
-                          style: TextStyle(
-                              fontSize: 14, color: Color(0xFF6B6B6B))),
+                    Text.rich(
                       TextSpan(
-                          text: '₹${p.price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                              fontSize: 17, fontWeight: FontWeight.w800)),
-                    ])),
+                        children: [
+                          const TextSpan(
+                            text: 'From: ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B6B6B),
+                            ),
+                          ),
+                          TextSpan(
+                            text: '₹${p.price.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const Spacer(),
                     for (var i = 0; i < _colors.length; i++)
                       GestureDetector(
@@ -93,9 +109,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                             color: _colors[i],
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: _color == i
-                                  ? _ink
-                                  : Colors.transparent,
+                              color: _color == i ? _ink : Colors.transparent,
                               width: 2,
                             ),
                           ),
@@ -105,9 +119,10 @@ class _DetailsScreenState extends State<DetailsScreen> {
                 ),
                 if (p.sizes.isNotEmpty) ...[
                   const SizedBox(height: 18),
-                  const Text('Select Size',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
+                  const Text(
+                    'Select Size',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 44,
@@ -124,31 +139,42 @@ class _DetailsScreenState extends State<DetailsScreen> {
                             color: _size == i ? _hero : Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          child: Text(p.sizes[i],
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: _size == i
-                                      ? FontWeight.w700
-                                      : FontWeight.w500)),
+                          child: Text(
+                            p.sizes[i],
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _size == i
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ],
                 const SizedBox(height: 18),
-                const Text('Description',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Description',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 6),
-                Text(p.description,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: Color(0xFF6B6B6B))),
+                Text(
+                  p.description,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: Color(0xFF6B6B6B),
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('Sold by ${p.store}',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF9A9A9A))),
+                Text(
+                  'Sold by ${p.store}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9A9A9A),
+                  ),
+                ),
                 ..._compareSection(context, p),
               ],
             ),
@@ -191,30 +217,42 @@ List<Widget> _compareSection(BuildContext context, Product p) {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Flexible(
-          child: Text('Local vendors',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          child: Text(
+            'Local vendors',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
         ),
         GestureDetector(
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => CompareScreen(product: p))),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CompareScreen(product: p)),
+          ),
           child: const Row(
             children: [
-              Text('Compare all',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2E7D32))),
+              Text(
+                'Compare all',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF2E7D32),
+                ),
+              ),
               SizedBox(width: 2),
-              Icon(LucideIcons.chevronRight,
-                  size: 15, color: Color(0xFF2E7D32)),
+              Icon(
+                LucideIcons.chevronRight,
+                size: 15,
+                color: Color(0xFF2E7D32),
+              ),
             ],
           ),
         ),
       ],
     ),
     const SizedBox(height: 2),
-    Text('Compared with ₹${p.price.toStringAsFixed(0)} at ${p.store}',
-        style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A))),
+    Text(
+      'Compared with ₹${p.price.toStringAsFixed(0)} at ${p.store}',
+      style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A)),
+    ),
     const SizedBox(height: 10),
     for (final o in p.offers)
       Container(
@@ -233,20 +271,24 @@ List<Widget> _compareSection(BuildContext context, Product p) {
                 color: Color(0xFFF1F1EF),
                 shape: BoxShape.circle,
               ),
-              child:
-                  const Icon(LucideIcons.store, size: 18, color: _ink),
+              child: const Icon(LucideIcons.store, size: 18, color: _ink),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(o.store,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                  const Text('Same product',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF9A9A9A))),
+                  Text(
+                    o.store,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Text(
+                    'Same product',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                  ),
                 ],
               ),
             ),
@@ -254,9 +296,13 @@ List<Widget> _compareSection(BuildContext context, Product p) {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('₹${o.price.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(
+                  '₹${o.price.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 _diffBadge(o.price - p.price),
               ],
             ),
@@ -279,9 +325,10 @@ Widget _diffBadge(double diff) {
     label = 'Same price';
     color = const Color(0xFF9A9A9A);
   }
-  return Text(label,
-      style:
-          TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color));
+  return Text(
+    label,
+    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+  );
 }
 
 class _Hero extends StatelessWidget {
@@ -309,9 +356,10 @@ class _Hero extends StatelessWidget {
                   icon: LucideIcons.arrowLeft,
                   onTap: () => Navigator.pop(context),
                 ),
-                const Text('Details',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Details',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
                 const _RoundIcon(icon: LucideIcons.heart),
               ],
             ),
@@ -369,8 +417,10 @@ class _RoundIcon extends StatelessWidget {
       child: Container(
         width: 42,
         height: 42,
-        decoration:
-            const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
         child: Icon(icon, size: 18, color: _ink),
       ),
     );
@@ -397,9 +447,10 @@ class _QtyStepper extends StatelessWidget {
           }, filled: false),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text(qty.toString().padLeft(2, '0'),
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700)),
+            child: Text(
+              qty.toString().padLeft(2, '0'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
           ),
           _step(LucideIcons.plus, () => onChanged(qty + 1), filled: true),
         ],
@@ -428,8 +479,11 @@ class _PillButton extends StatelessWidget {
   final String label;
   final Color background;
   final VoidCallback onTap;
-  const _PillButton(
-      {required this.label, required this.background, required this.onTap});
+  const _PillButton({
+    required this.label,
+    required this.background,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -442,9 +496,14 @@ class _PillButton extends StatelessWidget {
           color: background,
           borderRadius: BorderRadius.circular(28),
         ),
-        child: Text(label,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w700, color: _ink)),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: _ink,
+          ),
+        ),
       ),
     );
   }

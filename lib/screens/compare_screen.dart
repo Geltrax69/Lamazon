@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
@@ -28,102 +30,130 @@ class CompareScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 46,
-                    height: 46,
-                    decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(LucideIcons.arrowLeft,
-                        size: 18, color: _ink),
+      body: ReadableBody(
+        maxWidth: 700,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        LucideIcons.arrowLeft,
+                        size: 18,
+                        color: _ink,
+                      ),
+                    ),
                   ),
-                ),
-                const Text('Compare Prices',
-                    style:
-                        TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                const SizedBox(width: 46),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Product being compared.
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
+                  const Text(
+                    'Compare Prices',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 46),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Product being compared.
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
                       width: 72,
                       height: 72,
-                      child: NetImage(url: product.imageUrl)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                      child: NetImage(url: product.imageUrl),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          product.category,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B6B6B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (saving > 0) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
                     children: [
-                      Text(product.name,
+                      const Icon(
+                        LucideIcons.trendingDown,
+                        size: 18,
+                        color: _green,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Save ₹${saving.toStringAsFixed(0)} by buying from '
+                          '${best.store}',
                           style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text(product.category,
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF6B6B6B))),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _green,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
-            ),
-            if (saving > 0) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.trendingDown,
-                        size: 18, color: _green),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Save ₹${saving.toStringAsFixed(0)} by buying from '
-                        '${best.store}',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _green),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-            Text('${rows.length} local vendors',
+              const SizedBox(height: 20),
+              Text(
+                '${rows.length} local vendors',
                 style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            for (var i = 0; i < rows.length; i++)
-              _VendorRow(
-                offer: rows[i],
-                product: product,
-                isBest: i == 0,
-                // Nearer vendors listed first is a fair stand-in until real
-                // vendor distances arrive with the location API.
-                distance: '${(1.2 + i * 0.8).toStringAsFixed(1)} km',
-                eta: '${10 + i * 4} mins',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-          ],
+              const SizedBox(height: 12),
+              for (var i = 0; i < rows.length; i++)
+                _VendorRow(
+                  offer: rows[i],
+                  product: product,
+                  isBest: i == 0,
+                  // Nearer vendors listed first is a fair stand-in until real
+                  // vendor distances arrive with the location API.
+                  distance: '${(1.2 + i * 0.8).toStringAsFixed(1)} km',
+                  eta: '${10 + i * 4} mins',
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -163,7 +193,9 @@ class _VendorRow extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: const BoxDecoration(
-                    color: Color(0xFFF1F1EF), shape: BoxShape.circle),
+                  color: Color(0xFFF1F1EF),
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(LucideIcons.store, size: 18, color: _ink),
               ),
               const SizedBox(width: 12),
@@ -174,27 +206,35 @@ class _VendorRow extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(offer.store,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700)),
+                          child: Text(
+                            offer.store,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                         if (isBest) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: _green,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Text('BEST PRICE',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white)),
+                            child: const Text(
+                              'BEST PRICE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ],
                       ],
@@ -202,29 +242,46 @@ class _VendorRow extends StatelessWidget {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        const Icon(LucideIcons.mapPin,
-                            size: 11, color: Color(0xFF9A9A9A)),
+                        const Icon(
+                          LucideIcons.mapPin,
+                          size: 11,
+                          color: Color(0xFF9A9A9A),
+                        ),
                         const SizedBox(width: 3),
-                        Text(distance,
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF9A9A9A))),
+                        Text(
+                          distance,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF9A9A9A),
+                          ),
+                        ),
                         const SizedBox(width: 10),
-                        const Icon(LucideIcons.timer,
-                            size: 11, color: Color(0xFF9A9A9A)),
+                        const Icon(
+                          LucideIcons.timer,
+                          size: 11,
+                          color: Color(0xFF9A9A9A),
+                        ),
                         const SizedBox(width: 3),
-                        Text(eta,
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF9A9A9A))),
+                        Text(
+                          eta,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF9A9A9A),
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              Text('₹${offer.price.toStringAsFixed(0)}',
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: isBest ? _green : _ink)),
+              Text(
+                '₹${offer.price.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: isBest ? _green : _ink,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -252,13 +309,16 @@ class _VendorRow extends StatelessWidget {
                 color: isBest ? _green : const Color(0xFFF1F1EF),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Add from ${offer.store}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isBest ? Colors.white : _ink)),
+              child: Text(
+                'Add from ${offer.store}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isBest ? Colors.white : _ink,
+                ),
+              ),
             ),
           ),
         ],

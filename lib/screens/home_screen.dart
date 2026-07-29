@@ -7,6 +7,7 @@ import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../data/seller.dart';
 import '../models/product.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/image_marquee.dart';
 import '../widgets/location_prompt.dart';
 import '../widgets/product_card.dart';
@@ -89,16 +90,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   if (snap.hasError) {
                     return ErrorView(
-                      onRetry: () =>
-                          setState(() => _future = loadCatalog()),
+                      onRetry: () => setState(() => _future = loadCatalog()),
                     );
                   }
                   return _content(snap.data!);
                 },
               ),
               Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _BottomNav(theme: theme)),
+                alignment: Alignment.bottomCenter,
+                child: _BottomNav(theme: theme),
+              ),
             ],
           ),
         ),
@@ -108,12 +109,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _content(List<Product> items) {
     final tabName = _tabs[_tab].name;
-    final shownShops =
-        shops.where((s) => _tab == 0 || s.tab == tabName).toList();
-    final shownProducts =
-        items.where((p) => _tab == 0 || p.tab == tabName).toList();
+    final shownShops = shops
+        .where((s) => _tab == 0 || s.tab == tabName)
+        .toList();
+    final shownProducts = items
+        .where((p) => _tab == 0 || p.tab == tabName)
+        .toList();
+    final wide = isWide(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+      padding: EdgeInsets.fromLTRB(wide ? 32 : 20, 8, wide ? 32 : 20, 110),
       children: [
         const _TopBar(),
         const SizedBox(height: 20),
@@ -135,8 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
           shrinkWrap: true,
           padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: gridColumns(context),
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             childAspectRatio: 0.68,
@@ -144,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
           itemCount: shownProducts.length,
           itemBuilder: (_, i) => ProductCard(
             product: shownProducts[i],
-            showAddToCart: shownProducts[i].tab == 'Food' ||
+            showAddToCart:
+                shownProducts[i].tab == 'Food' ||
                 shownProducts[i].tab == 'Grocery',
             onTap: () => Navigator.push(
               context,
@@ -170,8 +175,10 @@ class _VersionBadge extends StatelessWidget {
     final updater = ShorebirdUpdater();
     if (!updater.isAvailable) {
       // Debug builds and platforms without the Shorebird engine.
-      return const Text('dev build — no OTA',
-          style: TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)));
+      return const Text(
+        'dev build — no OTA',
+        style: TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)),
+      );
     }
     return FutureBuilder<Patch?>(
       future: updater.readCurrentPatch(),
@@ -203,14 +210,20 @@ class _TopBar extends StatelessWidget {
               final a = AddressBook.instance.selected;
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AddressesScreen())),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Delivery in $deliveryEta',
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Delivery in $deliveryEta',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
@@ -230,13 +243,17 @@ class _TopBar extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF6B6B6B)),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6B6B6B),
+                            ),
                           ),
                         ),
-                        const Icon(LucideIcons.chevronDown,
-                            size: 15, color: Color(0xFF6B6B6B)),
+                        const Icon(
+                          LucideIcons.chevronDown,
+                          size: 15,
+                          color: Color(0xFF6B6B6B),
+                        ),
                       ],
                     ),
                   ],
@@ -257,7 +274,9 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
-          context, MaterialPageRoute(builder: (_) => const SearchScreen())),
+        context,
+        MaterialPageRoute(builder: (_) => const SearchScreen()),
+      ),
       child: Container(
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -269,8 +288,10 @@ class _SearchBar extends StatelessWidget {
           children: [
             Icon(LucideIcons.search, size: 20, color: Colors.grey),
             SizedBox(width: 10),
-            Text('what are you looking for?',
-                style: TextStyle(color: Colors.grey, fontSize: 14)),
+            Text(
+              'what are you looking for?',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
           ],
         ),
       ),
@@ -301,15 +322,16 @@ class _TabBar extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(tab.icon,
-                    size: 22, color: isActive ? activeColor : kInk),
+                Icon(tab.icon, size: 22, color: isActive ? activeColor : kInk),
                 const SizedBox(height: 4),
-                Text(tab.name,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: isActive ? activeColor : kInk,
-                        fontWeight:
-                            isActive ? FontWeight.w800 : FontWeight.w500)),
+                Text(
+                  tab.name,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isActive ? activeColor : kInk,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Container(
                   height: 3,
@@ -351,9 +373,11 @@ class _CategoryRow extends StatelessWidget {
           final name = entries[i].key;
           return GestureDetector(
             onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => SearchScreen(initialQuery: name))),
+              context,
+              MaterialPageRoute(
+                builder: (_) => SearchScreen(initialQuery: name),
+              ),
+            ),
             child: SizedBox(
               width: 82,
               child: Column(
@@ -362,19 +386,27 @@ class _CategoryRow extends StatelessWidget {
                     width: 78,
                     height: 78,
                     decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
                     padding: const EdgeInsets.all(5),
                     child: ClipOval(
-                        child: NetImage(
-                            url: thumb(entries[i].value.imageUrl, 160))),
+                      child: NetImage(
+                        url: thumb(entries[i].value.imageUrl, 160),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text(name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -418,7 +450,9 @@ class _ShopAd extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
-          context, MaterialPageRoute(builder: (_) => ShopScreen(shop: shop))),
+        context,
+        MaterialPageRoute(builder: (_) => ShopScreen(shop: shop)),
+      ),
       child: Container(
         width: 246,
         padding: const EdgeInsets.all(10),
@@ -431,9 +465,10 @@ class _ShopAd extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                  width: 76,
-                  height: 76,
-                  child: NetImage(url: thumb(shop.imageUrl, 160))),
+                width: 76,
+                height: 76,
+                child: NetImage(url: thumb(shop.imageUrl, 160)),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -441,30 +476,43 @@ class _ShopAd extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(shop.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text(
+                    shop.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 3),
-                  Text(shop.tagline,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 11.5,
-                          height: 1.3,
-                          color: Color(0xFF6B6B6B))),
+                  Text(
+                    shop.tagline,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: Color(0xFF6B6B6B),
+                    ),
+                  ),
                   const SizedBox(height: 5),
                   Row(
                     children: const [
-                      Icon(LucideIcons.timer,
-                          size: 12, color: Color(0xFF6B6B6B)),
+                      Icon(
+                        LucideIcons.timer,
+                        size: 12,
+                        color: Color(0xFF6B6B6B),
+                      ),
                       SizedBox(width: 4),
-                      Text(deliveryEta,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF6B6B6B))),
+                      Text(
+                        deliveryEta,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6B6B6B),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -489,20 +537,24 @@ class _SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: serif
-                  ? const TextStyle(
-                      fontSize: 24,
-                      fontFamily: 'Georgia',
-                      fontWeight: FontWeight.w600)
-                  : const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700)),
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: serif
+                ? const TextStyle(
+                    fontSize: 24,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w600,
+                  )
+                : const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
         ),
         const SizedBox(width: 10),
-        const Text('See all',
-            style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E))),
+        const Text(
+          'See all',
+          style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E)),
+        ),
       ],
     );
   }
@@ -515,6 +567,7 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 520),
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -542,15 +595,18 @@ class _BottomNav extends StatelessWidget {
               children: [
                 Icon(LucideIcons.house, size: 20, color: kInk),
                 SizedBox(width: 8),
-                Text('Home',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  'Home',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
               ],
             ),
           ),
           GestureDetector(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CartScreen())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ListenableBuilder(
@@ -559,15 +615,20 @@ class _BottomNav extends StatelessWidget {
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Icon(LucideIcons.shoppingCart,
-                          size: 22, color: kInk),
+                      const Icon(
+                        LucideIcons.shoppingCart,
+                        size: 22,
+                        color: kInk,
+                      ),
                       if (Cart.instance.count > 0)
                         Positioned(
                           top: -6,
                           right: -8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFD32F2F),
                               borderRadius: BorderRadius.circular(10),
@@ -575,9 +636,10 @@ class _BottomNav extends StatelessWidget {
                             child: Text(
                               '${Cart.instance.count}',
                               style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -608,24 +670,32 @@ class _BottomNav extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(selling ? LucideIcons.store : LucideIcons.heart,
-                          size: 22, color: kInk),
+                      Icon(
+                        selling ? LucideIcons.store : LucideIcons.heart,
+                        size: 22,
+                        color: kInk,
+                      ),
                       if (selling && Seller.instance.openOrders > 0)
                         Positioned(
                           top: -6,
                           right: -8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEF6C00),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Text('${Seller.instance.openOrders}',
-                                style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white)),
+                            child: Text(
+                              '${Seller.instance.openOrders}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                     ],
@@ -635,8 +705,10 @@ class _BottomNav extends StatelessWidget {
             },
           ),
           GestureDetector(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Icon(LucideIcons.user, size: 22, color: kInk),

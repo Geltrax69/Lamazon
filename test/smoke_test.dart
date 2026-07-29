@@ -123,12 +123,15 @@ void main() {
       await tester.enterText(
           find.widgetWithText(TextField, 'e.g. Campus Snacks Corner'),
           'Campus Snacks');
+      // The rest of the form sits below the fold in a test-sized window.
+      await tester.scrollUntilVisible(
+          find.widgetWithText(TextField, 'Block / shop number, area'), 200,
+          scrollable: find.byType(Scrollable).first);
       await tester.enterText(
           find.widgetWithText(TextField, 'Block / shop number, area'),
           'Block 32, Shop 4');
-      // The category chips sit below the fold in a test-sized window.
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
-      await tester.pump();
+      await tester.scrollUntilVisible(find.text('Food'), 200,
+          scrollable: find.byType(Scrollable).first);
       await tester.tap(find.text('Food'));
       await tester.pump();
 

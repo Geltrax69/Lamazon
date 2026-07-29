@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/catalog.dart';
 import '../data/session.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/image_marquee.dart';
 import 'home_screen.dart';
 
@@ -43,7 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
   }
 
   @override
@@ -53,7 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
       for (final tab in ['Electronics', 'Grocery', 'Food', 'Gifts', 'Beauty'])
         // Thumbnails: the backdrop tiles are ~104px, so full photos would
         // burn megabytes on first paint for no visible gain.
-        ...products.where((p) => p.tab == tab).map((p) => thumb(p.imageUrl, 200)),
+        ...products
+            .where((p) => p.tab == tab)
+            .map((p) => thumb(p.imageUrl, 200)),
     ];
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -94,12 +99,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         onTap: () => _enter(skip: true),
                         child: const Padding(
                           padding: EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 11),
-                          child: Text('Skip login',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: _ink)),
+                            horizontal: 18,
+                            vertical: 11,
+                          ),
+                          child: Text(
+                            'Skip login',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _ink,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -108,105 +118,130 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Spacer(),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(22),
-                  child: Image.asset('assets/logo.png',
-                      width: 96, height: 96, fit: BoxFit.cover),
+                  child: Image.asset(
+                    'assets/logo.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 const SizedBox(height: 18),
-                const Text('Local choice. Global experience.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: _ink)),
+                const Text(
+                  'Local choice. Global experience.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: _ink,
+                  ),
+                ),
                 const SizedBox(height: 22),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 22,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        const Text('Log in or sign up',
-                            style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 14),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF4F5F7),
-                            borderRadius: BorderRadius.circular(14),
+                  child: ReadableBody(
+                    maxWidth: 440,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 22,
+                            offset: const Offset(0, 8),
                           ),
-                          child: Row(
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.fromLTRB(16, 0, 12, 0),
-                                child: Icon(LucideIcons.mail,
-                                    size: 18, color: _muted),
-                              ),
-                              Expanded(
-                                child: TextField(
-                                  controller: _email,
-                                  keyboardType: TextInputType.emailAddress,
-                                  autocorrect: false,
-                                  onChanged: (_) => setState(() {}),
-                                  onSubmitted: (_) {
-                                    if (_valid) _enter(skip: false);
-                                  },
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: 'Enter email address',
-                                    contentPadding:
-                                        EdgeInsets.symmetric(vertical: 16),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Log in or sign up',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4F5F7),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.fromLTRB(16, 0, 12, 0),
+                                  child: Icon(
+                                    LucideIcons.mail,
+                                    size: 18,
+                                    color: _muted,
                                   ),
-                                  style: const TextStyle(
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _email,
+                                    keyboardType: TextInputType.emailAddress,
+                                    autocorrect: false,
+                                    onChanged: (_) => setState(() {}),
+                                    onSubmitted: (_) {
+                                      if (_valid) _enter(skip: false);
+                                    },
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      hintText: 'Enter email address',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                    ),
+                                    style: const TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w600),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _valid ? _ink : _yellow,
+                                foregroundColor: _valid ? Colors.white : _ink,
+                                disabledBackgroundColor: const Color(
+                                  0xFFE6E8EC,
+                                ),
+                                disabledForegroundColor: _muted,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _valid ? _ink : _yellow,
-                              foregroundColor:
-                                  _valid ? Colors.white : _ink,
-                              disabledBackgroundColor:
-                                  const Color(0xFFE6E8EC),
-                              disabledForegroundColor: _muted,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                            ),
-                            onPressed:
-                                _valid ? () => _enter(skip: false) : null,
-                            child: const Text('Continue',
+                              onPressed: _valid
+                                  ? () => _enter(skip: false)
+                                  : null,
+                              child: const Text(
+                                'Continue',
                                 style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700)),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'We only use your email for order updates and receipts.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11.5, color: _muted),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          const Text(
+                            'We only use your email for order updates and receipts.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11.5, color: _muted),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
