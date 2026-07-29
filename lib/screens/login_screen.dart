@@ -36,6 +36,12 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       Session.instance.login(_phone.text.trim());
     }
+    // Opened from the account screen: go back to it, now signed in. At app
+    // launch there is nothing to go back to, so home takes over instead.
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+      return;
+    }
     Navigator.pushReplacement(
         context, MaterialPageRoute(builder: (_) => const HomeScreen()));
   }

@@ -79,7 +79,7 @@ class ProfileScreen extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () => Navigator.pushReplacement(context,
+                    onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const LoginScreen())),
                     child: const Text('Continue',
                         style: TextStyle(
