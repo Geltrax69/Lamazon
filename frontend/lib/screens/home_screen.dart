@@ -49,8 +49,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<Product>> _future = loadCatalog();
+  // Catalog and shops both come from the API; one future so the screen has
+  // a single loading and error state.
+  late Future<(List<Product>, List<Shop>)> _future = _load();
   int _tab = 0;
+
+  Future<(List<Product>, List<Shop>)> _load() async =>
+      (await loadCatalog(), await loadShops());
 
   @override
   void initState() {
@@ -82,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
           bottom: false,
           child: Stack(
             children: [
-              FutureBuilder<List<Product>>(
+              FutureBuilder<(List<Product>, List<Shop>)>(
                 future: _future,
                 builder: (context, snap) {
                   if (snap.connectionState != ConnectionState.done) {
@@ -90,10 +95,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   if (snap.hasError) {
                     return ErrorView(
-                      onRetry: () => setState(() => _future = loadCatalog()),
+                      onRetry: () => setState(() => _future = _load()),
                     );
                   }
-                  return _content(snap.data!);
+                  final (items, liveShops) = snap.data!;
+                  return _content(items, liveShops);
                 },
               ),
               Align(
@@ -107,9 +113,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _content(List<Product> items) {
+  Widget _content(List<Product> items, List<Shop> liveShops) {
     final tabName = _tabs[_tab].name;
-    final shownShops = shops
+    final shownShops = liveShops
         .where((s) => _tab == 0 || s.tab == tabName)
         .toList();
     final shownProducts = items

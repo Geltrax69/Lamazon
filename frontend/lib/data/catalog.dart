@@ -1,11 +1,27 @@
 import '../models/product.dart';
+import 'api.dart';
 
-// ponytail: local data behind a Future so every screen gets real
-// loading/error/success states now, and swapping in an API later
-// changes only this function.
+/// Catalog from the Go API, falling back to the bundled sample data when the
+/// backend is unreachable — the app stays usable offline and in tests.
 Future<List<Product>> loadCatalog() async {
-  await Future.delayed(const Duration(milliseconds: 600));
+  try {
+    final live = await Api.instance.products();
+    if (live.isNotEmpty) return live;
+  } catch (e) {
+    logApiFailure('products', e);
+  }
   return products;
+}
+
+/// Shops from the API, same fallback.
+Future<List<Shop>> loadShops() async {
+  try {
+    final live = await Api.instance.shops();
+    if (live.isNotEmpty) return live;
+  } catch (e) {
+    logApiFailure('shops', e);
+  }
+  return shops;
 }
 
 /// Everything a shop sells: its own listings, plus items it stocks that are

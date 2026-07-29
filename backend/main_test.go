@@ -6,8 +6,32 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 )
+
+// testAPI connects to the DATABASE_URL Postgres and hands back a clean
+// slate. Skips rather than fails when no database is around, so `go test`
+// still works on a machine without one.
+func testAPI(t *testing.T) http.Handler {
+	t.Helper()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable"
+	}
+	db, err := OpenDB(dsn)
+	if err != nil {
+		t.Skipf("no Postgres at %s: %v", dsn, err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// Seller data is per-test; the catalog is shared read-only seed.
+	if _, err := db.sql.Exec(
+		`TRUNCATE orders, inventory_items, seller_stores CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	return routes(&API{db: db})
+}
 
 // call runs one request against the API and returns status plus decoded body.
 func call(t *testing.T, h http.Handler, method, path string, body any) (int, map[string]any) {
@@ -40,7 +64,7 @@ func callList(t *testing.T, h http.Handler, path string) []any {
 }
 
 func TestCatalogFilters(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 
 	all := callList(t, h, "/api/products")
 	if len(all) == 0 {
@@ -62,7 +86,7 @@ func TestCatalogFilters(t *testing.T) {
 }
 
 func TestShopStocksOthersListings(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 	// Milk is listed by Nature Fresh; FreshMart stocks it cheaper.
 	items := callList(t, h, "/api/shops/FreshMart/products")
 	if len(items) != 1 {
@@ -78,7 +102,7 @@ func TestShopStocksOthersListings(t *testing.T) {
 }
 
 func TestLocationOnlyServesCampus(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 	for _, city := range []string{"LPU", "  lpu, phagwara ", "Lovely Professional University"} {
 		_, body := call(t, h, http.MethodGet,
 			"/api/locations/check?city="+url.QueryEscape(city), nil)
@@ -96,7 +120,7 @@ func TestLocationOnlyServesCampus(t *testing.T) {
 }
 
 func TestLoginValidatesEmail(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 	if code, _ := call(t, h, http.MethodPost, "/api/login",
 		map[string]string{"email": "lalit@lpu.in"}); code != http.StatusOK {
 		t.Fatalf("valid email: want 200, got %d", code)
@@ -110,7 +134,7 @@ func TestLoginValidatesEmail(t *testing.T) {
 }
 
 func TestSellerLifecycle(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 
 	// Stock cannot exist before a store does.
 	if code, _ := call(t, h, http.MethodPost, "/api/seller/items",
@@ -190,7 +214,7 @@ func TestSellerLifecycle(t *testing.T) {
 }
 
 func TestStockNeverGoesNegative(t *testing.T) {
-	h := routes(NewStore())
+	h := testAPI(t)
 	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
 		"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"},
 	})

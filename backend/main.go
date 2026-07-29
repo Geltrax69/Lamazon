@@ -10,12 +10,22 @@ import (
 )
 
 func main() {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable"
+	}
+	db, err := OpenDB(dsn)
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
+	defer db.Close()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("Lamazon API listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, routes(NewStore())); err != nil {
+	log.Printf("Lamazon API on :%s, Postgres ready", port)
+	if err := http.ListenAndServe(":"+port, routes(&API{db: db})); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -23,7 +33,7 @@ func main() {
 // routes wires every endpoint. Go 1.22 pattern routing, so no router
 // dependency. ponytail: one mux, no middleware stack until there is a
 // second cross-cutting concern.
-func routes(s *Store) http.Handler {
+func routes(s *API) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {

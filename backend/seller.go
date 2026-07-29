@@ -1,19 +1,25 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// POST /api/seller/store — opens the seller's store.
-func (s *Store) handleCreateStore(w http.ResponseWriter, r *http.Request) {
+// POST /api/seller/store — opens (or updates) the seller's store.
+func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 	var in SellerStore
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	in.Owner = owner(r)
 	in.Name = strings.TrimSpace(in.Name)
 	in.Location = strings.TrimSpace(in.Location)
 	if in.Name == "" || in.Location == "" || len(in.Categories) == 0 {
@@ -29,63 +35,96 @@ func (s *Store) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 	}
 	in.City = city
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sellerStore = &in
+	if _, err := a.db.sql.ExecContext(r.Context(), `
+		INSERT INTO seller_stores (owner, name, location, city, categories)
+		VALUES ($1,$2,$3,$4,$5)
+		ON CONFLICT (owner) DO UPDATE SET
+			name = EXCLUDED.name, location = EXCLUDED.location,
+			city = EXCLUDED.city, categories = EXCLUDED.categories`,
+		in.Owner, in.Name, in.Location, in.City, in.Categories); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusCreated, in)
 }
 
 // GET /api/seller/store
-func (s *Store) handleGetStore(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.sellerStore == nil {
+func (a *API) handleGetStore(w http.ResponseWriter, r *http.Request) {
+	store, err := a.db.store(r.Context(), owner(r))
+	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no store yet")
 		return
 	}
-	writeJSON(w, http.StatusOK, s.sellerStore)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, store)
 }
 
-// GET /api/seller/items — inventory with derived status and totals.
-func (s *Store) handleItems(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// GET /api/seller/items — inventory plus the derived summary.
+func (a *API) handleItems(w http.ResponseWriter, r *http.Request) {
+	items, err := a.db.items(r.Context(), owner(r))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var units, needsRestock int
+	var value float64
+	for _, i := range items {
+		units += i.Stock
+		value += i.Price * float64(i.Stock)
+		if i.Status != "in_stock" {
+			needsRestock++
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"items":   s.itemsWithStatus(),
-		"summary": s.summary(),
+		"items": items,
+		"summary": map[string]any{
+			"products":       len(items),
+			"units":          units,
+			"needsRestock":   needsRestock,
+			"inventoryValue": value,
+		},
 	})
 }
 
 // POST /api/seller/items — add a line of stock.
-func (s *Store) handleAddItem(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	var in InventoryItem
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
-	if in.Title == "" {
+	switch {
+	case in.Title == "":
 		writeError(w, http.StatusBadRequest, "title is required")
 		return
-	}
-	if in.Price <= 0 {
+	case in.Price <= 0:
 		writeError(w, http.StatusBadRequest, "price must be above 0")
 		return
-	}
-	if in.Stock < 0 {
+	case in.Stock < 0:
 		writeError(w, http.StatusBadRequest, "stock cannot be negative")
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.sellerStore == nil {
+	in.ID = fmt.Sprintf("item-%d", time.Now().UnixMicro())
+	_, err := a.db.sql.ExecContext(r.Context(), `
+		INSERT INTO inventory_items (id, owner, title, description, category, price, stock)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		in.ID, owner(r), in.Title, in.Description, in.Category, in.Price, in.Stock)
+	// The foreign key is what enforces "no stock without a store".
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
 		writeError(w, http.StatusConflict, "open a store before adding stock")
 		return
 	}
-	in.ID = s.id("item")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	in.Status = stockStatus(in.Stock)
-	s.items = append([]InventoryItem{in}, s.items...)
 	writeJSON(w, http.StatusCreated, in)
 }
 
@@ -95,7 +134,7 @@ type stockPatch struct {
 }
 
 // PATCH /api/seller/items/{id}/stock
-func (s *Store) handlePatchStock(w http.ResponseWriter, r *http.Request) {
+func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	var in stockPatch
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -103,57 +142,68 @@ func (s *Store) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := range s.items {
-		if s.items[i].ID != id {
-			continue
-		}
-		switch {
-		case in.Stock != nil:
-			s.items[i].Stock = *in.Stock
-		case in.Delta != nil:
-			s.items[i].Stock += *in.Delta
-		default:
-			writeError(w, http.StatusBadRequest, "send delta or stock")
-			return
-		}
-		// Stock never goes negative — that is a bug upstream, not a state.
-		if s.items[i].Stock < 0 {
-			s.items[i].Stock = 0
-		}
-		s.items[i].Status = stockStatus(s.items[i].Stock)
-		writeJSON(w, http.StatusOK, s.items[i])
+	// GREATEST keeps the floor in SQL, so a racing update cannot slip a
+	// negative past the check constraint.
+	var query string
+	var arg int
+	switch {
+	case in.Stock != nil:
+		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
+		         WHERE id = $1 RETURNING id, title, description, category, price, stock`
+		arg = *in.Stock
+	case in.Delta != nil:
+		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
+		         WHERE id = $1 RETURNING id, title, description, category, price, stock`
+		arg = *in.Delta
+	default:
+		writeError(w, http.StatusBadRequest, "send delta or stock")
 		return
 	}
-	writeError(w, http.StatusNotFound, "no item with id "+id)
+
+	var it InventoryItem
+	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg).Scan(
+		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.Stock)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	it.Status = stockStatus(it.Stock)
+	writeJSON(w, http.StatusOK, it)
 }
 
 // DELETE /api/seller/items/{id}
-func (s *Store) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i, item := range s.items {
-		if item.ID == id {
-			s.items = append(s.items[:i], s.items[i+1:]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`DELETE FROM inventory_items WHERE id = $1`, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	writeError(w, http.StatusNotFound, "no item with id "+id)
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // GET /api/seller/orders
-func (s *Store) handleOrders(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (a *API) handleOrders(w http.ResponseWriter, r *http.Request) {
+	orders, err := a.db.orders(r.Context(), owner(r))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	counts := map[OrderStage]int{}
-	for _, o := range s.orders {
+	for _, o := range orders {
 		counts[o.Stage]++
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"orders": s.orders,
+		"orders": orders,
 		"counts": map[string]int{
 			"received":  counts[StageReceived],
 			"accepted":  counts[StageAccepted],
@@ -162,8 +212,8 @@ func (s *Store) handleOrders(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/seller/orders — a buyer places an order against a stock line.
-func (s *Store) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
+// POST /api/seller/orders — a buyer orders against a stock line.
+func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		ItemID string `json:"itemId"`
 		Units  int    `json:"units"`
@@ -176,99 +226,115 @@ func (s *Store) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		in.Units = 1
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, item := range s.items {
-		if item.ID != in.ItemID {
-			continue
-		}
-		if item.Stock < in.Units {
-			writeError(w, http.StatusConflict, "not enough stock")
-			return
-		}
-		order := Order{
-			ID:        s.id("order"),
-			ItemID:    item.ID,
-			ItemTitle: item.Title,
-			Units:     in.Units,
-			Amount:    item.Price * float64(in.Units),
-			Stage:     StageReceived,
-			PlacedAt:  time.Now().UTC(),
-		}
-		s.orders = append(s.orders, order)
-		writeJSON(w, http.StatusCreated, order)
+	var title string
+	var price float64
+	var stock int
+	err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT title, price, stock FROM inventory_items WHERE id = $1`, in.ItemID).
+		Scan(&title, &price, &stock)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+in.ItemID)
 		return
 	}
-	writeError(w, http.StatusNotFound, "no item with id "+in.ItemID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if stock < in.Units {
+		writeError(w, http.StatusConflict, "not enough stock")
+		return
+	}
+
+	order := Order{
+		ID:        fmt.Sprintf("order-%d", time.Now().UnixMicro()),
+		ItemID:    in.ItemID,
+		ItemTitle: title,
+		Units:     in.Units,
+		Amount:    price * float64(in.Units),
+		Stage:     StageReceived,
+		PlacedAt:  time.Now().UTC(),
+	}
+	if _, err := a.db.sql.ExecContext(r.Context(), `
+		INSERT INTO orders (id, item_id, item_title, units, amount, stage, placed_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		order.ID, order.ItemID, order.ItemTitle, order.Units, order.Amount,
+		order.Stage, order.PlacedAt); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, order)
 }
 
-// POST /api/seller/orders/{id}/accept
-func (s *Store) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
-	s.advance(w, r.PathValue("id"), StageAccepted)
+// POST /api/seller/orders/{id}/accept — reserves, stock untouched.
+func (a *API) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var o Order
+	err := a.db.sql.QueryRowContext(r.Context(), `
+		UPDATE orders SET stage = 'accepted'
+		WHERE id = $1 AND stage <> 'delivered'
+		RETURNING id, item_id, item_title, units, amount, stage, placed_at`, id).
+		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt)
+	a.finishStage(w, r, id, o, err)
 }
 
-// POST /api/seller/orders/{id}/deliver — the hand-over is what takes the
-// units out of inventory.
-func (s *Store) handleDeliverOrder(w http.ResponseWriter, r *http.Request) {
-	s.advance(w, r.PathValue("id"), StageDelivered)
+// POST /api/seller/orders/{id}/deliver — the hand-over, and the only thing
+// that removes units from inventory. Both writes share a transaction so a
+// half-delivered order cannot exist.
+func (a *API) handleDeliverOrder(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	tx, err := a.db.sql.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	var o Order
+	err = tx.QueryRowContext(r.Context(), `
+		UPDATE orders SET stage = 'delivered'
+		WHERE id = $1 AND stage <> 'delivered'
+		RETURNING id, item_id, item_title, units, amount, stage, placed_at`, id).
+		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		a.alreadyDeliveredOrMissing(w, r, id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(),
+		`UPDATE inventory_items SET stock = GREATEST(stock - $2, 0) WHERE id = $1`,
+		o.ItemID, o.Units); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, o)
 }
 
-func (s *Store) advance(w http.ResponseWriter, id string, to OrderStage) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := range s.orders {
-		if s.orders[i].ID != id {
-			continue
-		}
-		if s.orders[i].Stage == StageDelivered {
-			writeError(w, http.StatusConflict, "order already delivered")
-			return
-		}
-		s.orders[i].Stage = to
-		if to == StageDelivered {
-			for j := range s.items {
-				if s.items[j].ID == s.orders[i].ItemID {
-					s.items[j].Stock -= s.orders[i].Units
-					if s.items[j].Stock < 0 {
-						s.items[j].Stock = 0
-					}
-					s.items[j].Status = stockStatus(s.items[j].Stock)
-					break
-				}
-			}
-		}
-		writeJSON(w, http.StatusOK, s.orders[i])
+func (a *API) finishStage(w http.ResponseWriter, r *http.Request, id string, o Order, err error) {
+	if errors.Is(err, sql.ErrNoRows) {
+		a.alreadyDeliveredOrMissing(w, r, id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, o)
+}
+
+// Separating "already delivered" from "never existed" keeps 409 meaningful.
+func (a *API) alreadyDeliveredOrMissing(w http.ResponseWriter, r *http.Request, id string) {
+	var exists bool
+	if err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT true FROM orders WHERE id = $1`, id).Scan(&exists); err == nil && exists {
+		writeError(w, http.StatusConflict, "order already delivered")
 		return
 	}
 	writeError(w, http.StatusNotFound, "no order with id "+id)
-}
-
-func (s *Store) itemsWithStatus() []InventoryItem {
-	out := make([]InventoryItem, len(s.items))
-	copy(out, s.items)
-	for i := range out {
-		out[i].Status = stockStatus(out[i].Stock)
-	}
-	return out
-}
-
-func (s *Store) summary() map[string]any {
-	var units int
-	var value float64
-	var needsRestock int
-	for _, i := range s.items {
-		if i.Stock > 0 {
-			units += i.Stock
-		}
-		value += i.Price * float64(i.Stock)
-		if stockStatus(i.Stock) != "in_stock" {
-			needsRestock++
-		}
-	}
-	return map[string]any{
-		"products":       len(s.items),
-		"units":          units,
-		"needsRestock":   needsRestock,
-		"inventoryValue": value,
-	}
 }

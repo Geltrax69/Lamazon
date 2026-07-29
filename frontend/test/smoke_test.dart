@@ -35,8 +35,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(Session.instance.onboarded, isTrue);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
+      // The catalog now comes from the API and falls back to bundled data
+      // when it is unreachable, which is instant in tests.
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Shop By Category'), findsOneWidget);
       expect(find.text('Stores near you'), findsOneWidget);

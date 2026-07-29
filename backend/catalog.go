@@ -5,18 +5,24 @@ import (
 	"strings"
 )
 
+// API serves every endpoint off Postgres.
+type API struct{ db *DB }
+
 // GET /api/products?tab=&category=&q=
 // Filters stack, so ?tab=Grocery&q=milk narrows twice.
-func (s *Store) handleProducts(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleProducts(w http.ResponseWriter, r *http.Request) {
+	all, err := a.db.products(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	tab := r.URL.Query().Get("tab")
 	category := r.URL.Query().Get("category")
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	out := make([]Product, 0, len(s.products))
-	for _, p := range s.products {
+	out := make([]Product, 0, len(all))
+	for _, p := range all {
 		if tab != "" && !strings.EqualFold(tab, "all") && !strings.EqualFold(p.Tab, tab) {
 			continue
 		}
@@ -38,11 +44,14 @@ func matches(p Product, q string) bool {
 }
 
 // GET /api/products/{id}
-func (s *Store) handleProduct(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleProduct(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, p := range s.products {
+	all, err := a.db.products(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, p := range all {
 		if p.ID == id {
 			writeJSON(w, http.StatusOK, p)
 			return
@@ -52,13 +61,15 @@ func (s *Store) handleProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/shops?tab=
-func (s *Store) handleShops(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleShops(w http.ResponseWriter, r *http.Request) {
+	all, err := a.db.shops(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	tab := r.URL.Query().Get("tab")
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	out := make([]Shop, 0, len(s.shops))
-	for _, shop := range s.shops {
+	out := make([]Shop, 0, len(all))
+	for _, shop := range all {
 		if tab != "" && !strings.EqualFold(tab, "all") && !strings.EqualFold(shop.Tab, tab) {
 			continue
 		}
@@ -70,13 +81,16 @@ func (s *Store) handleShops(w http.ResponseWriter, r *http.Request) {
 // GET /api/shops/{name}/products
 // Everything the shop sells: its own listings, plus items it stocks that are
 // listed elsewhere, each priced at this shop's price.
-func (s *Store) handleShopProducts(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleShopProducts(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	all, err := a.db.products(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	out := make([]Product, 0)
-	for _, p := range s.products {
+	for _, p := range all {
 		if strings.EqualFold(p.Store, name) {
 			out = append(out, p)
 			continue
@@ -119,8 +133,7 @@ func handleLocations(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/locations/check?city=
 func handleLocationCheck(w http.ResponseWriter, r *http.Request) {
-	city := r.URL.Query().Get("city")
-	resolved, ok := resolveCity(city)
+	resolved, ok := resolveCity(r.URL.Query().Get("city"))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"city":        resolved,
 		"serviceable": ok,
@@ -143,4 +156,16 @@ func resolveCity(city string) (string, bool) {
 		}
 	}
 	return strings.TrimSpace(city), false
+}
+
+// owner identifies the seller. ponytail: header or query until the app has
+// real sessions; swap for the token subject then.
+func owner(r *http.Request) string {
+	if e := r.Header.Get("X-User-Email"); e != "" {
+		return strings.ToLower(strings.TrimSpace(e))
+	}
+	if e := r.URL.Query().Get("owner"); e != "" {
+		return strings.ToLower(strings.TrimSpace(e))
+	}
+	return DefaultOwner
 }

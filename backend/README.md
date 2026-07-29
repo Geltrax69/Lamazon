@@ -1,13 +1,36 @@
 # Lamazon API
 
-Go 1.22+ stdlib only — `net/http` pattern routing, no framework, no database.
-State lives in memory behind a mutex, seeded from the same catalog the Flutter
-app ships, so both sides agree on prices and stores.
+Go 1.22+ stdlib routing (`net/http`, no framework) over **PostgreSQL**, via
+pgx. The schema applies itself on boot and the catalog seeds once, so a fresh
+database is ready without any manual step.
+
+## Running it locally
 
 ```bash
-go run ./...          # listens on :8080, or $PORT
-go test ./...
+docker run -d --name lamazon-pg \
+  -e POSTGRES_USER=lamazon -e POSTGRES_PASSWORD=lamazon -e POSTGRES_DB=lamazon \
+  -p 5433:5432 postgres:16-alpine
+
+go run .              # http://localhost:8080
+go test ./...         # runs against DATABASE_URL, skips if no database
 ```
+
+`DATABASE_URL` defaults to
+`postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable`.
+
+## Calling it from Flutter
+
+The app reads `API_BASE_URL`, defaulting to `http://localhost:8080`:
+
+```bash
+cd ../frontend
+flutter run -d chrome                                   # localhost
+flutter run --dart-define=API_BASE_URL=http://192.168.1.5:8080   # phone on wifi
+```
+
+`loadCatalog()` and `loadShops()` call the API and fall back to the bundled
+sample data when it is unreachable, so the app still runs with the backend
+down — and so widget tests do not need a server.
 
 ## Endpoints
 
@@ -37,8 +60,18 @@ go test ./...
 - Delivering twice returns 409 rather than double-decrementing.
 - A store outside the serviceable area is refused at creation.
 
+## Where the rules live
+
+Some invariants sit in the schema rather than in Go, so no code path can get
+around them:
+
+- `inventory_items.stock` has `CHECK (stock >= 0)`; updates use `GREATEST(..., 0)`
+- `inventory_items.owner` is a foreign key to `seller_stores`, which is what
+  makes "no stock without a store" a 409 instead of an orphan row
+- `orders.stage` is constrained to the three known stages
+- Delivering runs the order update and the stock decrement in one transaction
+
 ## Not built yet
 
-No persistence, no auth tokens, no payments. The handlers do not care where
-the data comes from — swap the maps in `store.go` for a database and they stay
-as they are.
+No auth tokens, no payments. The seller is identified by `X-User-Email` or
+`?owner=`, defaulting to a demo account, until the app sends a real session.
