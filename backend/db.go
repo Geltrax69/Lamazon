@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +30,16 @@ func OpenDB(dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
-	conn.SetMaxOpenConns(10)
+	// Pool sized for concurrency: idle conns match open ones so a burst does
+	// not pay a fresh handshake per request. ponytail: env override instead
+	// of a config file — it is the only knob that varies per deploy.
+	max := 25
+	if n, err := strconv.Atoi(os.Getenv("DB_MAX_CONNS")); err == nil && n > 0 {
+		max = n
+	}
+	conn.SetMaxOpenConns(max)
+	conn.SetMaxIdleConns(max)
+	conn.SetConnMaxIdleTime(5 * time.Minute)
 	conn.SetConnMaxLifetime(time.Hour)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -90,49 +102,70 @@ func (d *DB) seedIfEmpty(ctx context.Context) error {
 	return tx.Commit()
 }
 
-// products loads the catalog with each product's offers attached.
-func (d *DB) products(ctx context.Context) ([]Product, error) {
-	rows, err := d.sql.QueryContext(ctx, `
-		SELECT id, name, category, tab, price, image_url, store, description
-		FROM products ORDER BY id`)
+// productFilter narrows the catalog. Empty fields are ignored, so the zero
+// value means "everything".
+type productFilter struct {
+	Tab      string
+	Category string
+	Q        string // substring of name, category or store
+	Store    string // lists the store owns, plus lists it stocks as an offer
+	ID       string
+}
+
+// productQuery filters and attaches offers in one round trip. Postgres does
+// the narrowing, so a search no longer ships the whole catalog through Go.
+const productQuery = `
+	SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
+	       p.description,
+	       COALESCE((SELECT json_agg(json_build_object('store', o.store, 'price', o.price)
+	                                 ORDER BY o.store)
+	                 FROM offers o WHERE o.product_id = p.id), '[]')
+	FROM products p
+	WHERE ($1::text = '' OR p.id = $1)
+	  AND ($2::text = '' OR p.tab ILIKE $2)
+	  AND ($3::text = '' OR p.category ILIKE $3)
+	  AND ($4::text = '' OR p.name ILIKE '%' || $4 || '%'
+	                     OR p.category ILIKE '%' || $4 || '%'
+	                     OR p.store ILIKE '%' || $4 || '%')
+	  AND ($5::text = '' OR p.store ILIKE $5
+	       OR EXISTS (SELECT 1 FROM offers o
+	                  WHERE o.product_id = p.id AND o.store ILIKE $5))
+	ORDER BY p.id`
+
+func (d *DB) products(ctx context.Context, f productFilter) ([]Product, error) {
+	rows, err := d.sql.QueryContext(ctx, productQuery,
+		f.ID, f.Tab, f.Category, f.Q, f.Store)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []Product
-	byID := map[string]int{}
+	out := make([]Product, 0)
 	for rows.Next() {
 		var p Product
+		var offers []byte
 		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Tab, &p.Price,
-			&p.ImageURL, &p.Store, &p.Description); err != nil {
+			&p.ImageURL, &p.Store, &p.Description, &offers); err != nil {
 			return nil, err
 		}
-		byID[p.ID] = len(out)
+		if err := json.Unmarshal(offers, &p.Offers); err != nil {
+			return nil, err
+		}
 		out = append(out, p)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
+	return out, rows.Err()
+}
 
-	// One extra query rather than N: offers are attached in a second pass.
-	offerRows, err := d.sql.QueryContext(ctx,
-		`SELECT product_id, store, price FROM offers ORDER BY product_id, store`)
+// product reads one listing, or sql.ErrNoRows.
+func (d *DB) product(ctx context.Context, id string) (Product, error) {
+	found, err := d.products(ctx, productFilter{ID: id})
 	if err != nil {
-		return nil, err
+		return Product{}, err
 	}
-	defer offerRows.Close()
-	for offerRows.Next() {
-		var id string
-		var o Offer
-		if err := offerRows.Scan(&id, &o.Store, &o.Price); err != nil {
-			return nil, err
-		}
-		if i, ok := byID[id]; ok {
-			out[i].Offers = append(out[i].Offers, o)
-		}
+	if len(found) == 0 {
+		return Product{}, sql.ErrNoRows
 	}
-	return out, offerRows.Err()
+	return found[0], nil
 }
 
 func (d *DB) shops(ctx context.Context) ([]Shop, error) {
@@ -163,9 +196,9 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 	var s SellerStore
 	var categories string
 	err := d.sql.QueryRowContext(ctx, `
-		SELECT owner, name, location, city, array_to_string(categories, ',')
+		SELECT owner, name, location, city, array_to_string(categories, ','), photo_url
 		FROM seller_stores WHERE owner = $1`, owner).
-		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &categories)
+		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &categories, &s.PhotoURL)
 	if err != nil {
 		return s, err
 	}
@@ -180,7 +213,8 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 // rather than stored — one less column that can drift out of sync.
 func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
-		SELECT id, title, description, category, price, stock
+		SELECT id, title, description, category, price, stock,
+		       array_to_string(image_urls, E'\n')
 		FROM inventory_items WHERE owner = $1 ORDER BY id DESC`, owner)
 	if err != nil {
 		return nil, err
@@ -190,11 +224,13 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	out := make([]InventoryItem, 0)
 	for rows.Next() {
 		var i InventoryItem
+		var urls string
 		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
-			&i.Price, &i.Stock); err != nil {
+			&i.Price, &i.Stock, &urls); err != nil {
 			return nil, err
 		}
 		i.Status = stockStatus(i.Stock)
+		i.ImageURLs = splitURLs(urls)
 		out = append(out, i)
 	}
 	return out, rows.Err()
@@ -223,4 +259,13 @@ func (d *DB) orders(ctx context.Context, owner string) ([]Order, error) {
 		out = append(out, o)
 	}
 	return out, rows.Err()
+}
+
+// splitURLs turns the newline-joined text[] back into a list. Same trick as
+// the categories column: no array-type dependency for two columns.
+func splitURLs(joined string) []string {
+	if joined == "" {
+		return []string{}
+	}
+	return strings.Split(joined, "\n")
 }

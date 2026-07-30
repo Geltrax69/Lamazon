@@ -2,18 +2,26 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 )
 
-// testAPI connects to the DATABASE_URL Postgres and hands back a clean
-// slate. Skips rather than fails when no database is around, so `go test`
-// still works on a machine without one.
+// testAPI is the whole handler over a clean database, without photo storage.
 func testAPI(t *testing.T) http.Handler {
+	t.Helper()
+	return routes(&API{db: testDB(t)})
+}
+
+// testDB connects to the DATABASE_URL Postgres and hands back a clean slate.
+// Skips rather than fails when no database is around, so `go test` still works
+// on a machine without one.
+func testDB(t *testing.T) *DB {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -27,11 +35,31 @@ func testAPI(t *testing.T) http.Handler {
 
 	// Seller data is per-test; the catalog is shared read-only seed.
 	if _, err := db.sql.Exec(
-		`TRUNCATE orders, inventory_items, seller_stores CASCADE`); err != nil {
+		`TRUNCATE orders, inventory_items, seller_stores, login_codes, auth_sessions CASCADE`); err != nil {
 		t.Fatal(err)
 	}
-	return routes(&API{db: db})
+	lastTestDB = db
+	testToken = signIn(t, db, DefaultOwner)
+	return db
 }
+
+// signIn mints a session straight through the database — the emailed-code
+// path has its own tests, and every other test just needs to be somebody.
+func signIn(t *testing.T, db *DB, email string) string {
+	t.Helper()
+	s, err := db.newSession(context.Background(), email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s.Token
+}
+
+// testToken is the session the plain call() helper uses, and lastTestDB the
+// database behind it — both set by testDB.
+var (
+	testToken  string
+	lastTestDB *DB
+)
 
 // call runs one request against the API and returns status plus decoded body.
 func call(t *testing.T, h http.Handler, method, path string, body any) (int, map[string]any) {
@@ -43,6 +71,7 @@ func call(t *testing.T, h http.Handler, method, path string, body any) (int, map
 		}
 	}
 	req := httptest.NewRequest(method, path, &buf)
+	req.Header.Set("Authorization", "Bearer "+testToken)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -242,5 +271,41 @@ func TestStockNeverGoesNegative(t *testing.T) {
 	}
 	if patched["status"] != "sold_out" {
 		t.Fatalf("0 units is sold_out, got %v", patched["status"])
+	}
+}
+
+// Twenty buyers, five units. Before order placement became a single locked
+// statement, the read-then-insert let every one of them through.
+func TestConcurrentOrdersCannotOversell(t *testing.T) {
+	h := testAPI(t)
+	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+		"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"},
+	})
+	_, item := call(t, h, http.MethodPost, "/api/seller/items",
+		map[string]any{"title": "Samosa", "price": 20, "stock": 5})
+	id := item["id"].(string)
+
+	var wg sync.WaitGroup
+	created := make(chan bool, 20)
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			code, _ := call(t, h, http.MethodPost, "/api/seller/orders",
+				map[string]any{"itemId": id, "units": 1})
+			created <- code == http.StatusCreated
+		}()
+	}
+	wg.Wait()
+	close(created)
+
+	won := 0
+	for ok := range created {
+		if ok {
+			won++
+		}
+	}
+	if won != 5 {
+		t.Fatalf("5 units should fill exactly 5 orders, got %d", won)
 	}
 }

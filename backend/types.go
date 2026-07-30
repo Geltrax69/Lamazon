@@ -34,17 +34,19 @@ type SellerStore struct {
 	Location   string   `json:"location"`
 	City       string   `json:"city"`
 	Categories []string `json:"categories"`
+	PhotoURL   string   `json:"photoUrl"` // Cloudinary, empty until uploaded
 }
 
 // InventoryItem is one line of a seller's stock.
 type InventoryItem struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Category    string  `json:"category"`
-	Price       float64 `json:"price"`
-	Stock       int     `json:"stock"`
-	Status      string  `json:"status"` // derived from stock, never stored
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"`
+	Price       float64  `json:"price"`
+	Stock       int      `json:"stock"`
+	Status      string   `json:"status"`    // derived from stock, never stored
+	ImageURLs   []string `json:"imageUrls"` // Cloudinary, in upload order
 }
 
 // LowStockAt is the threshold below which an item is flagged for restocking.

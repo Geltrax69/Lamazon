@@ -1,12 +1,15 @@
 package main
 
 import (
+	"compress/gzip"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -20,12 +23,32 @@ func main() {
 	}
 	defer db.Close()
 
+	mail := mailerFromEnv()
+	if mail == nil {
+		log.Print("RESEND_API_KEY/EMAIL_SEND unset: sign-in codes go to this log")
+	}
+
+	cloud := cloudinaryFromEnv()
+	if cloud == nil {
+		log.Print("CLOUDINARY_* unset: photo uploads will return 503")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	// Timeouts so one stalled client cannot hold a connection (and its pooled
+	// database conn) open forever.
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           routes(&API{db: db, cloud: cloud, mail: mail}),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("Lamazon API on :%s, Postgres ready", port)
-	if err := http.ListenAndServe(":"+port, routes(&API{db: db})); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -51,25 +74,65 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/locations/check", handleLocationCheck)
 
 	// Accounts
-	mux.HandleFunc("POST /api/login", handleLogin)
+	mux.HandleFunc("POST /api/login", s.handleLogin)
+	mux.HandleFunc("POST /api/login/verify", s.handleVerifyCode)
+	mux.HandleFunc("POST /api/login/refresh", s.handleRefresh)
 
 	// Seller
 	mux.HandleFunc("GET /api/seller/categories", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, SellCategories)
 	})
 	mux.HandleFunc("POST /api/seller/store", s.handleCreateStore)
+	mux.HandleFunc("POST /api/seller/store/photo", s.handleStorePhoto)
 	mux.HandleFunc("GET /api/seller/store", s.handleGetStore)
 	mux.HandleFunc("GET /api/seller/items", s.handleItems)
 	mux.HandleFunc("POST /api/seller/items", s.handleAddItem)
 	mux.HandleFunc("PATCH /api/seller/items/{id}/stock", s.handlePatchStock)
+	mux.HandleFunc("POST /api/seller/items/{id}/photos", s.handleItemPhotos)
 	mux.HandleFunc("DELETE /api/seller/items/{id}", s.handleDeleteItem)
 	mux.HandleFunc("GET /api/seller/orders", s.handleOrders)
 	mux.HandleFunc("POST /api/seller/orders", s.handlePlaceOrder)
 	mux.HandleFunc("POST /api/seller/orders/{id}/accept", s.handleAcceptOrder)
 	mux.HandleFunc("POST /api/seller/orders/{id}/deliver", s.handleDeliverOrder)
 
-	return withCORS(mux)
+	return withCORS(withGzip(s.withAuth(mux)))
 }
+
+// Everything under /api/seller/ belongs to one signed-in address, so the
+// token is checked once here instead of in a dozen handlers.
+const sellerPrefix = "/api/seller/"
+
+type ownerKey struct{}
+
+func (s *API) withAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, sellerPrefix) || r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "sign in to manage your store")
+			return
+		}
+		email, err := s.db.sessionEmail(r.Context(), strings.TrimSpace(token))
+		if err != nil {
+			// Expired and forged look the same from here; the app answers both
+			// by refreshing, and signs in again if that fails too.
+			writeError(w, http.StatusUnauthorized, "session expired — sign in again")
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, email)))
+	})
+}
+
+// maxBody caps a request payload. Every endpoint here posts a small JSON
+// object, so anything larger is a mistake or an attack.
+const maxBody = 1 << 20 // 1 MiB
+
+// maxUpload is the ceiling for a whole multipart request — several photos at
+// maxPhoto each, plus the fields around them.
+const maxUpload = 60 << 20
 
 // The Flutter web build is served from another origin, so browsers preflight
 // anything that is not a plain GET.
@@ -83,30 +146,44 @@ func withCORS(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		// JSON bodies are tiny; multipart carries photos and gets the bigger
+		// ceiling, with each file checked against maxPhoto once parsed.
+		cap := int64(maxBody)
+		if isMultipart(r) {
+			cap = maxUpload
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, cap)
 		next.ServeHTTP(w, r)
 	})
 }
 
-var emailPattern = regexp.MustCompile(`^[\w.+-]+@[\w-]+\.[\w.-]+$`)
-
-// POST /api/login — email only, matching the app's sign-in.
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Email string `json:"email"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	email := strings.TrimSpace(in.Email)
-	if !emailPattern.MatchString(email) {
-		writeError(w, http.StatusBadRequest, "enter a valid email address")
-		return
-	}
-	// ponytail: no password, no token — the app has no protected data yet.
-	// Issue a real session here when it does.
-	writeJSON(w, http.StatusOK, map[string]string{"email": email})
+// withGzip compresses GET responses, which are the big ones — the catalog is
+// mostly repeated field names and URLs, so it shrinks by roughly 80%.
+// ponytail: GET only, so there is no empty-body-with-Content-Encoding case to
+// reason about on 204s.
+func withGzip(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet ||
+			!strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Add("Vary", "Accept-Encoding")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, gz: gz}, r)
+	})
 }
+
+type gzipWriter struct {
+	http.ResponseWriter
+	gz *gzip.Writer
+}
+
+func (g gzipWriter) Write(b []byte) (int, error) { return g.gz.Write(b) }
+
+var emailPattern = regexp.MustCompile(`^[\w.+-]+@[\w-]+\.[\w.-]+$`)
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")

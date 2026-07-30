@@ -4,22 +4,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // POST /api/seller/store — opens (or updates) the seller's store.
 func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
-	var in SellerStore
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	in, photos, err := decodeStore(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	in.Owner = owner(r)
+	in.Owner = a.owner(r)
 	in.Name = strings.TrimSpace(in.Name)
 	in.Location = strings.TrimSpace(in.Location)
 	if in.Name == "" || in.Location == "" || len(in.Categories) == 0 {
@@ -35,13 +33,30 @@ func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 	}
 	in.City = city
 
+	// Photo first: if Cloudinary refuses, nothing has been written yet, so
+	// the seller retries one call instead of owning a store with no picture.
+	if len(photos) > 0 {
+		if a.cloud == nil {
+			writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
+			return
+		}
+		url, err := a.cloud.upload(r.Context(), storeFolder(in.Name), storePhotoName, photos[0])
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		in.PhotoURL = url
+	}
+
+	// COALESCE keeps an existing photo when this call did not carry one.
 	if _, err := a.db.sql.ExecContext(r.Context(), `
-		INSERT INTO seller_stores (owner, name, location, city, categories)
-		VALUES ($1,$2,$3,$4,$5)
+		INSERT INTO seller_stores (owner, name, location, city, categories, photo_url)
+		VALUES ($1,$2,$3,$4,$5,$6)
 		ON CONFLICT (owner) DO UPDATE SET
 			name = EXCLUDED.name, location = EXCLUDED.location,
-			city = EXCLUDED.city, categories = EXCLUDED.categories`,
-		in.Owner, in.Name, in.Location, in.City, in.Categories); err != nil {
+			city = EXCLUDED.city, categories = EXCLUDED.categories,
+			photo_url = COALESCE(NULLIF(EXCLUDED.photo_url, ''), seller_stores.photo_url)`,
+		in.Owner, in.Name, in.Location, in.City, in.Categories, in.PhotoURL); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -50,7 +65,7 @@ func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/seller/store
 func (a *API) handleGetStore(w http.ResponseWriter, r *http.Request) {
-	store, err := a.db.store(r.Context(), owner(r))
+	store, err := a.db.store(r.Context(), a.owner(r))
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no store yet")
 		return
@@ -64,7 +79,7 @@ func (a *API) handleGetStore(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/seller/items — inventory plus the derived summary.
 func (a *API) handleItems(w http.ResponseWriter, r *http.Request) {
-	items, err := a.db.items(r.Context(), owner(r))
+	items, err := a.db.items(r.Context(), a.owner(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -91,9 +106,9 @@ func (a *API) handleItems(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/seller/items — add a line of stock.
 func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
-	var in InventoryItem
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	in, photos, err := decodeItem(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
@@ -109,11 +124,41 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	in.ID = fmt.Sprintf("item-%d", time.Now().UnixMicro())
-	_, err := a.db.sql.ExecContext(r.Context(), `
-		INSERT INTO inventory_items (id, owner, title, description, category, price, stock)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		in.ID, owner(r), in.Title, in.Description, in.Category, in.Price, in.Stock)
+	// Photos are named after the store, so the store is what says whether
+	// this seller may add stock at all — a clearer 409 than a foreign key
+	// violation, and it happens before anything is uploaded.
+	in.ImageURLs = []string{}
+	if len(photos) > 0 {
+		if a.cloud == nil {
+			writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
+			return
+		}
+		store, err := a.db.store(r.Context(), a.owner(r))
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusConflict, "open a store before adding stock")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		for n, img := range photos {
+			url, err := a.cloud.upload(r.Context(), storeFolder(store.Name),
+				itemPhotoName(store.Name, in.Title, n+1), img)
+			if err != nil {
+				writeError(w, http.StatusBadGateway, err.Error())
+				return
+			}
+			in.ImageURLs = append(in.ImageURLs, url)
+		}
+	}
+
+	// The id comes from the sequence, so concurrent adds cannot collide.
+	err = a.db.sql.QueryRowContext(r.Context(), `
+		INSERT INTO inventory_items (owner, title, description, category, price, stock, image_urls)
+		VALUES ($1,$2,$3,$4,$5,$6,$7::text[]) RETURNING id`,
+		a.owner(r), in.Title, in.Description, in.Category, in.Price, in.Stock, in.ImageURLs).
+		Scan(&in.ID)
 	// The foreign key is what enforces "no stock without a store".
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
@@ -149,11 +194,13 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case in.Stock != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
-		         WHERE id = $1 RETURNING id, title, description, category, price, stock`
+		         WHERE id = $1 RETURNING id, title, description, category, price, stock,
+		         array_to_string(image_urls, E'\n')`
 		arg = *in.Stock
 	case in.Delta != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
-		         WHERE id = $1 RETURNING id, title, description, category, price, stock`
+		         WHERE id = $1 RETURNING id, title, description, category, price, stock,
+		         array_to_string(image_urls, E'\n')`
 		arg = *in.Delta
 	default:
 		writeError(w, http.StatusBadRequest, "send delta or stock")
@@ -161,8 +208,9 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var it InventoryItem
+	var urls string
 	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg).Scan(
-		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.Stock)
+		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.Stock, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
 		return
@@ -172,6 +220,7 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	it.Status = stockStatus(it.Stock)
+	it.ImageURLs = splitURLs(urls)
 	writeJSON(w, http.StatusOK, it)
 }
 
@@ -193,7 +242,7 @@ func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/seller/orders
 func (a *API) handleOrders(w http.ResponseWriter, r *http.Request) {
-	orders, err := a.db.orders(r.Context(), owner(r))
+	orders, err := a.db.orders(r.Context(), a.owner(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -226,12 +275,24 @@ func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		in.Units = 1
 	}
 
+	// Check and insert inside one transaction, holding the item row. FOR
+	// UPDATE makes concurrent orders for the same item queue up, and because
+	// each statement takes a fresh snapshot, the reserved sum below sees
+	// whatever the previous holder committed. A single statement would not:
+	// its CTEs would all read the snapshot from before the lock was granted.
+	tx, err := a.db.sql.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
 	var title string
 	var price float64
 	var stock int
-	err := a.db.sql.QueryRowContext(r.Context(),
-		`SELECT title, price, stock FROM inventory_items WHERE id = $1`, in.ItemID).
-		Scan(&title, &price, &stock)
+	err = tx.QueryRowContext(r.Context(),
+		`SELECT title, price, stock FROM inventory_items WHERE id = $1 FOR UPDATE`,
+		in.ItemID).Scan(&title, &price, &stock)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+in.ItemID)
 		return
@@ -240,29 +301,37 @@ func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if stock < in.Units {
+
+	// Undelivered orders already claim units, so the fifth buyer of five
+	// units is the last one served.
+	var reserved int
+	if err := tx.QueryRowContext(r.Context(), `
+		SELECT COALESCE(sum(units), 0) FROM orders
+		WHERE item_id = $1 AND stage <> 'delivered'`, in.ItemID).Scan(&reserved); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if stock-reserved < in.Units {
 		writeError(w, http.StatusConflict, "not enough stock")
 		return
 	}
 
-	order := Order{
-		ID:        fmt.Sprintf("order-%d", time.Now().UnixMicro()),
-		ItemID:    in.ItemID,
-		ItemTitle: title,
-		Units:     in.Units,
-		Amount:    price * float64(in.Units),
-		Stage:     StageReceived,
-		PlacedAt:  time.Now().UTC(),
-	}
-	if _, err := a.db.sql.ExecContext(r.Context(), `
-		INSERT INTO orders (id, item_id, item_title, units, amount, stage, placed_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		order.ID, order.ItemID, order.ItemTitle, order.Units, order.Amount,
-		order.Stage, order.PlacedAt); err != nil {
+	var o Order
+	if err := tx.QueryRowContext(r.Context(), `
+		INSERT INTO orders (item_id, item_title, units, amount, stage)
+		VALUES ($1,$2,$3,$4,'received')
+		RETURNING id, item_id, item_title, units, amount, stage, placed_at`,
+		in.ItemID, title, in.Units, price*float64(in.Units)).
+		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+			&o.PlacedAt); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, order)
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, o)
 }
 
 // POST /api/seller/orders/{id}/accept — reserves, stock untouched.

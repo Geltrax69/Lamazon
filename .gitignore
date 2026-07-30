@@ -46,3 +46,6 @@ app.*.map.json
 
 # Go
 backend/backend
+
+# Local secrets (Cloudinary). Never commit.
+.env

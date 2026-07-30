@@ -17,8 +17,12 @@ class _DevHttpOverrides extends HttpOverrides {
         ..badCertificateCallback = (cert, host, port) => true;
 }
 
-void main() {
+void main() async {
   if (kDebugMode) HttpOverrides.global = _DevHttpOverrides();
+  // The stored session decides whether the login screen shows at all, so it
+  // has to be read before the first frame.
+  WidgetsFlutterBinding.ensureInitialized();
+  await Session.instance.restore();
   runApp(const LamazonApp());
 }
 

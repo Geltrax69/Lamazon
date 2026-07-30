@@ -59,6 +59,51 @@ CREATE TABLE IF NOT EXISTS orders (
     placed_at  TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
+-- One live sign-in code per address; a resend replaces the row.
+CREATE TABLE IF NOT EXISTS login_codes (
+    email      TEXT PRIMARY KEY,
+    code_hash  TEXT        NOT NULL, -- sha256, so the table never holds a usable code
+    expires_at TIMESTAMPTZ NOT NULL,
+    sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    attempts   INTEGER     NOT NULL DEFAULT 0
+);
+
+-- Sessions hold hashes, never the tokens themselves: a leaked database dump
+-- cannot be used to sign in. The access token is short-lived and the refresh
+-- token is rotated on every use, so a stolen one is good for one call at most.
+DROP TABLE IF EXISTS sessions; -- superseded by the shape below
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    access_hash        TEXT PRIMARY KEY,
+    refresh_hash       TEXT        NOT NULL UNIQUE,
+    email              TEXT        NOT NULL,
+    expires_at         TIMESTAMPTZ NOT NULL,
+    refresh_expires_at TIMESTAMPTZ NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_email ON auth_sessions (email);
+
+-- Photos live in Cloudinary; Postgres keeps the URLs. Added with ALTER so an
+-- existing database picks them up on the next boot.
+ALTER TABLE seller_stores
+    ADD COLUMN IF NOT EXISTS photo_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE inventory_items
+    ADD COLUMN IF NOT EXISTS image_urls TEXT[] NOT NULL DEFAULT '{}';
+
+-- Postgres hands out ids, not the clock: two requests in the same microsecond
+-- used to generate the same primary key and one of them lost.
+CREATE SEQUENCE IF NOT EXISTS inventory_item_ids;
+CREATE SEQUENCE IF NOT EXISTS order_ids;
+ALTER TABLE inventory_items
+    ALTER COLUMN id SET DEFAULT 'item-' || nextval('inventory_item_ids');
+ALTER TABLE orders
+    ALTER COLUMN id SET DEFAULT 'order-' || nextval('order_ids');
+
 CREATE INDEX IF NOT EXISTS idx_offers_product ON offers (product_id);
 CREATE INDEX IF NOT EXISTS idx_items_owner ON inventory_items (owner);
 CREATE INDEX IF NOT EXISTS idx_orders_item ON orders (item_id);
+-- ponytail: plain indexes for the tab/category filters. The ?q= search still
+-- scans; add pg_trgm when the catalog outgrows a few thousand rows.
+CREATE INDEX IF NOT EXISTS idx_products_tab ON products (tab);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products (category);
+-- Placing an order sums this seller's outstanding units for one item.
+CREATE INDEX IF NOT EXISTS idx_orders_item_stage ON orders (item_id, stage);

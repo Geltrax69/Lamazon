@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../data/api.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/catalog.dart';
@@ -22,21 +25,78 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
+  final _code = TextEditingController();
+
+  /// Null until a code has been mailed; then the card asks for the code.
+  bool _codeSent = false;
+  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
     _email.dispose();
+    _code.dispose();
     super.dispose();
   }
 
-  bool get _valid => Session.isValidEmail(_email.text);
+  bool get _valid => _codeSent
+      ? _code.text.trim().length == 6
+      : Session.isValidEmail(_email.text);
+
+  /// Step one: ask the backend to mail a code.
+  Future<void> _sendCode() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.instance.requestLoginCode(_email.text.trim());
+      setState(() => _codeSent = true);
+    } on http.ClientException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      // Offline: the app still works on bundled data, so let people browse.
+      logApiFailure('login code', e);
+      Session.instance.skip();
+      _go();
+      return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Step two: the code buys a session token.
+  Future<void> _verifyCode() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final tokens = await Api.instance
+          .verifyLoginCode(_email.text.trim(), _code.text.trim());
+      await Session.instance.signIn(tokens);
+      _go();
+    } on http.ClientException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      logApiFailure('verify code', e);
+      setState(() => _error = 'Could not reach the server. Try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// One button, two steps: mail the code, then check it.
+  void _submit() => _codeSent ? _verifyCode() : _sendCode();
 
   void _enter({required bool skip}) {
-    if (skip) {
-      Session.instance.skip();
-    } else {
-      Session.instance.login(_email.text);
-    }
+    if (skip) Session.instance.skip();
+    _go();
+  }
+
+  /// Leaves the login screen for wherever the user came from.
+  void _go() {
+    if (!mounted) return;
     // Opened from the account screen: go back to it, now signed in. At app
     // launch there is nothing to go back to, so home takes over instead.
     if (Navigator.canPop(context)) {
@@ -180,17 +240,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 Expanded(
                                   child: TextField(
-                                    controller: _email,
-                                    keyboardType: TextInputType.emailAddress,
+                                    controller: _codeSent ? _code : _email,
+                                    keyboardType: _codeSent
+                                        ? TextInputType.number
+                                        : TextInputType.emailAddress,
                                     autocorrect: false,
                                     onChanged: (_) => setState(() {}),
                                     onSubmitted: (_) {
-                                      if (_valid) _enter(skip: false);
+                                      if (_valid && !_busy) _submit();
                                     },
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       border: InputBorder.none,
-                                      hintText: 'Enter email address',
-                                      contentPadding: EdgeInsets.symmetric(
+                                      hintText: _codeSent
+                                          ? 'Enter the 6-digit code'
+                                          : 'Enter email address',
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
                                         vertical: 16,
                                       ),
                                     ),
@@ -222,12 +287,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              onPressed: _valid
-                                  ? () => _enter(skip: false)
-                                  : null,
-                              child: const Text(
-                                'Continue',
-                                style: TextStyle(
+                              onPressed: _valid && !_busy ? _submit : null,
+                              child: Text(
+                                _busy
+                                    ? 'Please wait…'
+                                    : _codeSent
+                                        ? 'Verify code'
+                                        : 'Send me a code',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -235,10 +302,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            'We only use your email for order updates and receipts.',
+                          Text(
+                            _error ??
+                                (_codeSent
+                                    ? 'We sent a code to ${_email.text.trim()}. It expires in 10 minutes.'
+                                    : 'We only use your email for order updates and receipts.'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 11.5, color: _muted),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: _error == null
+                                  ? _muted
+                                  : const Color(0xFFD03A3A),
+                            ),
                           ),
                         ],
                       ),

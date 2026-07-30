@@ -1,63 +1,56 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 )
 
-// API serves every endpoint off Postgres.
-type API struct{ db *DB }
+// API serves every endpoint off Postgres, with photos in Cloudinary.
+type API struct {
+	db    *DB
+	cloud *Cloudinary // nil when the credentials are unset
+	mail  *Mailer     // nil when unconfigured: codes go to the log
+}
 
 // GET /api/products?tab=&category=&q=
 // Filters stack, so ?tab=Grocery&q=milk narrows twice.
 func (a *API) handleProducts(w http.ResponseWriter, r *http.Request) {
-	all, err := a.db.products(r.Context())
+	out, err := a.db.products(r.Context(), productFilter{
+		Tab:      anyTab(r.URL.Query().Get("tab")),
+		Category: strings.TrimSpace(r.URL.Query().Get("category")),
+		Q:        strings.TrimSpace(r.URL.Query().Get("q")),
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	tab := r.URL.Query().Get("tab")
-	category := r.URL.Query().Get("category")
-	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
-
-	out := make([]Product, 0, len(all))
-	for _, p := range all {
-		if tab != "" && !strings.EqualFold(tab, "all") && !strings.EqualFold(p.Tab, tab) {
-			continue
-		}
-		if category != "" && !strings.EqualFold(p.Category, category) {
-			continue
-		}
-		if q != "" && !matches(p, q) {
-			continue
-		}
-		out = append(out, p)
-	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-func matches(p Product, q string) bool {
-	return strings.Contains(strings.ToLower(p.Name), q) ||
-		strings.Contains(strings.ToLower(p.Category), q) ||
-		strings.Contains(strings.ToLower(p.Store), q)
+// "all" and "" both mean unfiltered.
+func anyTab(tab string) string {
+	tab = strings.TrimSpace(tab)
+	if strings.EqualFold(tab, "all") {
+		return ""
+	}
+	return tab
 }
 
 // GET /api/products/{id}
 func (a *API) handleProduct(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	all, err := a.db.products(r.Context())
+	p, err := a.db.product(r.Context(), id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no product with id "+id)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	for _, p := range all {
-		if p.ID == id {
-			writeJSON(w, http.StatusOK, p)
-			return
-		}
-	}
-	writeError(w, http.StatusNotFound, "no product with id "+id)
+	writeJSON(w, http.StatusOK, p)
 }
 
 // GET /api/shops?tab=
@@ -67,10 +60,10 @@ func (a *API) handleShops(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	tab := r.URL.Query().Get("tab")
+	tab := anyTab(r.URL.Query().Get("tab"))
 	out := make([]Shop, 0, len(all))
 	for _, shop := range all {
-		if tab != "" && !strings.EqualFold(tab, "all") && !strings.EqualFold(shop.Tab, tab) {
+		if tab != "" && !strings.EqualFold(shop.Tab, tab) {
 			continue
 		}
 		out = append(out, shop)
@@ -83,7 +76,7 @@ func (a *API) handleShops(w http.ResponseWriter, r *http.Request) {
 // listed elsewhere, each priced at this shop's price.
 func (a *API) handleShopProducts(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	all, err := a.db.products(r.Context())
+	all, err := a.db.products(r.Context(), productFilter{Store: name})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -158,14 +151,9 @@ func resolveCity(city string) (string, bool) {
 	return strings.TrimSpace(city), false
 }
 
-// owner identifies the seller. ponytail: header or query until the app has
-// real sessions; swap for the token subject then.
-func owner(r *http.Request) string {
-	if e := r.Header.Get("X-User-Email"); e != "" {
-		return strings.ToLower(strings.TrimSpace(e))
-	}
-	if e := r.URL.Query().Get("owner"); e != "" {
-		return strings.ToLower(strings.TrimSpace(e))
-	}
-	return DefaultOwner
+// owner is the address withAuth already verified. Handlers under
+// /api/seller/ never run without one, so there is no fallback to get wrong.
+func (a *API) owner(r *http.Request) string {
+	email, _ := r.Context().Value(ownerKey{}).(string)
+	return email
 }

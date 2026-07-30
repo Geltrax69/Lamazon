@@ -226,7 +226,7 @@ class ProfileScreen extends StatelessWidget {
                           label: 'Log out',
                           color: const Color(0xFFD32F2F),
                           onTap: () {
-                            Session.instance.logout();
+                            Session.instance.signOut();
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
