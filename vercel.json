@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter && cd frontend && $HOME/flutter/bin/flutter pub get",
-  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release",
+  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release --dart-define=API_BASE_URL=https://api.geltrax.engineer",
   "outputDirectory": "frontend/build/web",
   "framework": null,
   "headers": [
