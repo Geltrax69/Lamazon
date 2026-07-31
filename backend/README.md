@@ -9,13 +9,21 @@ database is ready without any manual step.
 ```bash
 ./dev.sh              # from the repo root: Postgres + API + the app in Chrome
 ./dev.sh macos        # any flutter device id
+LOCAL=1 ./dev.sh      # skip the tunnel, talk straight to localhost
 PORT=8081 ./dev.sh    # if 8080 is taken
 ```
 
 It starts (or reuses) the Postgres container, waits for it, builds and starts
-the API, blocks until `/api/health` answers, and only then launches Flutter with
-`API_BASE_URL` pointed at it — so the app never opens onto a backend that is
-still compiling. Quitting Flutter stops the API; Postgres stays up for next time.
+the API, blocks until `/api/health` answers, and only then launches Flutter —
+so the app never opens onto a backend that is still compiling. Quitting Flutter
+stops the API; Postgres stays up for next time.
+
+**The app calls `https://api.geltrax.engineer` by default**, the same hostname
+the deployed site uses, so a local run exercises the real path: TLS, CORS and
+the Cloudflare tunnel. Those are where the failures live — a CORS header that
+localhost never needed will break production and nothing else. `LOCAL=1` skips
+it, and a tunnel that is down falls back to localhost with a warning rather
+than blocking the run.
 
 ## Running the pieces by hand
 

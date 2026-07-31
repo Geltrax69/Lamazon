@@ -3,13 +3,20 @@
 # at it. Quitting Flutter (q, or Ctrl-C) stops the API too; Postgres is left
 # running in Docker so the next start is instant.
 #
-# Usage: ./dev.sh            # Chrome
-#        ./dev.sh macos      # any flutter device id
+# The app talks to the API over the Cloudflare tunnel by default, the same
+# hostname the deployed site uses. That way local runs exercise the real path
+# — TLS, CORS, the tunnel — instead of a localhost shortcut where those
+# problems cannot show up.
+#
+# Usage: ./dev.sh              # Chrome, app talks to api.geltrax.engineer
+#        ./dev.sh macos        # any flutter device id
+#        LOCAL=1 ./dev.sh      # skip the tunnel, talk straight to localhost
 set -euo pipefail
 
 DEVICE="${1:-chrome}"
 PORT="${PORT:-8080}"
-API="http://localhost:$PORT"
+LOCAL_API="http://localhost:$PORT"
+PUBLIC_API="${PUBLIC_API:-https://api.geltrax.engineer}"
 DB_URL="postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable"
 cd "$(dirname "$0")"
 
@@ -79,15 +86,30 @@ API_PID=$!
 # not always reach the EXIT trap on an untrapped signal.
 trap 'kill "$API_PID" 2>/dev/null; rm -f "$BIN"; exit' EXIT INT TERM
 
-# The app talks to the API over HTTP, so prove that link works before opening
-# a browser onto a backend that is still compiling or already dead.
-echo "==> waiting for $API/api/health"
+# Prove the API answers before opening a browser onto something that is still
+# compiling or already dead.
+echo "==> waiting for $LOCAL_API/api/health"
 for _ in $(seq 60); do
-  curl -sf "$API/api/health" >/dev/null && break
+  curl -sf "$LOCAL_API/api/health" >/dev/null && break
   kill -0 "$API_PID" 2>/dev/null || { echo "API exited, see the log above"; exit 1; }
   sleep 1
 done
-curl -sf "$API/api/health" >/dev/null || { echo "API never answered /api/health"; exit 1; }
+curl -sf "$LOCAL_API/api/health" >/dev/null || { echo "API never answered /api/health"; exit 1; }
+
+# Then decide what the app should call. The tunnel is the default because it
+# is what the deployed site uses, but a tunnel that is down should slow nobody
+# down: say so and carry on against localhost.
+API="$PUBLIC_API"
+if [ -n "${LOCAL:-}" ]; then
+  API="$LOCAL_API"
+  echo "==> LOCAL=1, skipping the tunnel"
+elif curl -sf -m 10 "$PUBLIC_API/api/health" >/dev/null 2>&1; then
+  echo "==> tunnel up: the app will call $PUBLIC_API"
+else
+  API="$LOCAL_API"
+  echo "!! $PUBLIC_API is not answering — falling back to localhost."
+  echo "   Check it with ./tunnel.sh status; the deployed site needs it up."
+fi
 
 products=$(curl -sf "$API/api/products" | grep -o '"id"' | wc -l | tr -d ' ')
 echo "==> API healthy, catalog has $products products"
