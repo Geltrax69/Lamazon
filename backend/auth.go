@@ -58,12 +58,19 @@ func mailerFromEnv() *Mailer {
 }
 
 func (m *Mailer) sendCode(ctx context.Context, to, code string) error {
+	return m.send(ctx, to, code+" is your Lamazon sign-in code",
+		"Your Lamazon sign-in code is "+code+
+			"\n\nIt expires in 10 minutes. If you did not ask to sign in, ignore this email.")
+}
+
+// send is one plain-text email. Every notification goes out this way too:
+// email is the channel that needs nothing installed and works on every phone.
+func (m *Mailer) send(ctx context.Context, to, subject, text string) error {
 	body, _ := json.Marshal(map[string]any{
 		"from":    m.from,
 		"to":      []string{to},
-		"subject": code + " is your Lamazon sign-in code",
-		"text": "Your Lamazon sign-in code is " + code +
-			"\n\nIt expires in 10 minutes. If you did not ask to sign in, ignore this email.",
+		"subject": subject,
+		"text":    text,
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.base+"/emails", bytes.NewReader(body))
 	if err != nil {

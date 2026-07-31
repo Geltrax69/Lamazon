@@ -12,6 +12,7 @@ type API struct {
 	db    *DB
 	cloud *Cloudinary // nil when the credentials are unset
 	mail  *Mailer     // nil when unconfigured: codes go to the log
+	push  *Push       // nil without VAPID keys: email still goes out
 }
 
 // GET /api/products?tab=&category=&q=

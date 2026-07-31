@@ -67,6 +67,32 @@ Non-alphanumeric characters in a store or item name become `_`, so a name
 cannot invent a folder. Re-uploading a store photo overwrites `store_image`;
 item photos append and keep counting from what the item already has.
 
+## Notifications
+
+Two channels, one call. `notify()` sends the email **always** — it needs
+nothing installed and works on every phone — and adds a browser notification
+wherever the person allowed one. Neither can fail an order: problems are
+logged and the request carries on.
+
+Web push is the Push API directly, signed with VAPID. ponytail: no Firebase —
+FCM for the web wraps this same protocol and costs a project, two client
+packages and a service account on top.
+
+```
+VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   # in .env
+```
+
+Unset, notifications quietly go by email only.
+
+Worth knowing before relying on it:
+
+- **iOS Safari delivers push only after the site is added to the Home Screen.**
+  Android Chrome and desktop work straight after the permission prompt.
+- Nothing sends while this API is asleep. An order at 3am notifies no one
+  until it is back up.
+- Subscriptions that answer 404 or 410 are deleted, so dead browsers are not
+  retried on every order.
+
 ## Endpoints
 
 | Method | Path | Purpose |
@@ -78,7 +104,11 @@ item photos append and keep counting from what the item already has.
 | GET | `/api/shops/{name}/products` | a shop's own listings **plus** items it stocks, at its price |
 | GET | `/api/locations` | where delivery runs |
 | GET | `/api/locations/check?city=` | serviceability; accepts `LPU`, `lpu, phagwara`, any casing |
-| POST | `/api/login` | `{"email"}` — validates format, no password yet |
+| POST | `/api/login` | `{"email"}` — mails a six-digit code |
+| POST | `/api/login/verify` | `{"email","code"}` — returns an access + refresh token |
+| POST | `/api/login/refresh` | `{"refreshToken"}` — rotates the pair |
+| GET | `/api/push/key` | VAPID public key for the browser to subscribe with |
+| POST/DELETE | `/api/push/subscribe` | register / drop this browser (needs a session) |
 | GET | `/api/seller/categories` | categories a seller can list under |
 | POST/GET | `/api/seller/store` | open / read the seller's store |
 | POST | `/api/seller/store/photo` | multipart `file` — store cover, to Cloudinary |
@@ -108,7 +138,19 @@ around them:
 - `orders.stage` is constrained to the three known stages
 - Delivering runs the order update and the stock decrement in one transaction
 
+## Sign-in
+
+A six-digit code by email through Resend. Codes come from `crypto/rand`, are
+stored only as a sha256, are single use, allow five attempts (counted in the
+statement that reads them, so scripting cannot race the limit), and one send
+per address per minute.
+
+Verifying returns an access token (1 hour) and a refresh token (30 days).
+Both are stored hashed. **The refresh token rotates on every use**, so a
+stolen one is good for a single call. Everything under `/api/seller/` requires
+a live token.
+
 ## Not built yet
 
-No auth tokens, no payments. The seller is identified by `X-User-Email` or
-`?owner=`, defaulting to a demo account, until the app sends a real session.
+No payments. Nothing prunes expired rows from `auth_sessions` or
+`login_codes`, and deleting an item leaves its Cloudinary photos behind.

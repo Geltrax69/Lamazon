@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/push.dart';
 import '../data/seller.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/screen_header.dart';
@@ -39,6 +40,7 @@ class SellerDashboardScreen extends StatelessWidget {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
                       children: [
+                        const _NotifyBanner(),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: SizedBox(
@@ -545,6 +547,66 @@ class _StockButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(9),
         ),
         child: Icon(icon, size: 15, color: _ink),
+      ),
+    );
+  }
+}
+
+
+/// Asks for notification permission where the reason is obvious — the seller
+/// is looking at their store — rather than on app start, which browsers
+/// penalise and people reflexively deny. Hidden once it has been answered,
+/// and everywhere the browser cannot do it (including iOS Safari until the
+/// site is added to the Home Screen).
+class _NotifyBanner extends StatefulWidget {
+  const _NotifyBanner();
+
+  @override
+  State<_NotifyBanner> createState() => _NotifyBannerState();
+}
+
+class _NotifyBannerState extends State<_NotifyBanner> {
+  bool _hidden = false;
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final push = Push.instance;
+    if (_hidden || !push.supported || push.granted || push.denied) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.bell, size: 18),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Get notified the moment an order arrives.\nWe email you either way.',
+              style: TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () async {
+                    setState(() => _busy = true);
+                    await push.enable();
+                    if (mounted) setState(() => _busy = false);
+                  },
+            child: Text(_busy ? '…' : 'Turn on'),
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.x, size: 15),
+            onPressed: () => setState(() => _hidden = true),
+          ),
+        ],
       ),
     );
   }

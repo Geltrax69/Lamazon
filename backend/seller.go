@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -331,7 +334,28 @@ func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	// The seller hears about it only once the order is committed, and a
+	// notification that fails never undoes a real order.
+	a.notifyOwnerOfOrder(r.Context(), in.ItemID, o)
 	writeJSON(w, http.StatusCreated, o)
+}
+
+// notifyOwnerOfOrder tells whoever owns the stock that someone bought it.
+func (a *API) notifyOwnerOfOrder(ctx context.Context, itemID string, o Order) {
+	var owner, storeName string
+	if err := a.db.sql.QueryRowContext(ctx, `
+		SELECT s.owner, s.name FROM inventory_items i
+		JOIN seller_stores s ON s.owner = i.owner WHERE i.id = $1`, itemID).
+		Scan(&owner, &storeName); err != nil {
+		log.Printf("order %s: no one to notify: %v", o.ID, err)
+		return
+	}
+	a.notify(ctx, owner,
+		fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
+		fmt.Sprintf("%s just received an order.\n\n%d × %s\nTotal ₹%.0f\n\n"+
+			"Open Lamazon to accept it.",
+			storeName, o.Units, o.ItemTitle, o.Amount))
 }
 
 // POST /api/seller/orders/{id}/accept — reserves, stock untouched.

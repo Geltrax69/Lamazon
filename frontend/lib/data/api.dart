@@ -137,6 +137,26 @@ class Api {
     }
   }
 
+  // ---- Notifications ----------------------------------------------------
+
+  /// The VAPID public key the browser needs to subscribe. Empty when the
+  /// backend has no keys, which is how push stays optional.
+  Future<String> pushPublicKey() async {
+    final res = await http.get(_url('/api/push/key')).timeout(_timeout);
+    if (res.statusCode != 200) return '';
+    return (jsonDecode(res.body) as Map<String, dynamic>)['publicKey'] as String;
+  }
+
+  /// Files this browser under the signed-in address, so orders can reach it.
+  Future<void> subscribeToPush(Map<String, dynamic> subscription) async {
+    final res = await http
+        .post(_url('/api/push/subscribe'),
+            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+            body: jsonEncode(subscription))
+        .timeout(_timeout);
+    if (res.statusCode != 204) throw http.ClientException(_reason(res));
+  }
+
   // ---- Seller ----------------------------------------------------------
   //
   // The seller header stands in for a session; the backend reads it the same

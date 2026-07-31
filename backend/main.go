@@ -28,6 +28,11 @@ func main() {
 		log.Print("RESEND_API_KEY/EMAIL_SEND unset: sign-in codes go to this log")
 	}
 
+	push := pushFromEnv()
+	if push == nil {
+		log.Print("VAPID_* unset: notifications go by email only")
+	}
+
 	cloud := cloudinaryFromEnv()
 	if cloud == nil {
 		log.Print("CLOUDINARY_* unset: photo uploads will return 503")
@@ -41,7 +46,7 @@ func main() {
 	// database conn) open forever.
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           routes(&API{db: db, cloud: cloud, mail: mail}),
+		Handler:           routes(&API{db: db, cloud: cloud, mail: mail, push: push}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -78,6 +83,11 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/login/verify", s.handleVerifyCode)
 	mux.HandleFunc("POST /api/login/refresh", s.handleRefresh)
 
+	// Notifications
+	mux.HandleFunc("GET /api/push/key", s.handlePushKey)
+	mux.HandleFunc("POST /api/push/subscribe", s.handlePushSubscribe)
+	mux.HandleFunc("DELETE /api/push/subscribe", s.handlePushUnsubscribe)
+
 	// Seller
 	mux.HandleFunc("GET /api/seller/categories", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, SellCategories)
@@ -102,11 +112,18 @@ func routes(s *API) http.Handler {
 // token is checked once here instead of in a dozen handlers.
 const sellerPrefix = "/api/seller/"
 
+// Subscribing files a browser under one address, so it needs a session too.
+// The public key itself is not a secret and stays open.
+func needsSession(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, sellerPrefix) ||
+		r.URL.Path == "/api/push/subscribe"
+}
+
 type ownerKey struct{}
 
 func (s *API) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, sellerPrefix) || r.Method == http.MethodOptions {
+		if !needsSession(r) || r.Method == http.MethodOptions {
 			next.ServeHTTP(w, r)
 			return
 		}
