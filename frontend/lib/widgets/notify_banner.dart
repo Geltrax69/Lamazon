@@ -23,8 +23,11 @@ class NotifyBanner extends StatefulWidget {
 enum _NotifyStep { ask, sending, waiting, confirmed, failed }
 
 class _NotifyBannerState extends State<NotifyBanner> {
+  static const _confirmTimeout = Duration(seconds: 25);
+
   _NotifyStep _step = _NotifyStep.ask;
   bool _hidden = false;
+  bool _delivered = false;
   String? _error;
 
   @override
@@ -32,9 +35,14 @@ class _NotifyBannerState extends State<NotifyBanner> {
     super.initState();
     // The service worker tells us when the test notification was answered,
     // including when the app was opened from it.
-    Push.instance.onConfirmed(() {
-      if (mounted) setState(() => _step = _NotifyStep.confirmed);
-    });
+    Push.instance.onConfirmed(
+      () {
+        if (mounted) setState(() => _step = _NotifyStep.confirmed);
+      },
+      onDelivered: () {
+        if (mounted) _delivered = true;
+      },
+    );
   }
 
   Future<void> _turnOn() async {
@@ -62,7 +70,23 @@ class _NotifyBannerState extends State<NotifyBanner> {
       });
       return;
     }
-    setState(() => _step = _NotifyStep.waiting);
+    setState(() {
+      _step = _NotifyStep.waiting;
+      _delivered = false;
+    });
+    Future<void>.delayed(_confirmTimeout, () {
+      if (!mounted || _step != _NotifyStep.waiting) return;
+      setState(() {
+        // Knowing it was drawn is the difference between push being broken
+        // and nobody having tapped it — say which one happened.
+        _step = _delivered ? _NotifyStep.confirmed : _NotifyStep.failed;
+        _error = _delivered
+            ? null
+            : 'FCM accepted it but no notification appeared. Check that '
+                'Chrome is allowed to notify you in macOS System Settings, '
+                'then try again.';
+      });
+    });
   }
 
   /// The explanation lives in a dialog rather than the banner, so the banner

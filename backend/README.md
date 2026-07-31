@@ -9,7 +9,7 @@ database is ready without any manual step.
 ```bash
 ./dev.sh              # from the repo root: Postgres + API + the app in Chrome
 ./dev.sh macos        # any flutter device id
-LOCAL=1 ./dev.sh      # skip the tunnel, talk straight to localhost
+PUBLIC=1 ./dev.sh     # use the Cloudflare tunnel / deployed API hostname
 PORT=8081 ./dev.sh    # if 8080 is taken
 ```
 
@@ -18,12 +18,8 @@ the API, blocks until `/api/health` answers, and only then launches Flutter —
 so the app never opens onto a backend that is still compiling. Quitting Flutter
 stops the API; Postgres stays up for next time.
 
-**The app calls `https://api.geltrax.engineer` by default**, the same hostname
-the deployed site uses, so a local run exercises the real path: TLS, CORS and
-the Cloudflare tunnel. Those are where the failures live — a CORS header that
-localhost never needed will break production and nothing else. `LOCAL=1` skips
-it, and a tunnel that is down falls back to localhost with a warning rather
-than blocking the run.
+The app calls the local API by default. Use `PUBLIC=1 ./dev.sh` when you
+explicitly want to exercise the Cloudflare tunnel / deployed hostname.
 
 ## Running the pieces by hand
 
@@ -82,15 +78,20 @@ nothing installed and works on every phone — and adds a browser notification
 wherever the person allowed one. Neither can fail an order: problems are
 logged and the request carries on.
 
-Web push is the Push API directly, signed with VAPID. ponytail: no Firebase —
-FCM for the web wraps this same protocol and costs a project, two client
-packages and a service account on top.
+Web push uses Firebase Cloud Messaging only. The Firebase browser config lives
+in `frontend/web/index.html` and `frontend/web/push/sw.js`; the server needs
+service-account credentials before it can send through FCM.
 
 ```
-VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   # in .env
+FIREBASE_CREDENTIALS_JSON                              # service account JSON
+GOOGLE_APPLICATION_CREDENTIALS                         # or path to that JSON
+FIREBASE_WEB_PUSH_PUBLIC_KEY                           # web push certificate public key
 ```
 
-Unset, notifications quietly go by email only.
+With only `FIREBASE_WEB_PUSH_PUBLIC_KEY`, browsers can register FCM tokens.
+Test pushes and real order pushes also need `FIREBASE_CREDENTIALS_JSON` or
+`GOOGLE_APPLICATION_CREDENTIALS`; without those, notifications quietly go by
+email only.
 
 Worth knowing before relying on it:
 
@@ -98,7 +99,7 @@ Worth knowing before relying on it:
   Android Chrome and desktop work straight after the permission prompt.
 - Nothing sends while this API is asleep. An order at 3am notifies no one
   until it is back up.
-- Subscriptions that answer 404 or 410 are deleted, so dead browsers are not
+- FCM tokens that answer 404 or 410 are deleted, so dead browsers are not
   retried on every order.
 
 ## Endpoints
@@ -115,8 +116,8 @@ Worth knowing before relying on it:
 | POST | `/api/login` | `{"email"}` — mails a six-digit code |
 | POST | `/api/login/verify` | `{"email","code"}` — returns an access + refresh token |
 | POST | `/api/login/refresh` | `{"refreshToken"}` — rotates the pair |
-| GET | `/api/push/key` | VAPID public key for the browser to subscribe with |
-| POST/DELETE | `/api/push/subscribe` | register / drop this browser (needs a session) |
+| GET | `/api/push/key` | web-push public key for Firebase Messaging |
+| POST/DELETE | `/api/push/subscribe` | register / drop this browser's FCM token (needs a session) |
 | GET | `/api/seller/categories` | categories a seller can list under |
 | POST/GET | `/api/seller/store` | open / read the seller's store |
 | POST | `/api/seller/store/photo` | multipart `file` — store cover, to Cloudinary |

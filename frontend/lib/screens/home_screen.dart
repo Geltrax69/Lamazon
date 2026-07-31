@@ -680,12 +680,14 @@ class _BottomNav extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Stack(
                     clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        selling ? LucideIcons.store : LucideIcons.heart,
-                        size: 22,
-                        color: kInk,
-                      ),
+	                    children: [
+	                      Icon(
+	                        selling
+	                            ? Icons.storefront_outlined
+	                            : LucideIcons.heart,
+	                        size: 22,
+	                        color: kInk,
+	                      ),
                       if (selling && Seller.instance.openOrders > 0)
                         Positioned(
                           top: -6,

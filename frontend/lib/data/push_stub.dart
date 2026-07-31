@@ -12,5 +12,5 @@ class Push {
 
   Future<bool> enable() async => false;
   Future<bool> sendTest() async => false;
-  void onConfirmed(void Function() handler) {}
+  void onConfirmed(void Function() handler, {void Function()? onDelivered}) {}
 }

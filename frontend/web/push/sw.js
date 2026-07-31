@@ -1,19 +1,40 @@
-// Service worker for web push. Separate from Flutter's own service worker,
-// which handles caching and knows nothing about notifications.
-//
-// The payload arrives encrypted and is decrypted by the browser before this
-// runs, so `data` is the JSON the backend sent.
+// Service worker for Firebase Cloud Messaging web push. It stays separate from
+// Flutter's own service worker, which handles caching and knows nothing about
+// notifications.
 
-self.addEventListener('push', (event) => {
-  let payload = { title: 'Lamazon', body: '' };
-  try {
-    if (event.data) payload = event.data.json();
-  } catch (_) {
-    // A push with no body, or one this version does not understand, should
-    // still surface something rather than nothing.
-    payload.body = event.data ? event.data.text() : '';
-  }
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
+try {
+  self.importScripts('/firebase-env.js');
+} catch (_) {
+  // Production builds can use the checked-in fallback config below.
+}
+
+firebase.initializeApp(self.lamazonFirebaseConfig || {
+  apiKey: 'AIzaSyBGvYciGBw1hGyAiOE2OjOEbeiuonkfsvk',
+  authDomain: 'messages-34023.firebaseapp.com',
+  projectId: 'messages-34023',
+  storageBucket: 'messages-34023.firebasestorage.app',
+  messagingSenderId: '712322562286',
+  appId: '1:712322562286:web:cbbb820967ae46611b1bff',
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  console.info('[Lamazon push] background FCM payload', payload);
+  showLamazonNotification({ ...(payload.notification || {}), ...(payload.data || {}) });
+});
+
+// FCM data values arrive as strings, so "false" would be truthy — every flag
+// has to be compared, never coerced.
+function isTrue(value) {
+  return value === true || value === 'true';
+}
+
+function showLamazonNotification(payload) {
+  const confirm = isTrue(payload.confirm);
   const options = {
     body: payload.body,
     icon: '/icons/Icon-192.png',
@@ -21,17 +42,26 @@ self.addEventListener('push', (event) => {
     // Same tag replaces the previous notification instead of stacking a
     // dozen of them when several orders land together.
     tag: payload.tag || 'lamazon',
-    data: { url: payload.url || '/', confirm: !!payload.confirm },
+    data: { url: payload.url || '/', confirm },
   };
   // The test notification carries a button, because the only real proof it
   // arrived is the person answering it.
-  if (payload.confirm) {
+  if (confirm) {
     options.actions = [{ action: 'confirm', title: 'Yes, got it' }];
     options.requireInteraction = true; // do not vanish before it is answered
   }
 
-  event.waitUntil(self.registration.showNotification(payload.title, options));
-});
+  // Telling the page it was drawn separates "push is broken" from "you did
+  // not tap it" — two very different problems that looked identical before.
+  if (confirm) tellClients({ type: 'push-delivered' });
+  return self.registration.showNotification(payload.title || 'Lamazon', options);
+}
+
+function tellClients(message) {
+  return self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((tabs) => tabs.forEach((tab) => tab.postMessage(message)));
+}
 
 // Tapping the notification should land in the app, reusing the tab that is
 // already open rather than piling up new ones. Tapping "Yes, got it" also
@@ -39,7 +69,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  const confirmed = event.action === 'confirm' || data.confirm;
+  const confirmed = event.action === 'confirm' || isTrue(data.confirm);
 
   event.waitUntil(
     self.clients

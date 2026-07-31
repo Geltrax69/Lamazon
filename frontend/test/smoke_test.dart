@@ -15,6 +15,7 @@ import 'package:lamazon/screens/cart_screen.dart';
 import 'package:lamazon/screens/compare_screen.dart';
 import 'package:lamazon/screens/details_screen.dart';
 import 'package:lamazon/screens/help_screen.dart';
+import 'package:lamazon/screens/home_screen.dart';
 import 'package:lamazon/screens/notifications_screen.dart';
 import 'package:lamazon/screens/settings_screen.dart';
 import 'package:lamazon/screens/profile_screen.dart';
@@ -217,6 +218,12 @@ void main() {
       expect(Seller.instance.items.firstWhere((i) => i.id == 'i1').stock,
           before - 2);
       expect(Seller.instance.openOrders, 1);
+
+      // The seller bottom-nav icon used to trigger a web StackOverflowError
+      // when the home screen rebuilt after a refresh.
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(tester.takeException(), isNull);
 
       // The stock lines sit below the store header and stats.
       await tester.drag(find.byType(ListView).last, const Offset(0, -500));

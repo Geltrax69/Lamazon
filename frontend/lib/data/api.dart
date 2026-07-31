@@ -139,8 +139,8 @@ class Api {
 
   // ---- Notifications ----------------------------------------------------
 
-  /// The VAPID public key the browser needs to subscribe. Empty when the
-  /// backend has no keys, which is how push stays optional.
+  /// Firebase Web Push certificate public key. Empty when the backend has no
+  /// key, which is how push stays optional.
   Future<String> pushPublicKey() async {
     final res = await http.get(_url('/api/push/key')).timeout(_timeout);
     if (res.statusCode != 200) return '';

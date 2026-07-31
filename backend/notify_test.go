@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,46 +12,44 @@ import (
 	"testing"
 )
 
-// A push service, stood up locally: the subscription endpoint points here, so
-// what the backend actually sends over the wire is what gets recorded.
-type fakePushService struct {
+// A fake FCM service: it grants a token, accepts messages, and records what
+// the backend sent over the wire.
+type fakeFCMService struct {
 	*httptest.Server
 	mu    sync.Mutex
 	calls int
-	auth  string // the VAPID Authorization header it was given
+	auth  string
 }
 
-func newFakePushService(t *testing.T) *fakePushService {
+func newFakeFCMService(t *testing.T) *fakeFCMService {
 	t.Helper()
-	f := &fakePushService{}
+	f := &fakeFCMService{}
 	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"access_token": "stub-access-token",
+				"expires_in":   3600,
+			})
+			return
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.calls++
 		f.auth = r.Header.Get("Authorization")
-		w.WriteHeader(http.StatusCreated)
+		writeJSON(w, http.StatusOK, map[string]string{"name": "stub"})
 	}))
 	t.Cleanup(f.Close)
 	return f
 }
 
-func (f *fakePushService) count() int {
+func (f *fakeFCMService) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.calls
 }
 
-// These are a throwaway pair, generated for the test only.
-const (
-	testVAPIDPublic  = "BEXu6aCzSzGET0NM99XhPmm0U-LGEI3W6uOMLUWgzPNB7YGOYSMovkWIg60UQyrRRxYtn_DylCzabljQ-qfd5_4"
-	testVAPIDPrivate = "pVbmuDYDghQCq9ojifDYMtzoh6FKQIcccvPD3QbSGeY"
-	// A real browser key pair's public half; the payload is encrypted to it.
-	testP256dh = "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM"
-	testAuth   = "tBHItJI5svbpez7KI4CCXg"
-)
-
 // notifyAPI is the handler with both channels stubbed, plus the two stubs.
-func notifyAPI(t *testing.T) (http.Handler, *sentMail, *fakePushService) {
+func notifyAPI(t *testing.T) (http.Handler, *sentMail, *fakeFCMService) {
 	t.Helper()
 	sent := &sentMail{}
 	mailSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,23 +65,31 @@ func notifyAPI(t *testing.T) (http.Handler, *sentMail, *fakePushService) {
 	}))
 	t.Cleanup(mailSrv.Close)
 
-	push := newFakePushService(t)
+	fcm := newFakeFCMService(t)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return routes(&API{
 		db: testDB(t),
 		mail: &Mailer{
 			key: "k", from: "auth@simpedu.in", http: mailSrv.Client(), base: mailSrv.URL,
 		},
 		push: &Push{
-			publicKey: testVAPIDPublic, privateKey: testVAPIDPrivate,
-			subject: "mailto:auth@simpedu.in",
+			publicKey: "firebase-web-push-public-key",
+			fcm: &FCM{
+				projectID: "messages-34023", clientEmail: "firebase@example.com",
+				privateKey: key, http: fcm.Client(), tokenURL: fcm.URL + "/token",
+				messagingBaseURL: fcm.URL,
+			},
 		},
-	}), sent, push
+	}), sent, fcm
 }
 
 // An order has to reach the seller on both channels: email always, and a
 // browser notification wherever they allowed one.
 func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
-	h, sent, push := notifyAPI(t)
+	h, sent, fcm := notifyAPI(t)
 
 	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
 		"name": "Farm", "location": "Block 32", "city": "LPU",
@@ -89,10 +98,8 @@ func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Straubery", "price": 120, "stock": 25})
 
-	// The browser hands over an endpoint and its keys; ours points at the stub.
 	code, _ := call(t, h, http.MethodPost, "/api/push/subscribe", map[string]any{
-		"endpoint": push.URL + "/push/abc",
-		"keys":     map[string]string{"p256dh": testP256dh, "auth": testAuth},
+		"token": "firebase-token-abc",
 	})
 	if code != http.StatusNoContent {
 		t.Fatalf("subscribe: want 204, got %d", code)
@@ -114,12 +121,11 @@ func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 			t.Fatalf("email missing %q:\n%s", want, sent.text)
 		}
 	}
-	if push.count() != 1 {
-		t.Fatalf("want one push delivery, got %d", push.count())
+	if fcm.count() != 1 {
+		t.Fatalf("want one push delivery, got %d", fcm.count())
 	}
-	// Signed, or the push service would reject it in production.
-	if !strings.HasPrefix(push.auth, "vapid ") {
-		t.Fatalf("push was not VAPID-signed: %q", push.auth)
+	if fcm.auth != "Bearer stub-access-token" {
+		t.Fatalf("push was not FCM-authorized: %q", fcm.auth)
 	}
 }
 
@@ -144,7 +150,7 @@ func TestEmailStillSendsWithoutPush(t *testing.T) {
 func TestPushSubscribeNeedsASession(t *testing.T) {
 	h := testAPI(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/push/subscribe",
-		strings.NewReader(`{"endpoint":"https://example.com/x","keys":{"p256dh":"a","auth":"b"}}`))
+		strings.NewReader(`{"token":"firebase-token-abc"}`))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
@@ -152,10 +158,51 @@ func TestPushSubscribeNeedsASession(t *testing.T) {
 	}
 }
 
+func TestPushSubscribeAcceptsFirebaseToken(t *testing.T) {
+	h, _, _ := notifyAPI(t)
+
+	code, _ := call(t, h, http.MethodPost, "/api/push/subscribe", map[string]any{
+		"token": "firebase-token-abc",
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("subscribe FCM token: want 204, got %d", code)
+	}
+}
+
+func TestPushKeyWorksBeforeServerSendCredentials(t *testing.T) {
+	h := routes(&API{
+		db:   testDB(t),
+		push: &Push{publicKey: "firebase-web-push-public-key"},
+	})
+
+	code, body := call(t, h, http.MethodGet, "/api/push/key", nil)
+	if code != http.StatusOK {
+		t.Fatalf("push key: want 200, got %d", code)
+	}
+	if body["publicKey"] != "firebase-web-push-public-key" {
+		t.Fatalf("wrong public key: %v", body["publicKey"])
+	}
+}
+
+func TestPushTestReportsMissingServerSendCredentials(t *testing.T) {
+	h := routes(&API{
+		db:   testDB(t),
+		push: &Push{publicKey: "firebase-web-push-public-key"},
+	})
+
+	code, body := call(t, h, http.MethodPost, "/api/push/test", nil)
+	if code != http.StatusServiceUnavailable {
+		t.Fatalf("test push without FCM credentials: want 503, got %d", code)
+	}
+	if body["error"] != "Firebase service account is not configured" {
+		t.Fatalf("wrong error: %v", body["error"])
+	}
+}
+
 // The test notification is the one the seller answers, so it has to carry the
 // confirm flag the service worker turns into a button.
 func TestPushTestSendsAConfirmableNotification(t *testing.T) {
-	h, _, push := notifyAPI(t)
+	h, _, fcm := notifyAPI(t)
 
 	// Nothing subscribed yet: say so rather than pretending it went.
 	if code, body := call(t, h, http.MethodPost, "/api/push/test", nil); code != http.StatusNotFound {
@@ -163,8 +210,7 @@ func TestPushTestSendsAConfirmableNotification(t *testing.T) {
 	}
 
 	call(t, h, http.MethodPost, "/api/push/subscribe", map[string]any{
-		"endpoint": push.URL + "/push/abc",
-		"keys":     map[string]string{"p256dh": testP256dh, "auth": testAuth},
+		"token": "firebase-token-abc",
 	})
 
 	code, body := call(t, h, http.MethodPost, "/api/push/test", nil)
@@ -174,7 +220,54 @@ func TestPushTestSendsAConfirmableNotification(t *testing.T) {
 	if body["sent"].(float64) != 1 {
 		t.Fatalf("want one delivery, got %v", body["sent"])
 	}
-	if push.count() != 1 {
-		t.Fatalf("push service saw %d requests", push.count())
+	if fcm.count() != 1 {
+		t.Fatalf("push service saw %d requests", fcm.count())
 	}
+}
+
+// FCM must be sent data-only. A "notification" block makes Chrome draw the
+// message itself — without our confirm button, and only when the tab is in
+// the background — which is why the first attempt never showed anything.
+func TestFCMSendsDataOnly(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/token") { // the OAuth exchange
+			w.Write([]byte(`{"access_token":"stub","expires_in":3600}`))
+			return
+		}
+		json.NewDecoder(r.Body).Decode(&got)
+		w.Write([]byte(`{"name":"projects/p/messages/1"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	f := &FCM{
+		projectID: "p", clientEmail: "svc@p.iam", tokenURL: srv.URL + "/token",
+		messagingBaseURL: srv.URL, http: srv.Client(), privateKey: testRSAKey(t),
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"title": "Notifications are on", "body": "Tap below.", "confirm": true,
+	})
+	if err := f.send(context.Background(), "device-token", payload); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	msg := got["message"].(map[string]any)
+	if _, present := msg["notification"]; present {
+		t.Fatal("message carries a notification block; Chrome will draw its own " +
+			"without the confirm button and only when backgrounded")
+	}
+	data := msg["data"].(map[string]any)
+	if data["title"] != "Notifications are on" || data["confirm"] != "true" {
+		t.Fatalf("data payload is wrong: %v", data)
+	}
+}
+
+// A throwaway key, generated per run — signing is real, the identity is not.
+func testRSAKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
 }

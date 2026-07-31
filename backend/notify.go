@@ -1,54 +1,56 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
-
-	webpush "github.com/SherClockHolmes/webpush-go"
+	"time"
 )
 
-// Push sends browser notifications. ponytail: the Web Push protocol directly,
-// no Firebase — FCM for the web is a wrapper around this same thing, and the
-// wrapper costs a project, two client packages and a service account.
+// Push sends browser notifications through Firebase Cloud Messaging.
 type Push struct {
-	publicKey, privateKey, subject string
+	publicKey string
+	fcm       *FCM
 }
 
 func pushFromEnv() *Push {
 	p := &Push{
-		publicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
-		privateKey: os.Getenv("VAPID_PRIVATE_KEY"),
-		subject:    os.Getenv("VAPID_SUBJECT"),
+		publicKey: os.Getenv("FIREBASE_WEB_PUSH_PUBLIC_KEY"),
+		fcm:       fcmFromEnv(),
 	}
-	if p.publicKey == "" || p.privateKey == "" {
+	if p.publicKey == "" && p.fcm == nil {
 		return nil
-	}
-	if p.subject == "" {
-		p.subject = "mailto:admin@example.com"
 	}
 	return p
 }
 
-// A subscription is what the browser hands us: where to deliver, plus the two
-// keys that encrypt the payload so the push service cannot read it.
+// A subscription is the Firebase Messaging token the browser hands us.
 type subscription struct {
 	Endpoint string `json:"endpoint"`
-	Keys     struct {
-		P256dh string `json:"p256dh"`
-		Auth   string `json:"auth"`
-	} `json:"keys"`
+	Token    string `json:"token"`
 }
 
-// GET /api/push/key — the app needs the public key to subscribe, and baking
-// it into the build would mean rebuilding to rotate it.
+// GET /api/push/key — the app needs the Firebase Web Push certificate public
+// key to subscribe, and baking it into the build would mean rebuilding to
+// rotate it.
 func (a *API) handlePushKey(w http.ResponseWriter, r *http.Request) {
-	if a.push == nil {
-		writeError(w, http.StatusServiceUnavailable, "push is not configured")
+	if a.push == nil || a.push.publicKey == "" {
+		writeError(w, http.StatusServiceUnavailable, "FIREBASE_WEB_PUSH_PUBLIC_KEY is not configured")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"publicKey": a.push.publicKey})
@@ -62,18 +64,18 @@ func (a *API) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if in.Endpoint == "" || in.Keys.P256dh == "" || in.Keys.Auth == "" {
-		writeError(w, http.StatusBadRequest, "endpoint and keys are required")
+	if in.Token == "" {
+		writeError(w, http.StatusBadRequest, "Firebase token is required")
 		return
 	}
-	// Re-subscribing with the same endpoint refreshes it rather than
-	// duplicating; browsers hand back the same endpoint until it expires.
+	in.Endpoint = "fcm:" + in.Token
+	// Re-subscribing with the same token refreshes it rather than duplicating.
 	if _, err := a.db.sql.ExecContext(r.Context(), `
 		INSERT INTO push_subscriptions (endpoint, email, p256dh, auth)
 		VALUES ($1,$2,$3,$4)
 		ON CONFLICT (endpoint) DO UPDATE SET
 			email = EXCLUDED.email, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
-		in.Endpoint, a.owner(r), in.Keys.P256dh, in.Keys.Auth); err != nil {
+		in.Endpoint, a.owner(r), "", ""); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -84,15 +86,19 @@ func (a *API) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
 // notifications off.
 func (a *API) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Endpoint string `json:"endpoint"`
+		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	if in.Token == "" {
+		writeError(w, http.StatusBadRequest, "Firebase token is required")
+		return
+	}
 	if _, err := a.db.sql.ExecContext(r.Context(),
 		`DELETE FROM push_subscriptions WHERE endpoint = $1 AND email = $2`,
-		in.Endpoint, a.owner(r)); err != nil {
+		"fcm:"+in.Token, a.owner(r)); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -105,6 +111,10 @@ func (a *API) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 func (a *API) handlePushTest(w http.ResponseWriter, r *http.Request) {
 	if a.push == nil {
 		writeError(w, http.StatusServiceUnavailable, "push is not configured")
+		return
+	}
+	if a.push.fcm == nil {
+		writeError(w, http.StatusServiceUnavailable, "Firebase service account is not configured")
 		return
 	}
 	email := a.owner(r)
@@ -184,15 +194,133 @@ func (a *API) notify(ctx context.Context, email, title, body string) {
 var errSubscriptionGone = errors.New("subscription no longer exists")
 
 func (p *Push) send(ctx context.Context, s subscription, payload []byte) error {
-	res, err := webpush.SendNotificationWithContext(ctx, payload, &webpush.Subscription{
-		Endpoint: s.Endpoint,
-		Keys:     webpush.Keys{P256dh: s.Keys.P256dh, Auth: s.Keys.Auth},
-	}, &webpush.Options{
-		Subscriber:      p.subject,
-		VAPIDPublicKey:  p.publicKey,
-		VAPIDPrivateKey: p.privateKey,
-		TTL:             86400, // a day: an order is still worth reading tomorrow
+	token, ok := strings.CutPrefix(s.Endpoint, "fcm:")
+	if !ok || token == "" {
+		return errSubscriptionGone
+	}
+	if p.fcm == nil {
+		return errors.New("Firebase Cloud Messaging is not configured")
+	}
+	return p.fcm.send(ctx, token, payload)
+}
+
+// FCM is the minimum needed for Firebase Cloud Messaging HTTP v1. Configure it
+// with FIREBASE_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS.
+type FCM struct {
+	projectID, clientEmail string
+	privateKey             *rsa.PrivateKey
+	http                   *http.Client
+	token                  string
+	tokenExpires           time.Time
+	tokenURL               string
+	messagingBaseURL       string
+}
+
+func fcmFromEnv() *FCM {
+	raw := strings.TrimSpace(os.Getenv("FIREBASE_CREDENTIALS_JSON"))
+	if raw == "" {
+		if path := strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")); path != "" {
+			b, err := os.ReadFile(path)
+			if err != nil {
+				log.Printf("Firebase credentials: %v", err)
+				return nil
+			}
+			raw = string(b)
+		}
+	}
+	if raw == "" {
+		return nil
+	}
+
+	var in struct {
+		ProjectID   string `json:"project_id"`
+		ClientEmail string `json:"client_email"`
+		PrivateKey  string `json:"private_key"`
+	}
+	if err := json.Unmarshal([]byte(raw), &in); err != nil {
+		log.Printf("Firebase credentials JSON: %v", err)
+		return nil
+	}
+	key, err := parsePrivateKey(in.PrivateKey)
+	if err != nil {
+		log.Printf("Firebase private key: %v", err)
+		return nil
+	}
+	if in.ProjectID == "" || in.ClientEmail == "" {
+		log.Print("Firebase credentials missing project_id or client_email")
+		return nil
+	}
+	return &FCM{
+		projectID: in.ProjectID, clientEmail: in.ClientEmail,
+		privateKey: key, http: http.DefaultClient,
+		tokenURL:         "https://oauth2.googleapis.com/token",
+		messagingBaseURL: "https://fcm.googleapis.com",
+	}
+}
+
+func parsePrivateKey(value string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(value))
+	if block == nil {
+		return nil, errors.New("missing PEM block")
+	}
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		if rsaKey, ok := key.(*rsa.PrivateKey); ok {
+			return rsaKey, nil
+		}
+		return nil, errors.New("key is not RSA")
+	}
+	return x509.ParsePKCS1PrivateKey(block.Bytes)
+}
+
+func (f *FCM) send(ctx context.Context, token string, payload []byte) error {
+	access, err := f.accessToken(ctx)
+	if err != nil {
+		return err
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return err
+	}
+	data := make(map[string]string, len(raw))
+	for k, v := range raw {
+		switch typed := v.(type) {
+		case string:
+			data[k] = typed
+		case bool:
+			if typed {
+				data[k] = "true"
+			} else {
+				data[k] = "false"
+			}
+		default:
+			data[k] = strings.TrimSpace(strings.ReplaceAll(strings.Trim(fmt.Sprint(typed), "\""), "\n", " "))
+		}
+	}
+	// Data-only, deliberately. A "notification" block makes FCM display the
+	// message itself, and that changes behaviour depending on whether the tab
+	// happens to be focused: in the background Chrome draws its own
+	// notification — without our confirm button and without our click data —
+	// and in the foreground it suppresses display entirely. Sending data only
+	// means our own handlers draw it every time, the same way, in both states.
+	body, _ := json.Marshal(map[string]any{
+		"message": map[string]any{
+			"token": token,
+			"data":  data,
+			"webpush": map[string]any{
+				"headers": map[string]string{"TTL": "86400"},
+			},
+		},
 	})
+
+	endpoint := strings.TrimRight(f.messagingBaseURL, "/") + "/v1/projects/" +
+		url.PathEscape(f.projectID) + "/messages:send"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+access)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := f.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -201,16 +329,79 @@ func (p *Push) send(ctx context.Context, s subscription, payload []byte) error {
 		return errSubscriptionGone
 	}
 	if res.StatusCode >= 300 {
-		return errors.New("push service said " + strings.TrimSpace(res.Status))
+		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return errors.New("FCM said " + strings.TrimSpace(res.Status+" "+string(b)))
 	}
 	return nil
+}
+
+func (f *FCM) accessToken(ctx context.Context) (string, error) {
+	if f.token != "" && time.Now().Before(f.tokenExpires.Add(-time.Minute)) {
+		return f.token, nil
+	}
+	now := time.Now()
+	claims, _ := json.Marshal(map[string]any{
+		"iss":   f.clientEmail,
+		"scope": "https://www.googleapis.com/auth/firebase.messaging",
+		"aud":   "https://oauth2.googleapis.com/token",
+		"iat":   now.Unix(),
+		"exp":   now.Add(time.Hour).Unix(),
+	})
+	assertion, err := f.signJWT(claims)
+	if err != nil {
+		return "", err
+	}
+	form := url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {assertion},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		f.tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := f.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return "", errors.New("Google token endpoint said " + strings.TrimSpace(res.Status+" "+string(b)))
+	}
+	var out struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	if out.AccessToken == "" {
+		return "", errors.New("Google token endpoint returned no access token")
+	}
+	f.token = out.AccessToken
+	f.tokenExpires = now.Add(time.Duration(out.ExpiresIn) * time.Second)
+	return f.token, nil
+}
+
+func (f *FCM) signJWT(claims []byte) (string, error) {
+	header := []byte(`{"alg":"RS256","typ":"JWT"}`)
+	unsigned := base64.RawURLEncoding.EncodeToString(header) + "." +
+		base64.RawURLEncoding.EncodeToString(claims)
+	sum := sha256.Sum256([]byte(unsigned))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, f.privateKey, crypto.SHA256, sum[:])
+	if err != nil {
+		return "", err
+	}
+	return unsigned + "." + base64.RawURLEncoding.EncodeToString(sig), nil
 }
 
 // pushSubscriptions is every browser this address has registered — a phone and
 // a laptop are two rows, and both get told.
 func (d *DB) pushSubscriptions(ctx context.Context, email string) ([]subscription, error) {
 	rows, err := d.sql.QueryContext(ctx,
-		`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE email = $1`, email)
+		`SELECT endpoint FROM push_subscriptions WHERE email = $1`, email)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +410,7 @@ func (d *DB) pushSubscriptions(ctx context.Context, email string) ([]subscriptio
 	var out []subscription
 	for rows.Next() {
 		var s subscription
-		if err := rows.Scan(&s.Endpoint, &s.Keys.P256dh, &s.Keys.Auth); err != nil {
+		if err := rows.Scan(&s.Endpoint); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

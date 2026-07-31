@@ -82,17 +82,19 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_email ON auth_sessions (email);
 
--- One row per browser that agreed to notifications. The endpoint is the
--- address the push service gave us, and the keys encrypt the payload so only
--- that browser can read it.
+-- One row per browser that agreed to notifications. The endpoint stores the
+-- Firebase Messaging token with an internal fcm: prefix.
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     endpoint   TEXT PRIMARY KEY,
     email      TEXT        NOT NULL,
-    p256dh     TEXT        NOT NULL,
-    auth       TEXT        NOT NULL,
+    p256dh     TEXT        NOT NULL DEFAULT '',
+    auth       TEXT        NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions (email);
+ALTER TABLE push_subscriptions
+    ALTER COLUMN p256dh SET DEFAULT '',
+    ALTER COLUMN auth SET DEFAULT '';
 
 -- Photos live in Cloudinary; Postgres keeps the URLs. Added with ALTER so an
 -- existing database picks them up on the next boot.

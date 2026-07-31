@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
@@ -8,17 +7,10 @@ import 'api.dart';
 
 /// Browser notifications, on top of the email every seller gets anyway.
 ///
-/// ponytail: the Push API directly through js_interop — no Firebase project,
-/// no extra packages. FCM for the web wraps this same protocol.
-///
 /// Reached through push.dart, which swaps in a do-nothing version off the
 /// web, so nothing here has to guard for platform.
 extension type _Nav(JSObject _) implements JSObject {
   external JSObject get serviceWorker;
-}
-
-extension type _Registration(JSObject _) implements JSObject {
-  external JSObject get pushManager;
 }
 
 @JS('navigator')
@@ -29,6 +21,9 @@ external String get _permission;
 
 @JS('Notification.requestPermission')
 external JSPromise<JSString> _requestPermission();
+
+@JS('window.lamazonFirebaseMessagingToken')
+external JSFunction? get _firebaseMessagingToken;
 
 @JS('window.isSecureContext')
 external bool get _isSecureContext;
@@ -65,7 +60,10 @@ class Push {
 
   /// Fires when the service worker reports the test notification was
   /// answered, or when the app was opened from it (?push=confirmed).
-  void onConfirmed(void Function() handler) {
+  ///
+  /// [onDelivered] fires earlier, when the notification was drawn — proof the
+  /// push arrived even if nobody taps the button.
+  void onConfirmed(void Function() handler, {void Function()? onDelivered}) {
     if (!supported) return;
     try {
       if (_search().contains('push=confirmed')) {
@@ -77,8 +75,12 @@ class Push {
         'message'.toJS,
         ((JSObject event) {
           final data = event.getProperty('data'.toJS);
-          if (data != null && _stringify(data as JSObject).contains('push-confirmed')) {
+          if (data == null) return;
+          final message = _stringify(data as JSObject);
+          if (message.contains('push-confirmed')) {
             handler();
+          } else if (message.contains('push-delivered')) {
+            onDelivered?.call();
           }
         }).toJS,
       );
@@ -107,27 +109,23 @@ class Push {
     if (!supported || denied) return false;
     try {
       final key = await Api.instance.pushPublicKey();
-      if (key.isEmpty) return false;
+      if (key.isEmpty) {
+        logApiFailure('push', 'FIREBASE_WEB_PUSH_PUBLIC_KEY is not configured');
+        return false;
+      }
 
       if (!granted) {
         final result = (await _requestPermission().toDart).toDart;
         if (result != 'granted') return false;
       }
 
-      final registration = await _activeRegistration();
-      if (registration == null) {
-        logApiFailure('push', 'the service worker never became active');
+      final token = await _fcmToken(key);
+      if (token.isEmpty) {
+        logApiFailure('push', 'Firebase Messaging did not return a token');
         return false;
       }
-      final sub = await _subscribe(
-        registration.pushManager,
-        _urlBase64ToBytes(key),
-      ).toDart;
 
-      // The browser hands back endpoint + keys as a plain object; its own
-      // toJSON is the shape the backend expects.
-      final json = jsonDecode(_stringify(_toJSON(sub as JSObject))) as Map<String, dynamic>;
-      await Api.instance.subscribeToPush(json);
+      await Api.instance.subscribeToPush({'token': token});
       return true;
     } catch (e) {
       logApiFailure('push subscribe', e);
@@ -136,44 +134,16 @@ class Push {
   }
 }
 
-/// Registers the push worker and waits for it to actually be running.
-///
-/// Two things bite here. Registration resolves before the worker is active,
-/// and subscribing against an inactive one fails with "no active Service
-/// Worker". And the worker lives at /push/ so its scope cannot collide with
-/// the service worker Flutter registers at the root — same scope means the
-/// second registration replaces the first.
-Future<_Registration?> _activeRegistration() async {
-  final reg = _Registration(
-    (await _navigator.serviceWorker.callMethod<JSPromise>(
-      'register'.toJS,
-      '/push/sw.js'.toJS,
-      {'scope': '/push/'}.jsify(),
-    ).toDart) as JSObject,
-  );
-  for (var i = 0; i < 100; i++) {
-    if (reg.getProperty('active'.toJS) != null) return reg;
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-  }
-  return null;
+Future<String> _fcmToken(String vapidKey) async {
+  final fn = _firebaseMessagingToken;
+  if (fn == null) return '';
+  final promise = fn.callAsFunction(
+    globalContext,
+    vapidKey.toJS,
+  ) as JSPromise<JSString>?;
+  if (promise == null) return '';
+  return (await promise.toDart).toDart;
 }
 
 @JS('JSON.stringify')
 external String _stringify(JSObject value);
-
-/// `subscription.toJSON()` — reached through a helper because js_interop
-/// cannot call an instance method on an opaque object directly.
-JSObject _toJSON(JSObject sub) =>
-    (sub.callMethod('toJSON'.toJS) as JSObject?) ?? sub;
-
-JSPromise _subscribe(JSObject manager, JSUint8Array key) =>
-    manager.callMethod(
-      'subscribe'.toJS,
-      {'userVisibleOnly': true, 'applicationServerKey': key}.jsify(),
-    ) as JSPromise;
-
-/// VAPID keys travel as url-safe base64; the Push API wants raw bytes.
-JSUint8Array _urlBase64ToBytes(String value) {
-  final padded = value.padRight((value.length + 3) & ~3, '=');
-  return base64Url.decode(padded).toJS;
-}

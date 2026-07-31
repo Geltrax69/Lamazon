@@ -30,7 +30,9 @@ func main() {
 
 	push := pushFromEnv()
 	if push == nil {
-		log.Print("VAPID_* unset: notifications go by email only")
+		log.Print("push credentials unset: notifications go by email only")
+	} else if push.fcm == nil {
+		log.Print("Firebase service account unset: browsers can subscribe, but notifications go by email only")
 	}
 
 	cloud := cloudinaryFromEnv()
