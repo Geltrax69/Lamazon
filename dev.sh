@@ -40,11 +40,30 @@ done
 docker exec lamazon-pg pg_isready -U lamazon -q || { echo "Postgres never came up"; exit 1; }
 
 # A leftover server on the port would answer the health check below and the app
-# would silently talk to stale code, so refuse instead of guessing.
-if lsof -ti "tcp:$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Port $PORT is already in use by pid $(lsof -ti "tcp:$PORT" -sTCP:LISTEN | tr '\n' ' ')"
-  echo "Stop it, or run PORT=8081 $0"
-  exit 1
+# would silently talk to stale code. An earlier copy of this API is ours to
+# replace; anything else is someone else's and gets left alone.
+# `|| true` because lsof exits non-zero when it finds nothing, which under
+# `set -e` would end the script right here — silently, since it prints nothing.
+held=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' || true)
+if [ -n "$held" ]; then
+  for pid in $held; do
+    case "$(ps -o command= -p "$pid" 2>/dev/null)" in
+    *lamazon-api*)
+      echo "==> replacing the API already on $PORT (pid $pid)"
+      kill "$pid" 2>/dev/null
+      ;;
+    *)
+      echo "Port $PORT is held by pid $pid: $(ps -o command= -p "$pid" 2>/dev/null)"
+      echo "Stop it, or run PORT=8081 $0"
+      exit 1
+      ;;
+    esac
+  done
+  # The port is not free the instant the process dies.
+  for _ in $(seq 20); do
+    lsof -ti "tcp:$PORT" -sTCP:LISTEN >/dev/null 2>&1 || break
+    sleep 0.25
+  done
 fi
 
 # Built rather than `go run`, so the pid we background is the server itself and
