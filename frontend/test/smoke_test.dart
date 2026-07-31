@@ -295,11 +295,20 @@ void main() {
 
       await tester.pumpWidget(const MaterialApp(home: CartScreen()));
       expect(find.text(p.name), findsOneWidget);
-      expect(find.text('Make a Payment'), findsOneWidget);
+      // The amount is on the button, and the unit price is spelled out
+      // whenever the line holds more than one.
+      expect(
+        find.text('Make a Payment  ·  ₹${Cart.instance.total.toStringAsFixed(0)}'),
+        findsOneWidget,
+      );
+      expect(find.text('2 items'), findsOneWidget);
+      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsOneWidget);
 
       Cart.instance.setQty(p.id, 1);
       await tester.pump();
       expect(Cart.instance.total, p.price + 15);
+      // At one unit "each" would just repeat the line total, so it goes away.
+      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsNothing);
 
       Cart.instance.remove(p.id);
       await tester.pump();

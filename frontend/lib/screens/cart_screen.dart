@@ -34,12 +34,26 @@ class CartScreen extends StatelessWidget {
                           icon: LucideIcons.arrowLeft,
                           onTap: () => Navigator.pop(context),
                         ),
-                        const Text(
-                          'My Cart',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        // The count belongs in the title: it is the one
+                        // number people check before paying.
+                        Column(
+                          children: [
+                            const Text(
+                              'My Cart',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (!cart.isEmpty)
+                              Text(
+                                cart.count == 1 ? '1 item' : '${cart.count} items',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF6B6B6B),
+                                ),
+                              ),
+                          ],
                         ),
                         const _RoundIcon(icon: LucideIcons.shoppingCart),
                       ],
@@ -73,15 +87,40 @@ class _EmptyCart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(LucideIcons.shoppingBasket, size: 48, color: Colors.grey),
-          SizedBox(height: 12),
-          Text(
+          const Icon(LucideIcons.shoppingBasket, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          const Text(
             'Your cart is empty',
-            style: TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Items you add will show up here',
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF9A9A9A)),
+          ),
+          const SizedBox(height: 16),
+          // An empty screen with no way out is a dead end.
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+              decoration: BoxDecoration(
+                color: _green,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: const Text(
+                'Start shopping',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -159,6 +198,16 @@ class _CartRow extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  // At one unit the line total and the unit price are the
+                  // same number, so only say it when they differ.
+                  if (item.qty > 1)
+                    Text(
+                      '₹${p.price.toStringAsFixed(0)} each',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9A9A9A),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -176,12 +225,16 @@ class _QtyControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final last = item.qty <= 1;
     return Row(
       children: [
+        // Going below one removes the line, so at one the button says so —
+        // swiping the row away is not discoverable with a mouse.
         _qtyBtn(
-          LucideIcons.minus,
+          last ? LucideIcons.trash2 : LucideIcons.minus,
           () => Cart.instance.setQty(item.product.id, item.qty - 1),
           filled: false,
+          danger: last,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -199,7 +252,12 @@ class _QtyControls extends StatelessWidget {
     );
   }
 
-  Widget _qtyBtn(IconData icon, VoidCallback onTap, {required bool filled}) {
+  Widget _qtyBtn(
+    IconData icon,
+    VoidCallback onTap, {
+    required bool filled,
+    bool danger = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -208,9 +266,23 @@ class _QtyControls extends StatelessWidget {
         decoration: BoxDecoration(
           color: filled ? _green : Colors.white,
           shape: BoxShape.circle,
-          border: filled ? null : Border.all(color: const Color(0xFFE3E3E0)),
+          border: filled
+              ? null
+              : Border.all(
+                  color: danger
+                      ? const Color(0xFFF0C8CB)
+                      : const Color(0xFFE3E3E0),
+                ),
         ),
-        child: Icon(icon, size: 13, color: filled ? Colors.white : _ink),
+        child: Icon(
+          icon,
+          size: 13,
+          color: filled
+              ? Colors.white
+              : danger
+                  ? const Color(0xFFD32F2F)
+                  : _ink,
+        ),
       ),
     );
   }
@@ -279,9 +351,12 @@ class _CheckoutPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _summaryRow('Sub Total', cart.subtotal),
+          _summaryRow(
+            cart.count == 1 ? 'Sub Total (1 item)' : 'Sub Total (${cart.count} items)',
+            cart.subtotal,
+          ),
           const SizedBox(height: 4),
-          _summaryRow('Shipping', cart.shipping),
+          _summaryRow('Delivery', cart.shipping),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
@@ -306,9 +381,11 @@ class _CheckoutPanel extends StatelessWidget {
                 color: _green,
                 borderRadius: BorderRadius.circular(26),
               ),
-              child: const Text(
-                'Make a Payment',
-                style: TextStyle(
+              // The amount rides on the button, so nobody pays without
+              // seeing what they are paying.
+              child: Text(
+                'Make a Payment  ·  ₹${cart.total.toStringAsFixed(0)}',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
