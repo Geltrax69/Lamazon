@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -308,5 +309,32 @@ func TestConcurrentOrdersCannotOversell(t *testing.T) {
 	}
 	if won != 5 {
 		t.Fatalf("5 units should fill exactly 5 orders, got %d", won)
+	}
+}
+
+// The web build sends Authorization on every seller call, and a browser will
+// not send the real request unless the preflight says that header is allowed.
+// Getting this wrong fails silently: the app catches it and shows sample data.
+func TestPreflightAllowsTheHeadersWeSend(t *testing.T) {
+	h := testAPI(t)
+	for _, path := range []string{
+		"/api/seller/items", "/api/push/subscribe", "/api/push/test", "/api/login",
+	} {
+		req := httptest.NewRequest(http.MethodOptions, path, nil)
+		req.Header.Set("Origin", "http://localhost:52614")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Errorf("%s preflight: want 204, got %d", path, rec.Code)
+		}
+		allowed := strings.ToLower(rec.Header().Get("Access-Control-Allow-Headers"))
+		for _, header := range []string{"authorization", "content-type"} {
+			if !strings.Contains(allowed, header) {
+				t.Errorf("%s preflight does not allow %s: %q", path, header, allowed)
+			}
+		}
 	}
 }
