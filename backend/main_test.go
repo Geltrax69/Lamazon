@@ -35,7 +35,8 @@ func testDB(t *testing.T) *DB {
 
 	// Seller data is per-test; the catalog is shared read-only seed.
 	if _, err := db.sql.Exec(
-		`TRUNCATE orders, inventory_items, seller_stores, login_codes, auth_sessions CASCADE`); err != nil {
+		`TRUNCATE orders, inventory_items, seller_stores, login_codes,
+		  auth_sessions, push_subscriptions CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	lastTestDB = db

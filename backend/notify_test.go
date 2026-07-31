@@ -151,3 +151,30 @@ func TestPushSubscribeNeedsASession(t *testing.T) {
 		t.Fatalf("subscribe without a token: want 401, got %d", rec.Code)
 	}
 }
+
+// The test notification is the one the seller answers, so it has to carry the
+// confirm flag the service worker turns into a button.
+func TestPushTestSendsAConfirmableNotification(t *testing.T) {
+	h, _, push := notifyAPI(t)
+
+	// Nothing subscribed yet: say so rather than pretending it went.
+	if code, body := call(t, h, http.MethodPost, "/api/push/test", nil); code != http.StatusNotFound {
+		t.Fatalf("test before subscribing: want 404, got %d (%v)", code, body["error"])
+	}
+
+	call(t, h, http.MethodPost, "/api/push/subscribe", map[string]any{
+		"endpoint": push.URL + "/push/abc",
+		"keys":     map[string]string{"p256dh": testP256dh, "auth": testAuth},
+	})
+
+	code, body := call(t, h, http.MethodPost, "/api/push/test", nil)
+	if code != http.StatusOK {
+		t.Fatalf("test push: want 200, got %d (%v)", code, body["error"])
+	}
+	if body["sent"].(float64) != 1 {
+		t.Fatalf("want one delivery, got %v", body["sent"])
+	}
+	if push.count() != 1 {
+		t.Fatalf("push service saw %d requests", push.count())
+	}
+}

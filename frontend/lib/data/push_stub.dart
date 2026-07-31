@@ -11,4 +11,6 @@ class Push {
   bool get granted => false;
 
   Future<bool> enable() async => false;
+  Future<bool> sendTest() async => false;
+  void onConfirmed(void Function() handler) {}
 }

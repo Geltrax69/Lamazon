@@ -99,6 +99,51 @@ func (a *API) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /api/push/test — proves the whole chain end to end: this backend, the
+// push service, the browser, the service worker. The notification carries a
+// confirm button, so the seller answering it is the proof it arrived.
+func (a *API) handlePushTest(w http.ResponseWriter, r *http.Request) {
+	if a.push == nil {
+		writeError(w, http.StatusServiceUnavailable, "push is not configured")
+		return
+	}
+	email := a.owner(r)
+	subs, err := a.db.pushSubscriptions(r.Context(), email)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(subs) == 0 {
+		writeError(w, http.StatusNotFound, "this browser is not subscribed yet")
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"title": "Notifications are on",
+		"body":  "Tap below to confirm you got this.",
+		"tag":   "lamazon-test",
+		// The service worker turns this into a button on the notification.
+		"confirm": true,
+	})
+	var sent int
+	for _, s := range subs {
+		if err := a.push.send(r.Context(), s, payload); err != nil {
+			log.Printf("test push to %s: %v", email, err)
+			if errors.Is(err, errSubscriptionGone) {
+				a.db.sql.ExecContext(r.Context(),
+					`DELETE FROM push_subscriptions WHERE endpoint = $1`, s.Endpoint)
+			}
+			continue
+		}
+		sent++
+	}
+	if sent == 0 {
+		writeError(w, http.StatusBadGateway, "the push service would not take it")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"sent": sent})
+}
+
 // notify reaches one person on every channel that is set up: email always,
 // because it works on every phone with nothing installed, and a browser
 // notification on top wherever they allowed one.
@@ -115,22 +160,10 @@ func (a *API) notify(ctx context.Context, email, title, body string) {
 		return
 	}
 
-	rows, err := a.db.sql.QueryContext(ctx,
-		`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE email = $1`, email)
+	subs, err := a.db.pushSubscriptions(ctx, email)
 	if err != nil {
 		log.Printf("notify %s: reading subscriptions: %v", email, err)
 		return
-	}
-	defer rows.Close()
-
-	var subs []subscription
-	for rows.Next() {
-		var s subscription
-		if err := rows.Scan(&s.Endpoint, &s.Keys.P256dh, &s.Keys.Auth); err != nil {
-			log.Printf("notify %s: %v", email, err)
-			return
-		}
-		subs = append(subs, s)
 	}
 
 	payload, _ := json.Marshal(map[string]string{"title": title, "body": body})
@@ -171,4 +204,25 @@ func (p *Push) send(ctx context.Context, s subscription, payload []byte) error {
 		return errors.New("push service said " + strings.TrimSpace(res.Status))
 	}
 	return nil
+}
+
+// pushSubscriptions is every browser this address has registered — a phone and
+// a laptop are two rows, and both get told.
+func (d *DB) pushSubscriptions(ctx context.Context, email string) ([]subscription, error) {
+	rows, err := d.sql.QueryContext(ctx,
+		`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE email = $1`, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []subscription
+	for rows.Next() {
+		var s subscription
+		if err := rows.Scan(&s.Endpoint, &s.Keys.P256dh, &s.Keys.Auth); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }

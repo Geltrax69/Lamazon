@@ -14,30 +14,45 @@ self.addEventListener('push', (event) => {
     payload.body = event.data ? event.data.text() : '';
   }
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: '/icons/Icon-192.png',
-      badge: '/icons/Icon-192.png',
-      // Same tag replaces the previous notification instead of stacking a
-      // dozen of them when several orders land together.
-      tag: payload.tag || 'lamazon',
-      data: { url: payload.url || '/' },
-    }),
-  );
+  const options = {
+    body: payload.body,
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    // Same tag replaces the previous notification instead of stacking a
+    // dozen of them when several orders land together.
+    tag: payload.tag || 'lamazon',
+    data: { url: payload.url || '/', confirm: !!payload.confirm },
+  };
+  // The test notification carries a button, because the only real proof it
+  // arrived is the person answering it.
+  if (payload.confirm) {
+    options.actions = [{ action: 'confirm', title: 'Yes, got it' }];
+    options.requireInteraction = true; // do not vanish before it is answered
+  }
+
+  event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
 // Tapping the notification should land in the app, reusing the tab that is
-// already open rather than piling up new ones.
+// already open rather than piling up new ones. Tapping "Yes, got it" also
+// tells that tab, so the screen can stop waiting and say it worked.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
+  const data = event.notification.data || {};
+  const confirmed = event.action === 'confirm' || data.confirm;
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((tabs) => {
-      for (const tab of tabs) {
-        if ('focus' in tab) return tab.focus();
-      }
-      return self.clients.openWindow(url);
-    }),
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((tabs) => {
+        for (const tab of tabs) {
+          if (confirmed) tab.postMessage({ type: 'push-confirmed' });
+          if ('focus' in tab) return tab.focus();
+        }
+        // No tab open: carry the answer in the URL instead of losing it.
+        return self.clients.openWindow(
+          confirmed ? '/?push=confirmed' : data.url || '/',
+        );
+      }),
   );
 });

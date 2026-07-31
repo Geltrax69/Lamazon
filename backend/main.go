@@ -87,6 +87,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/push/key", s.handlePushKey)
 	mux.HandleFunc("POST /api/push/subscribe", s.handlePushSubscribe)
 	mux.HandleFunc("DELETE /api/push/subscribe", s.handlePushUnsubscribe)
+	mux.HandleFunc("POST /api/push/test", s.handlePushTest)
 
 	// Seller
 	mux.HandleFunc("GET /api/seller/categories", func(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +117,8 @@ const sellerPrefix = "/api/seller/"
 // The public key itself is not a secret and stays open.
 func needsSession(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, sellerPrefix) ||
-		r.URL.Path == "/api/push/subscribe"
+		r.URL.Path == "/api/push/subscribe" ||
+		r.URL.Path == "/api/push/test"
 }
 
 type ownerKey struct{}

@@ -157,6 +157,14 @@ class Api {
     if (res.statusCode != 204) throw http.ClientException(_reason(res));
   }
 
+  /// Asks the backend to push a test notification to this browser.
+  Future<void> sendTestPush() async {
+    final res = await http
+        .post(_url('/api/push/test'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+  }
+
   // ---- Seller ----------------------------------------------------------
   //
   // The seller header stands in for a session; the backend reads it the same

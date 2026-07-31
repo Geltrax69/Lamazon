@@ -33,6 +33,17 @@ external JSPromise<JSString> _requestPermission();
 @JS('window.isSecureContext')
 external bool get _isSecureContext;
 
+@JS('window.location.search')
+external String get _searchRaw;
+
+String _search() {
+  try {
+    return _searchRaw;
+  } catch (_) {
+    return '';
+  }
+}
+
 class Push {
   Push._();
   static final Push instance = Push._();
@@ -51,6 +62,41 @@ class Push {
 
   bool get denied => supported && _permission == 'denied';
   bool get granted => supported && _permission == 'granted';
+
+  /// Fires when the service worker reports the test notification was
+  /// answered, or when the app was opened from it (?push=confirmed).
+  void onConfirmed(void Function() handler) {
+    if (!supported) return;
+    try {
+      if (_search().contains('push=confirmed')) {
+        handler();
+        return;
+      }
+      _navigator.serviceWorker.callMethod(
+        'addEventListener'.toJS,
+        'message'.toJS,
+        ((JSObject event) {
+          final data = event.getProperty('data'.toJS);
+          if (data != null && _stringify(data as JSObject).contains('push-confirmed')) {
+            handler();
+          }
+        }).toJS,
+      );
+    } catch (e) {
+      logApiFailure('push confirm listener', e);
+    }
+  }
+
+  /// Asks the backend to send this browser a test notification.
+  Future<bool> sendTest() async {
+    try {
+      await Api.instance.sendTestPush();
+      return true;
+    } catch (e) {
+      logApiFailure('test push', e);
+      return false;
+    }
+  }
 
   /// Asks for permission and registers this browser with the backend.
   ///
