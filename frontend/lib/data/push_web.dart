@@ -114,9 +114,11 @@ class Push {
         if (result != 'granted') return false;
       }
 
-      final registration = _Registration(
-        (await _register('/push-sw.js').toDart) as JSObject,
-      );
+      final registration = await _activeRegistration();
+      if (registration == null) {
+        logApiFailure('push', 'the service worker never became active');
+        return false;
+      }
       final sub = await _subscribe(
         registration.pushManager,
         _urlBase64ToBytes(key),
@@ -134,8 +136,27 @@ class Push {
   }
 }
 
-@JS('navigator.serviceWorker.register')
-external JSPromise _register(String url);
+/// Registers the push worker and waits for it to actually be running.
+///
+/// Two things bite here. Registration resolves before the worker is active,
+/// and subscribing against an inactive one fails with "no active Service
+/// Worker". And the worker lives at /push/ so its scope cannot collide with
+/// the service worker Flutter registers at the root — same scope means the
+/// second registration replaces the first.
+Future<_Registration?> _activeRegistration() async {
+  final reg = _Registration(
+    (await _navigator.serviceWorker.callMethod<JSPromise>(
+      'register'.toJS,
+      '/push/sw.js'.toJS,
+      {'scope': '/push/'}.jsify(),
+    ).toDart) as JSObject,
+  );
+  for (var i = 0; i < 100; i++) {
+    if (reg.getProperty('active'.toJS) != null) return reg;
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+  return null;
+}
 
 @JS('JSON.stringify')
 external String _stringify(JSObject value);
