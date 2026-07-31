@@ -152,7 +152,7 @@ func (a *API) handlePushTest(w http.ResponseWriter, r *http.Request) {
 // triggered it, so problems are logged and the caller carries on.
 func (a *API) notify(ctx context.Context, email, title, body string) {
 	if a.mail != nil {
-		if err := a.mail.send(ctx, email, title, body); err != nil {
+		if err := a.mail.send(ctx, email, title, body, notifyHTML(title, body)); err != nil {
 			log.Printf("notify %s by email: %v", email, err)
 		}
 	}

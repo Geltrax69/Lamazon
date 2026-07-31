@@ -60,18 +60,24 @@ func mailerFromEnv() *Mailer {
 func (m *Mailer) sendCode(ctx context.Context, to, code string) error {
 	return m.send(ctx, to, code+" is your Lamazon sign-in code",
 		"Your Lamazon sign-in code is "+code+
-			"\n\nIt expires in 10 minutes. If you did not ask to sign in, ignore this email.")
+			"\n\nIt expires in 10 minutes. If you did not ask to sign in, ignore this email.",
+		codeHTML(code))
 }
 
-// send is one plain-text email. Every notification goes out this way too:
-// email is the channel that needs nothing installed and works on every phone.
-func (m *Mailer) send(ctx context.Context, to, subject, text string) error {
-	body, _ := json.Marshal(map[string]any{
+// send is one email. The plain-text part is what some clients show and what
+// every client can fall back to, so it is never skipped; the HTML is the
+// version most people actually see. Pass an empty html for text-only.
+func (m *Mailer) send(ctx context.Context, to, subject, text string, html ...string) error {
+	payload := map[string]any{
 		"from":    m.from,
 		"to":      []string{to},
 		"subject": subject,
 		"text":    text,
-	})
+	}
+	if len(html) > 0 && html[0] != "" {
+		payload["html"] = html[0]
+	}
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.base+"/emails", bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -84,11 +90,11 @@ func (m *Mailer) send(ctx context.Context, to, subject, text string) error {
 		return err
 	}
 	defer res.Body.Close()
-	payload, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	resBody, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
 	if res.StatusCode >= 300 {
 		// Resend explains itself in the body — a wrong from-domain is the
 		// usual cause and worth passing through.
-		return fmt.Errorf("resend %s: %s", res.Status, strings.TrimSpace(string(payload)))
+		return fmt.Errorf("resend %s: %s", res.Status, strings.TrimSpace(string(resBody)))
 	}
 	return nil
 }

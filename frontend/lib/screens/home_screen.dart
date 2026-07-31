@@ -5,6 +5,8 @@ import 'package:shorebird_code_push/shorebird_code_push.dart';
 import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
+import '../data/session.dart';
+import '../widgets/notify_banner.dart';
 import '../data/seller.dart';
 import '../models/product.dart';
 import '../widgets/app_shell.dart';
@@ -127,6 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const _TopBar(),
         const SizedBox(height: 20),
+        // Asked here, not only on the seller screen: order updates matter to
+        // whoever is buying too, and this is the first screen after signing in.
+        if (Session.instance.loggedIn) const NotifyBanner(),
         const _SearchBar(),
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
