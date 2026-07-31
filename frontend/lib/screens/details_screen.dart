@@ -81,25 +81,30 @@ class _DetailsScreenState extends State<DetailsScreen> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'From: ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6B6B6B),
-                              ),
+                      // The number follows the stepper: two of them costs
+                      // twice as much, with the unit price kept in view so
+                      // the total is never a mystery.
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '₹${(p.price * _qty).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                             ),
-                            TextSpan(
-                              text: '₹${p.price.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                              ),
+                          ),
+                          Text(
+                            _qty == 1
+                                ? 'From: ₹${p.price.toStringAsFixed(0)}'
+                                : '$_qty × ₹${p.price.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B6B6B),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       const Spacer(),
                       for (var i = 0; i < _colors.length; i++)
@@ -342,75 +347,89 @@ Widget _diffBadge(double diff) {
   );
 }
 
-class _Hero extends StatelessWidget {
+/// Swipeable gallery: every photo gets the full width and you page through
+/// them, instead of one big picture with a strip of thumbnails beside it.
+class _Hero extends StatefulWidget {
   final Product product;
   const _Hero({required this.product});
 
   @override
+  State<_Hero> createState() => _HeroState();
+}
+
+class _HeroState extends State<_Hero> {
+  final _pages = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.all(14),
+    final photos = [widget.product.imageUrl, ...widget.product.extraImages];
+
+    return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.44,
-      decoration: BoxDecoration(
-        color: _hero,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _RoundIcon(
-                  icon: LucideIcons.arrowLeft,
-                  onTap: () => Navigator.pop(context),
-                ),
-                const Text(
-                  'Details',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const _RoundIcon(icon: LucideIcons.heart),
-              ],
+      child: Stack(
+        children: [
+          // The photos sit on the page background — no coloured card behind.
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+              ),
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: photos.length,
+                onPageChanged: (i) => setState(() => _page = i),
+                itemBuilder: (_, i) => NetImage(url: photos[i]),
+              ),
             ),
-            const SizedBox(height: 12),
-            Expanded(
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: NetImage(url: product.imageUrl),
-                    ),
+                  _RoundIcon(
+                    icon: LucideIcons.arrowLeft,
+                    onTap: () => Navigator.pop(context),
                   ),
-                  if (product.extraImages.isNotEmpty) ...[
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 64,
-                      child: Column(
-                        children: [
-                          for (final url in product.extraImages.take(3)) ...[
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: SizedBox(
-                                  width: 64,
-                                  child: NetImage(url: url),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
+                  const _RoundIcon(icon: LucideIcons.heart),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (photos.length > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < photos.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: i == _page ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: i == _page
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

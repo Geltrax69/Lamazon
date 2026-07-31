@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/data/catalog.dart';
@@ -65,6 +66,31 @@ void main() {
       expect(find.text('Add to Cart'), findsOneWidget);
       expect(find.text('Buy Now'), findsOneWidget);
       expect(find.text('Select Size'), findsOneWidget);
+    });
+  });
+
+  testWidgets('details price follows the quantity stepper', (tester) async {
+    await mockNetworkImagesFor(() async {
+      // p3 is the one with several photos, so the swipe gallery renders too.
+      final p = products.firstWhere((x) => x.extraImages.isNotEmpty);
+      await tester.pumpWidget(MaterialApp(home: DetailsScreen(product: p)));
+
+      final unit = '₹${p.price.toStringAsFixed(0)}';
+      expect(find.text(unit), findsWidgets); // one of them is the big number
+
+      // The bug: the price used to stay at the unit price whatever the stepper
+      // said. Two of them costs twice as much.
+      await tester.tap(find.byIcon(LucideIcons.plus));
+      await tester.pump();
+      expect(find.text('₹${(p.price * 2).toStringAsFixed(0)}'), findsOneWidget);
+      expect(find.text('2 × $unit'), findsOneWidget);
+
+      await tester.tap(find.byIcon(LucideIcons.minus));
+      await tester.pump();
+      expect(find.text('From: $unit'), findsOneWidget);
+
+      // Every photo is a page you swipe, not a thumbnail you tap.
+      expect(find.byType(PageView), findsOneWidget);
     });
   });
 
