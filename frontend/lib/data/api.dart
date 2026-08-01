@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
+import 'addresses.dart';
 import 'session.dart';
 
 /// Where the Go backend lives. Override per build:
@@ -135,6 +136,63 @@ class Api {
     } catch (_) {
       return 'Something went wrong (${res.statusCode})';
     }
+  }
+
+  // ---- Account ----------------------------------------------------------
+
+  /// Who is signed in, with their public id and roles. The backend derives
+  /// "seller" from owning a store, so it is right the moment one is opened.
+  Future<Map<String, dynamic>> me() async {
+    final res = await http
+        .get(_url('/api/me'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<void> updateMe({String? name, String? phone}) async {
+    final res = await http
+        .patch(_url('/api/me'),
+            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+            // Null means "leave it alone"; the backend COALESCEs on its side.
+            body: jsonEncode({'name': ?name, 'phone': ?phone}))
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+  }
+
+  Future<List<Address>> addresses() async {
+    final res = await http
+        .get(_url('/api/addresses'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return (jsonDecode(res.body) as List<dynamic>)
+        .map((r) => Address.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Returns the saved address, whose id comes from the server.
+  Future<Address> addAddress(Address a) async {
+    final res = await http
+        .post(_url('/api/addresses'),
+            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'label': a.label.title,
+              'line': a.line,
+              'city': a.city,
+              'pincode': a.pincode,
+              'name': a.name,
+              'phone': a.phone,
+            }))
+        .timeout(_timeout);
+    if (res.statusCode != 201) throw http.ClientException(_reason(res));
+    return Address.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAddress(String id) async {
+    final res = await http
+        .delete(_url('/api/addresses/$id'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 204) throw http.ClientException(_reason(res));
   }
 
   // ---- Notifications ----------------------------------------------------

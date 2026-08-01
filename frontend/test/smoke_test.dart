@@ -256,6 +256,13 @@ void main() {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: LocationScreen()));
 
+      // A porter needs someone to hand the bag to, so the form asks who and
+      // on what number before it will save anything.
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Full name'), 'Lalit Singh');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Mobile number'), '9876543210');
+
       // Fill an address in a city we do not cover.
       await tester.enterText(
           find.widgetWithText(TextField, 'House / Flat, street, area'),

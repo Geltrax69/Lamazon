@@ -56,6 +56,43 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (loggedIn) ...[
+                    const SizedBox(height: 10),
+                    // Who they are to us: the id they can quote, and what
+                    // they can do here. Seller appears by itself the moment
+                    // a store is opened.
+                    Center(
+                      child: Wrap(
+                        spacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (Session.instance.publicId.isNotEmpty)
+                            _Chip(
+                              label: Session.instance.publicId,
+                              color: const Color(0xFFEDEDEA),
+                              text: _ink,
+                            ),
+                          for (final role in Session.instance.roles)
+                            _Chip(
+                              label: role == 'seller' ? 'Seller' : 'Buyer',
+                              color: role == 'seller'
+                                  ? const Color(0xFFDCEBD2)
+                                  : const Color(0xFFE3ECF6),
+                              text: const Color(0xFF1A1A1A),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (Session.instance.phone.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          Session.instance.phone,
+                          style: const TextStyle(fontSize: 13, color: _muted),
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 18),
                   Center(
                     child: Container(
@@ -74,10 +111,14 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Center(
+                  Center(
                     child: Text(
-                      'Your account',
-                      style: TextStyle(
+                      // The name once we know it — asked for with the first
+                      // address, so most people see their own name here.
+                      loggedIn && Session.instance.name.isNotEmpty
+                          ? Session.instance.name
+                          : 'Your account',
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                       ),
@@ -127,12 +168,6 @@ class ProfileScreen extends StatelessWidget {
                             builder: (_) => const OrdersScreen(),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      _Tile(
-                        icon: LucideIcons.wallet,
-                        label: 'Lamazon Money',
-                        onTap: () => _soon(context, 'Lamazon Money'),
                       ),
                       const SizedBox(width: 10),
                       _Tile(
@@ -401,6 +436,34 @@ class _Row extends StatelessWidget {
         color: Color(0xFF9A9A9A),
       ),
       onTap: onTap,
+    );
+  }
+}
+
+
+/// A small pill: the account id, and one per role.
+class _Chip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color text;
+  const _Chip({required this.label, required this.color, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: text,
+        ),
+      ),
     );
   }
 }

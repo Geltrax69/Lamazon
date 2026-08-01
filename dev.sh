@@ -3,14 +3,12 @@
 # at it. Quitting Flutter (q, or Ctrl-C) stops the API too; Postgres is left
 # running in Docker so the next start is instant.
 #
-# The app talks to the API over the Cloudflare tunnel by default, the same
-# hostname the deployed site uses. That way local runs exercise the real path
-# — TLS, CORS, the tunnel — instead of a localhost shortcut where those
-# problems cannot show up.
+# The app talks to the local API by default. Use PUBLIC=1 when you explicitly
+# want to exercise the Cloudflare tunnel / deployed hostname.
 #
-# Usage: ./dev.sh              # Chrome, app talks to api.geltrax.engineer
+# Usage: ./dev.sh              # Chrome, app talks to localhost
 #        ./dev.sh macos        # any flutter device id
-#        LOCAL=1 ./dev.sh      # skip the tunnel, talk straight to localhost
+#        PUBLIC=1 ./dev.sh     # app talks to api.geltrax.engineer
 set -euo pipefail
 
 DEVICE="${1:-chrome}"
@@ -33,8 +31,11 @@ if [ -z "$(docker ps -q -f name=^lamazon-pg$)" ]; then
     docker start lamazon-pg >/dev/null
   else
     echo "==> creating lamazon-pg"
+    # Named volume: without it the data lives in the container's own layer and
+    # `docker rm lamazon-pg` takes every user, address and store with it.
     docker run -d --name lamazon-pg \
       -e POSTGRES_USER=lamazon -e POSTGRES_PASSWORD=lamazon -e POSTGRES_DB=lamazon \
+      -v lamazon-pgdata:/var/lib/postgresql/data \
       -p 5433:5432 postgres:16-alpine >/dev/null
   fi
 fi
@@ -96,23 +97,35 @@ for _ in $(seq 60); do
 done
 curl -sf "$LOCAL_API/api/health" >/dev/null || { echo "API never answered /api/health"; exit 1; }
 
-# Then decide what the app should call. The tunnel is the default because it
-# is what the deployed site uses, but a tunnel that is down should slow nobody
-# down: say so and carry on against localhost.
-API="$PUBLIC_API"
-if [ -n "${LOCAL:-}" ]; then
-  API="$LOCAL_API"
-  echo "==> LOCAL=1, skipping the tunnel"
-elif curl -sf -m 10 "$PUBLIC_API/api/health" >/dev/null 2>&1; then
-  echo "==> tunnel up: the app will call $PUBLIC_API"
+# Then decide what the app should call. Localhost avoids Cloudflare-generated
+# 502 pages that do not carry CORS headers and look like browser CORS bugs.
+API="$LOCAL_API"
+if [ -n "${PUBLIC:-}" ]; then
+  if curl -sf -m 10 "$PUBLIC_API/api/health" >/dev/null 2>&1; then
+    API="$PUBLIC_API"
+    echo "==> PUBLIC=1, tunnel up: the app will call $PUBLIC_API"
+  else
+    echo "!! PUBLIC=1 requested, but $PUBLIC_API is not answering."
+    echo "   Check it with ./tunnel.sh status."
+    exit 1
+  fi
 else
-  API="$LOCAL_API"
-  echo "!! $PUBLIC_API is not answering — falling back to localhost."
-  echo "   Check it with ./tunnel.sh status; the deployed site needs it up."
+  echo "==> local dev: the app will call $LOCAL_API"
 fi
 
 products=$(curl -sf "$API/api/products" | grep -o '"id"' | wc -l | tr -d ' ')
 echo "==> API healthy, catalog has $products products"
+
+cat > frontend/web/firebase-env.js <<EOF
+globalThis.lamazonFirebaseConfig = {
+  apiKey: "${FIREBASE_API_KEY:-}",
+  authDomain: "${FIREBASE_AUTH_DOMAIN:-}",
+  projectId: "${FIREBASE_PROJECT_ID:-}",
+  storageBucket: "${FIREBASE_STORAGE_BUCKET:-}",
+  messagingSenderId: "${FIREBASE_MESSAGING_SENDER_ID:-}",
+  appId: "${FIREBASE_APP_ID:-}",
+};
+EOF
 
 echo "==> flutter run -d $DEVICE"
 cd frontend

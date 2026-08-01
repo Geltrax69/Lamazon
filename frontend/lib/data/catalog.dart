@@ -1,15 +1,28 @@
 import '../models/product.dart';
 import 'api.dart';
 
+/// The catalog the app is currently showing — live rows once they load, the
+/// bundled samples before that.
+///
+/// Screens that look a product up by id have to read this rather than the
+/// bundled list: the two do not hold the same products, so filtering the
+/// bundled one silently drops anything that exists only on the server. That
+/// is what made the wishlist look broken.
+List<Product> shownCatalog = products;
+
 /// Catalog from the Go API, falling back to the bundled sample data when the
 /// backend is unreachable — the app stays usable offline and in tests.
 Future<List<Product>> loadCatalog() async {
   try {
     final live = await Api.instance.products();
-    if (live.isNotEmpty) return live;
+    if (live.isNotEmpty) {
+      shownCatalog = live;
+      return live;
+    }
   } catch (e) {
     logApiFailure('products', e);
   }
+  shownCatalog = products;
   return products;
 }
 

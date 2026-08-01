@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,10 +25,7 @@ func testAPI(t *testing.T) http.Handler {
 // on a machine without one.
 func testDB(t *testing.T) *DB {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable"
-	}
+	dsn := testDSN(t)
 	db, err := OpenDB(dsn)
 	if err != nil {
 		t.Skipf("no Postgres at %s: %v", dsn, err)
@@ -37,12 +35,53 @@ func testDB(t *testing.T) *DB {
 	// Seller data is per-test; the catalog is shared read-only seed.
 	if _, err := db.sql.Exec(
 		`TRUNCATE orders, inventory_items, seller_stores, login_codes,
-		  auth_sessions, push_subscriptions CASCADE`); err != nil {
+		  auth_sessions, push_subscriptions, addresses, users CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	lastTestDB = db
 	testToken = signIn(t, db, DefaultOwner)
 	return db
+}
+
+// testDSN points at a database of its own, created on demand.
+//
+// These tests TRUNCATE. Pointed at the development database they would delete
+// real people, their addresses and their stores — which is exactly what used
+// to happen. LAMAZON_TEST_URL overrides for CI.
+func testDSN(t *testing.T) string {
+	t.Helper()
+	if dsn := os.Getenv("LAMAZON_TEST_URL"); dsn != "" {
+		return dsn
+	}
+	dev := os.Getenv("DATABASE_URL")
+	if dev == "" {
+		dev = "postgres://lamazon:lamazon@localhost:5433/lamazon?sslmode=disable"
+	}
+	u, err := url.Parse(dev)
+	if err != nil {
+		t.Skipf("DATABASE_URL is not a URL: %v", err)
+	}
+	name := strings.TrimPrefix(u.Path, "/")
+	if strings.HasSuffix(name, "_test") {
+		return dev // already a test database
+	}
+	u.Path = "/" + name + "_test"
+
+	// CREATE DATABASE cannot run inside a transaction or against the database
+	// being created, so it goes through the server's default one.
+	admin := *u
+	admin.Path = "/postgres"
+	conn, err := sql.Open("pgx", admin.String())
+	if err != nil {
+		t.Skipf("no Postgres: %v", err)
+	}
+	defer conn.Close()
+	if err := conn.Ping(); err != nil {
+		t.Skipf("no Postgres at %s: %v", admin.Host, err)
+	}
+	// Already-exists is the normal case after the first run.
+	conn.Exec(`CREATE DATABASE ` + name + `_test`)
+	return u.String()
 }
 
 // signIn mints a session straight through the database — the emailed-code
@@ -85,6 +124,7 @@ func call(t *testing.T, h http.Handler, method, path string, body any) (int, map
 func callList(t *testing.T, h http.Handler, path string) []any {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer "+testToken)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	var out []any

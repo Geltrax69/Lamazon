@@ -19,6 +19,8 @@ class LocationScreen extends StatefulWidget {
 }
 
 class _LocationScreenState extends State<LocationScreen> {
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
   final _line = TextEditingController();
   final _city = TextEditingController();
   final _pin = TextEditingController();
@@ -27,6 +29,8 @@ class _LocationScreenState extends State<LocationScreen> {
 
   @override
   void dispose() {
+    _name.dispose();
+    _phone.dispose();
     _line.dispose();
     _city.dispose();
     _pin.dispose();
@@ -34,18 +38,26 @@ class _LocationScreenState extends State<LocationScreen> {
   }
 
   bool get _serviceable => isServiceable(_city.text);
+
+  /// A porter needs someone to hand the bag to and a number to call, so the
+  /// two are required rather than optional extras.
   bool get _complete =>
+      _name.text.trim().isNotEmpty &&
+      _phone.text.trim().length >= 10 &&
       _line.text.trim().isNotEmpty &&
       _city.text.trim().isNotEmpty &&
       _pin.text.trim().length >= 5;
 
   void _save() {
     final a = Address(
+      // A placeholder only until the server answers with the real one.
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       label: _label,
       line: _line.text.trim(),
       city: _city.text.trim(),
       pincode: _pin.text.trim(),
+      name: _name.text.trim(),
+      phone: _phone.text.trim(),
     );
     AddressBook.instance.add(a);
     Navigator.pop(context);
@@ -105,6 +117,21 @@ class _LocationScreenState extends State<LocationScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
                   children: [
+                    _Field(
+                      controller: _name,
+                      hint: 'Full name',
+                      icon: LucideIcons.user,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    _Field(
+                      controller: _phone,
+                      hint: 'Mobile number',
+                      icon: LucideIcons.phone,
+                      keyboardType: TextInputType.phone,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
                     _Field(
                       controller: _line,
                       hint: 'House / Flat, street, area',

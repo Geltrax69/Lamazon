@@ -99,6 +99,33 @@ func (d *DB) seedIfEmpty(ctx context.Context) error {
 			return err
 		}
 	}
+
+	// The two campus restaurants go in as ordinary seller stores, through the
+	// same tables a student's own store uses. They are proof the seller side
+	// reaches shoppers, not a special case beside it.
+	for _, store := range foodStores() {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO users (email, name) VALUES ($1,$2)
+			ON CONFLICT (email) DO NOTHING`, store.Owner, store.Name); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO seller_stores (owner, name, location, city, categories)
+			VALUES ($1,$2,$3,$4,$5)`,
+			store.Owner, store.Name, store.Location,
+			ServiceableCities[0], store.Categories); err != nil {
+			return err
+		}
+		for _, item := range store.Items {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO inventory_items (owner, title, description, category, price, stock)
+				VALUES ($1,$2,$3,$4,$5,$6)`,
+				store.Owner, item.Title, item.Section, item.Category,
+				item.Price, 50); err != nil {
+				return err
+			}
+		}
+	}
 	return tx.Commit()
 }
 
@@ -114,13 +141,31 @@ type productFilter struct {
 
 // productQuery filters and attaches offers in one round trip. Postgres does
 // the narrowing, so a search no longer ships the whole catalog through Go.
+//
+// The catalog is the seeded rows *and* what real sellers have in stock: a
+// store's items are products to a shopper, and listing them anywhere else
+// would mean a seller can add stock nobody can buy. Sold-out lines are left
+// out rather than shown as unavailable.
 const productQuery = `
+	WITH catalogue AS (
+		SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
+		       p.description, true AS seeded
+		FROM products p
+		UNION ALL
+		SELECT i.id, i.title, COALESCE(NULLIF(i.category, ''), 'Food'),
+		       COALESCE(NULLIF(i.category, ''), 'Food'),
+		       i.price,
+		       COALESCE(i.image_urls[1], ''), s.name, i.description, false
+		FROM inventory_items i
+		JOIN seller_stores s ON s.owner = i.owner
+		WHERE i.stock > 0
+	)
 	SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
 	       p.description,
 	       COALESCE((SELECT json_agg(json_build_object('store', o.store, 'price', o.price)
 	                                 ORDER BY o.store)
 	                 FROM offers o WHERE o.product_id = p.id), '[]')
-	FROM products p
+	FROM catalogue p
 	WHERE ($1::text = '' OR p.id = $1)
 	  AND ($2::text = '' OR p.tab ILIKE $2)
 	  AND ($3::text = '' OR p.category ILIKE $3)
@@ -168,9 +213,19 @@ func (d *DB) product(ctx context.Context, id string) (Product, error) {
 	return found[0], nil
 }
 
+// shops lists the seeded storefronts plus every real seller's store, so a
+// store someone opens shows up next to the sample ones rather than nowhere.
 func (d *DB) shops(ctx context.Context) ([]Shop, error) {
-	rows, err := d.sql.QueryContext(ctx,
-		`SELECT name, tagline, image_url, tab FROM shops ORDER BY name`)
+	rows, err := d.sql.QueryContext(ctx, `
+		SELECT name, tagline, image_url, tab FROM shops
+		UNION ALL
+		SELECT s.name,
+		       COALESCE(NULLIF(array_to_string(s.categories, ', '), ''), s.location),
+		       s.photo_url,
+		       COALESCE(s.categories[1], 'All')
+		FROM seller_stores s
+		WHERE NOT EXISTS (SELECT 1 FROM shops sh WHERE sh.name = s.name)
+		ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}

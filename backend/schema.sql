@@ -59,6 +59,39 @@ CREATE TABLE IF NOT EXISTS orders (
     placed_at  TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
+-- Everyone who has ever signed in. The row is created on first verified code
+-- and never disappears, so a returning person is recognised rather than
+-- re-registered.
+--
+-- The public id is what a person sees and quotes at support; the email stays
+-- the key everything else joins on.
+CREATE SEQUENCE IF NOT EXISTS user_ids START 1001;
+CREATE TABLE IF NOT EXISTS users (
+    email      TEXT PRIMARY KEY,
+    public_id  TEXT        NOT NULL UNIQUE DEFAULT 'LMZ-' || nextval('user_ids'),
+    name       TEXT        NOT NULL DEFAULT '',
+    phone      TEXT        NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- The address book, one row per saved address. Kept per person rather than
+-- per device so it follows them to a new browser.
+CREATE TABLE IF NOT EXISTS addresses (
+    id         TEXT PRIMARY KEY,
+    email      TEXT        NOT NULL REFERENCES users (email) ON DELETE CASCADE,
+    label      TEXT        NOT NULL DEFAULT 'Home',
+    line       TEXT        NOT NULL,
+    city       TEXT        NOT NULL,
+    pincode    TEXT        NOT NULL DEFAULT '',
+    name       TEXT        NOT NULL DEFAULT '',  -- who receives it
+    phone      TEXT        NOT NULL DEFAULT '',  -- and on what number
+    is_default BOOLEAN     NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE SEQUENCE IF NOT EXISTS address_ids;
+ALTER TABLE addresses ALTER COLUMN id SET DEFAULT 'addr-' || nextval('address_ids');
+CREATE INDEX IF NOT EXISTS idx_addresses_email ON addresses (email);
+
 -- One live sign-in code per address; a resend replaces the row.
 CREATE TABLE IF NOT EXISTS login_codes (
     email      TEXT PRIMARY KEY,

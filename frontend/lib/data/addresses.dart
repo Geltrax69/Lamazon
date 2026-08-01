@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'api.dart';
+
 enum AddressLabel { home, office, other }
 
 extension AddressLabelInfo on AddressLabel {
@@ -16,6 +18,8 @@ class Address {
   final String line; // house / street
   final String city;
   final String pincode;
+  final String name;  // who the delivery is for
+  final String phone; // and how the porter reaches them
 
   const Address({
     required this.id,
@@ -23,7 +27,22 @@ class Address {
     required this.line,
     required this.city,
     required this.pincode,
+    this.name = '',
+    this.phone = '',
   });
+
+  factory Address.fromJson(Map<String, dynamic> r) => Address(
+        id: r['id'] as String,
+        label: AddressLabel.values.firstWhere(
+          (l) => l.title.toLowerCase() == (r['label'] as String? ?? '').toLowerCase(),
+          orElse: () => AddressLabel.home,
+        ),
+        line: r['line'] as String? ?? '',
+        city: r['city'] as String? ?? '',
+        pincode: r['pincode'] as String? ?? '',
+        name: r['name'] as String? ?? '',
+        phone: r['phone'] as String? ?? '',
+      );
 
   String get full => '$line, $city $pincode';
 }
@@ -52,17 +71,37 @@ class AddressBook extends ChangeNotifier {
   AddressBook._();
   static final AddressBook instance = AddressBook._();
 
-  final List<Address> _addresses = [
-    const Address(
-      id: 'a1',
-      label: AddressLabel.home,
-      line: 'Block 34, Boys Hostel',
-      city: 'Lovely Professional University',
-      pincode: '144411',
-    ),
-  ];
+  // Starts empty: addresses belong to the person, and the server is where
+  // they live. A sample one here would look real and vanish on sign-in.
+  final List<Address> _addresses = [];
 
-  String _selectedId = 'a1';
+  String _selectedId = '';
+
+  /// Pulls the book from the server. Called after sign-in and on restore, so
+  /// a new browser shows the same addresses as the old one.
+  Future<void> load() async {
+    try {
+      final list = await Api.instance.addresses();
+      _addresses
+        ..clear()
+        ..addAll(list);
+      if (_addresses.isNotEmpty &&
+          !_addresses.any((a) => a.id == _selectedId)) {
+        _selectedId = _addresses.first.id;
+      }
+      notifyListeners();
+    } catch (e) {
+      logApiFailure('addresses', e);
+    }
+  }
+
+  /// Forgets everything on sign-out — the next person on this browser must
+  /// not see the last one's addresses.
+  void clear() {
+    _addresses.clear();
+    _selectedId = '';
+    notifyListeners();
+  }
 
   // ponytail: no geolocator dependency yet — this flag stands in for the OS
   // permission. Wire enableLocation() to the real plugin when GPS is needed.
@@ -78,9 +117,18 @@ class AddressBook extends ChangeNotifier {
   Address? get selected =>
       _addresses.where((a) => a.id == _selectedId).firstOrNull;
 
-  void add(Address a) {
-    _addresses.add(a);
-    _selectedId = a.id;
+  /// Saves to the server and keeps the id it hands back, so the address is
+  /// the same row on every device. Falls back to local-only when offline.
+  Future<void> add(Address a) async {
+    try {
+      final saved = await Api.instance.addAddress(a);
+      _addresses.add(saved);
+      _selectedId = saved.id;
+    } catch (e) {
+      logApiFailure('save address', e);
+      _addresses.add(a);
+      _selectedId = a.id;
+    }
     notifyListeners();
   }
 
@@ -90,6 +138,7 @@ class AddressBook extends ChangeNotifier {
   }
 
   void remove(String id) {
+    Api.instance.deleteAddress(id).catchError((e) => logApiFailure('delete address', e));
     _addresses.removeWhere((a) => a.id == id);
     if (_selectedId == id && _addresses.isNotEmpty) {
       _selectedId = _addresses.first.id;

@@ -212,11 +212,19 @@ func (a *API) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// First verified code is where a person becomes a row, and where their
+	// public id is minted. Everything else joins on the email.
+	user, err := a.db.upsertUser(r.Context(), email)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	session, err := a.db.newSession(r.Context(), email)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	session.User = &user
 	writeJSON(w, http.StatusOK, session)
 }
 
@@ -257,6 +265,7 @@ func (a *API) handleRefresh(w http.ResponseWriter, r *http.Request) {
 // Session is what the app stores: two tokens and when the short one dies, so
 // the client can refresh before a call fails rather than after.
 type Session struct {
+	User         *User  `json:"user,omitempty"` // sent on sign-in, not on refresh
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refreshToken"`

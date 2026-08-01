@@ -21,7 +21,7 @@ class WishlistScreen extends StatelessWidget {
           child: ListenableBuilder(
             listenable: Wishlist.instance,
             builder: (context, _) {
-              final items = products
+              final items = shownCatalog
                   .where((p) => Wishlist.instance.contains(p.id))
                   .toList();
               return Column(

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'addresses.dart';
 import 'api.dart';
 
 /// Sign-in state from the emailed-code flow, persisted so a browser refresh
@@ -20,6 +21,7 @@ class Session extends ChangeNotifier {
 
   String? _email;
   String? _token;
+  Map<String, dynamic>? _user; // id, name, phone, roles — from the server
   String? _refreshToken;
   DateTime? _expiresAt;
   bool _skipped = false;
@@ -27,6 +29,17 @@ class Session extends ChangeNotifier {
   String? get email => _email;
   String? get token => _token;
   bool get loggedIn => _email != null;
+
+  /// The public id a person quotes at support, e.g. LMZ-1042.
+  String get publicId => _user?['id'] as String? ?? '';
+  String get name => _user?['name'] as String? ?? '';
+  String get phone => _user?['phone'] as String? ?? '';
+
+  /// "buyer", or "buyer" and "seller" once they open a store. Derived on the
+  /// server from whether a store exists, so it is never stale.
+  List<String> get roles =>
+      (_user?['roles'] as List<dynamic>? ?? const ['buyer']).cast<String>();
+  bool get isSeller => roles.contains('seller');
 
   /// True once the user has either logged in or chosen to browse as a guest,
   /// so the login screen is not shown again.
@@ -44,7 +57,25 @@ class Session extends ChangeNotifier {
     _refreshToken = prefs.getString(_refreshKey);
     final expiry = prefs.getString(_expiryKey);
     _expiresAt = expiry == null ? null : DateTime.tryParse(expiry);
-    if (_email != null) notifyListeners();
+    if (_email != null) {
+      notifyListeners();
+      // The profile and address book live on the server, so a restored
+      // session fetches them rather than trusting anything cached here.
+      refreshProfile();
+    }
+  }
+
+  /// Reads the profile and address book back from the server. Safe to call
+  /// whenever; failures leave the last known values alone.
+  Future<void> refreshProfile() async {
+    if (_token == null) return;
+    try {
+      _user = await Api.instance.me();
+      notifyListeners();
+    } catch (e) {
+      logApiFailure('profile', e);
+    }
+    await AddressBook.instance.load();
   }
 
   Future<void> signIn(AuthTokens tokens) async {
@@ -59,6 +90,7 @@ class Session extends ChangeNotifier {
     _skipped = false;
     await _save();
     notifyListeners();
+    await refreshProfile();
   }
 
   /// A usable access token, renewed first if it is close to expiring. Null
@@ -86,6 +118,8 @@ class Session extends ChangeNotifier {
   Future<void> signOut() async {
     _email = null;
     _token = null;
+    _user = null;
+    AddressBook.instance.clear();
     _refreshToken = null;
     _expiresAt = null;
     _skipped = true;

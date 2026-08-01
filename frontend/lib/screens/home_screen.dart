@@ -21,6 +21,7 @@ import 'profile_screen.dart';
 import 'search_screen.dart';
 import 'seller_dashboard_screen.dart';
 import 'shop_screen.dart';
+import 'shops_screen.dart';
 import 'wishlist_screen.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
@@ -136,15 +137,28 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
-        const _SectionHeader(title: 'Shop By Category', serif: true),
+        _SectionHeader(
+          title: 'Shop By Category',
+          serif: true,
+          onSeeAll: () => _openSearch(context),
+        ),
         const SizedBox(height: 12),
         _CategoryRow(products: shownProducts),
         const SizedBox(height: 22),
-        const _SectionHeader(title: 'Stores near you'),
+        _SectionHeader(
+          title: 'Stores near you',
+          onSeeAll: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ShopsScreen()),
+          ),
+        ),
         const SizedBox(height: 12),
         _ShopAds(shops: shownShops),
         const SizedBox(height: 24),
-        const _SectionHeader(title: 'New Arrival'),
+        _SectionHeader(
+          title: 'New Arrival',
+          onSeeAll: () => _openSearch(context),
+        ),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
@@ -536,10 +550,18 @@ class _ShopAd extends StatelessWidget {
   }
 }
 
+/// Browsing everything is what the search screen already does, so "See all"
+/// opens it rather than inventing a second list of the same products.
+void _openSearch(BuildContext context) => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SearchScreen()),
+    );
+
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool serif; // editorial serif look, as in the Shop By Shop design
-  const _SectionHeader({required this.title, this.serif = false});
+  final VoidCallback? onSeeAll;
+  const _SectionHeader({required this.title, this.serif = false, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -562,9 +584,17 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        const Text(
-          'See all',
-          style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E)),
+        // "See all" was a bare Text — it looked like a link and did nothing.
+        GestureDetector(
+          onTap: onSeeAll,
+          behavior: HitTestBehavior.opaque,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Text(
+              'See all',
+              style: TextStyle(fontSize: 13, color: Color(0xFF7BA32E)),
+            ),
+          ),
         ),
       ],
     );

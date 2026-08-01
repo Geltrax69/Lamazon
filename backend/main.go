@@ -85,6 +85,13 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/login/verify", s.handleVerifyCode)
 	mux.HandleFunc("POST /api/login/refresh", s.handleRefresh)
 
+	// Account: who is signed in, and where they want things delivered.
+	mux.HandleFunc("GET /api/me", s.handleMe)
+	mux.HandleFunc("PATCH /api/me", s.handleUpdateMe)
+	mux.HandleFunc("GET /api/addresses", s.handleAddresses)
+	mux.HandleFunc("POST /api/addresses", s.handleAddAddress)
+	mux.HandleFunc("DELETE /api/addresses/{id}", s.handleDeleteAddress)
+
 	// Notifications
 	mux.HandleFunc("GET /api/push/key", s.handlePushKey)
 	mux.HandleFunc("POST /api/push/subscribe", s.handlePushSubscribe)
@@ -119,6 +126,8 @@ const sellerPrefix = "/api/seller/"
 // The public key itself is not a secret and stays open.
 func needsSession(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, sellerPrefix) ||
+		r.URL.Path == "/api/me" ||
+		strings.HasPrefix(r.URL.Path, "/api/addresses") ||
 		r.URL.Path == "/api/push/subscribe" ||
 		r.URL.Path == "/api/push/test"
 }
