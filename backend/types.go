@@ -4,15 +4,18 @@ import "time"
 
 // Product is one listing in the catalog.
 type Product struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Category    string  `json:"category"`
-	Tab         string  `json:"tab"`
-	Price       float64 `json:"price"`
-	ImageURL    string  `json:"imageUrl"`
-	Store       string  `json:"store"`
-	Description string  `json:"description"`
-	Offers      []Offer `json:"offers,omitempty"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Category string  `json:"category"`
+	Tab      string  `json:"tab"`
+	Price    float64 `json:"price"`
+	ImageURL string  `json:"imageUrl"`
+	// Every photo, in upload order. A seller's item can carry several; the
+	// seeded rows have one. imageUrl stays the cover so old callers still work.
+	ImageURLs   []string `json:"imageUrls"`
+	Store       string   `json:"store"`
+	Description string   `json:"description"`
+	Offers      []Offer  `json:"offers,omitempty"`
 }
 
 // Offer is the same product priced at another vendor.

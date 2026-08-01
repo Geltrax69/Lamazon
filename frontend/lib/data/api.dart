@@ -393,6 +393,14 @@ class Api {
         imageUrl: r['imageUrl'] as String? ?? '',
         store: r['store'] as String? ?? '',
         description: r['description'] as String? ?? '',
+        // Photos past the cover. The gallery shows every one; before this they
+        // were parsed away, so a two-photo listing looked like a one-photo one.
+        extraImages: ((r['imageUrls'] as List<dynamic>? ?? const [])
+                .cast<String>()
+                .toList()
+              ..remove(r['imageUrl'] as String? ?? ''))
+            .where((u) => u.isNotEmpty)
+            .toList(),
         offers: [
           for (final o in (r['offers'] as List<dynamic>? ?? const []))
             ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),

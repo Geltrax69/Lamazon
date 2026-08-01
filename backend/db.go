@@ -149,19 +149,22 @@ type productFilter struct {
 const productQuery = `
 	WITH catalogue AS (
 		SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
-		       p.description, true AS seeded
+		       p.description, p.image_url AS photos
 		FROM products p
 		UNION ALL
 		SELECT i.id, i.title, COALESCE(NULLIF(i.category, ''), 'Food'),
 		       COALESCE(NULLIF(i.category, ''), 'Food'),
 		       i.price,
-		       COALESCE(i.image_urls[1], ''), s.name, i.description, false
+		       COALESCE(i.image_urls[1], ''), s.name, i.description,
+		       -- every photo, not just the cover: the details gallery shows
+		       -- all of them, and dropping them here lost the rest silently.
+		       array_to_string(i.image_urls, E'\n')
 		FROM inventory_items i
 		JOIN seller_stores s ON s.owner = i.owner
 		WHERE i.stock > 0
 	)
 	SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
-	       p.description,
+	       p.description, p.photos,
 	       COALESCE((SELECT json_agg(json_build_object('store', o.store, 'price', o.price)
 	                                 ORDER BY o.store)
 	                 FROM offers o WHERE o.product_id = p.id), '[]')
@@ -189,10 +192,12 @@ func (d *DB) products(ctx context.Context, f productFilter) ([]Product, error) {
 	for rows.Next() {
 		var p Product
 		var offers []byte
+		var photos string
 		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Tab, &p.Price,
-			&p.ImageURL, &p.Store, &p.Description, &offers); err != nil {
+			&p.ImageURL, &p.Store, &p.Description, &photos, &offers); err != nil {
 			return nil, err
 		}
+		p.ImageURLs = splitURLs(photos)
 		if err := json.Unmarshal(offers, &p.Offers); err != nil {
 			return nil, err
 		}
