@@ -12,13 +12,22 @@ const _red = Color(0xFFD32F2F);
 /// Enter a delivery location manually, check whether porters cover it, and
 /// save it under Home / Office / Other.
 class LocationScreen extends StatefulWidget {
-  const LocationScreen({super.key});
+  /// Pre-filled when we arrive from a confirmed device location: the city is
+  /// already known, so only the parts GPS cannot tell us are left to type.
+  final String? city;
+  const LocationScreen({super.key, this.city});
 
   @override
   State<LocationScreen> createState() => _LocationScreenState();
 }
 
 class _LocationScreenState extends State<LocationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.city != null) _city.text = widget.city!;
+  }
+
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _line = TextEditingController();

@@ -45,18 +45,18 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
     });
   }
 
+  /// Confirming the fix is the start of saving it, not the end. GPS gives the
+  /// campus, never the room number or who to hand the bag to, so the form
+  /// opens with the city already filled and asks only for the rest.
   void _useIt() {
     AddressBook.instance.enableLocation();
     Navigator.pop(context);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Delivering to ${serviceableCities.first}'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationScreen(city: serviceableCities.first),
+      ),
+    );
   }
 
   /// What the browser found, in words rather than coordinates, with the

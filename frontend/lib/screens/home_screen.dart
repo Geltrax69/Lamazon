@@ -63,12 +63,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Ask for a delivery location once, on the first frame after launch.
-    if (!AddressBook.instance.locationEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) showLocationPrompt(context);
-      });
+    _askForLocationIfNeeded();
+  }
+
+  /// Asks for a delivery location, but only once the saved addresses have
+  /// arrived. Firing on the first frame asked people who already had an
+  /// address saved, because the book was still empty when we looked.
+  Future<void> _askForLocationIfNeeded() async {
+    await AddressBook.instance.ready;
+    if (!mounted) return;
+    if (AddressBook.instance.addresses.isNotEmpty ||
+        AddressBook.instance.locationEnabled) {
+      return;
     }
+    showLocationPrompt(context);
   }
 
   @override

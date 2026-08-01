@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
@@ -77,6 +79,17 @@ class AddressBook extends ChangeNotifier {
 
   String _selectedId = '';
 
+  /// Completes once the book has been fetched, so callers can wait instead of
+  /// acting on an empty list that simply has not arrived yet.
+  final Completer<void> _ready = Completer<void>();
+  Future<void> get ready => _ready.future;
+
+  /// Marks the book settled without a fetch — a guest has no book to load,
+  /// and callers waiting on [ready] would otherwise wait forever.
+  void markLoaded() {
+    if (!_ready.isCompleted) _ready.complete();
+  }
+
   /// Pulls the book from the server. Called after sign-in and on restore, so
   /// a new browser shows the same addresses as the old one.
   Future<void> load() async {
@@ -93,6 +106,7 @@ class AddressBook extends ChangeNotifier {
     } catch (e) {
       logApiFailure('addresses', e);
     }
+    if (!_ready.isCompleted) _ready.complete();
   }
 
   /// Forgets everything on sign-out — the next person on this browser must

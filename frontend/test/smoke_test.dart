@@ -360,6 +360,31 @@ void main() {
     });
   });
 
+  testWidgets('a saved address means no location prompt', (tester) async {
+    await mockNetworkImagesFor(() async {
+      // The book has arrived and it is not empty: asking again would be
+      // asking a question we already have the answer to.
+      AddressBook.instance.markLoaded();
+      await AddressBook.instance.add(const Address(
+        id: 'saved-1',
+        label: AddressLabel.home,
+        line: 'Block 34',
+        city: 'Lovely Professional University',
+        pincode: '144411',
+        name: 'Lalit',
+        phone: '9876543210',
+      ));
+
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(find.text('Enable device location'), findsNothing);
+      expect(find.text('Use my current location'), findsNothing);
+      expect(find.text('Enter it manually'), findsNothing);
+    });
+  });
+
   testWidgets('every See all opens something', (tester) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: HomeScreen()));

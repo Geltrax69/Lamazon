@@ -58,7 +58,10 @@ class Session extends ChangeNotifier {
     _refreshToken = prefs.getString(_refreshKey);
     final expiry = prefs.getString(_expiryKey);
     _expiresAt = expiry == null ? null : DateTime.tryParse(expiry);
-    if (_email != null) {
+    if (_email == null) {
+      // Nobody to fetch a book for; let anything waiting on it carry on.
+      AddressBook.instance.markLoaded();
+    } else {
       notifyListeners();
       // The profile and address book live on the server, so a restored
       // session fetches them rather than trusting anything cached here.
@@ -116,6 +119,7 @@ class Session extends ChangeNotifier {
 
   /// Guest browsing. Nothing is stored, because there is nothing to remember.
   void skip() {
+    AddressBook.instance.markLoaded();
     _skipped = true;
     notifyListeners();
   }
