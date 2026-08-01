@@ -696,7 +696,8 @@ class _BottomNav extends StatelessWidget {
           ListenableBuilder(
             listenable: Seller.instance,
             builder: (context, _) {
-              final selling = Seller.instance.hasStore;
+              final selling =
+                  Session.instance.isSeller || Seller.instance.hasStore;
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,

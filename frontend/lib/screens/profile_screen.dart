@@ -245,9 +245,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       _Row(
                         icon: LucideIcons.store,
-                        label: Seller.instance.hasStore
-                            ? 'Your store'
-                            : 'Sell on Lamazon',
+                        label: _sells ? 'Your store' : 'Sell on Lamazon',
                         onTap: () => _openSeller(context),
                       ),
                     ],
@@ -308,12 +306,17 @@ Future<void> _openSeller(BuildContext context) async {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (_) => Seller.instance.hasStore
+      builder: (_) => _sells
           ? const SellerDashboardScreen()
           : const SellerOnboardingScreen(),
     ),
   );
 }
+
+/// Whether this person has a store. The server decides — it derives the role
+/// from whether one exists — and the local copy only covers the moment
+/// between opening a store and the next refresh.
+bool get _sells => Session.instance.isSeller || Seller.instance.hasStore;
 
 void _soon(BuildContext context, String what) {
   ScaffoldMessenger.of(context)

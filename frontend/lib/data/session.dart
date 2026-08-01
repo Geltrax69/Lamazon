@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'addresses.dart';
 import 'api.dart';
+import 'seller.dart';
 
 /// Sign-in state from the emailed-code flow, persisted so a browser refresh
 /// does not sign the seller out.
@@ -76,6 +77,10 @@ class Session extends ChangeNotifier {
       logApiFailure('profile', e);
     }
     await AddressBook.instance.load();
+    // The store lives on the server, so a fresh sign-in has to fetch it.
+    // Without this the app forgets someone is a seller the moment they log
+    // out, and offers them "Sell on Lamazon" for a store they already have.
+    if (isSeller) await Seller.instance.load();
   }
 
   Future<void> signIn(AuthTokens tokens) async {

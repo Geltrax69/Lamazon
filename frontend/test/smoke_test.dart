@@ -359,4 +359,34 @@ void main() {
           isNot(before));
     });
   });
+
+  testWidgets('every See all opens something', (tester) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Three sections carry one, and each was a bare Text before — it looked
+      // like a link and did nothing at all.
+      // The location prompt opens over home and absorbs pointers, so it has
+      // to go before anything underneath can be tapped.
+      if (find.text('Enable device location').evaluate().isNotEmpty ||
+          find.text('Use my current location').evaluate().isNotEmpty) {
+        tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      expect(find.text('See all'), findsWidgets);
+
+      // Shop By Category and New Arrival open search; Stores near you opens
+      // the shops list. A pushed route leaves home mounted underneath, so
+      // assert on the destination, not on home being gone.
+      await tester.tap(find.text('See all').first);
+      // Not pumpAndSettle: a spinner somewhere never stops, so settle never
+      // returns. A few frames is enough for the route transition.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(SearchScreen), findsOneWidget);
+    });
+  });
 }
