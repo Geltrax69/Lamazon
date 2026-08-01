@@ -119,9 +119,11 @@ void main() {
       expect(find.text('Your orders'), findsOneWidget);
       expect(find.text('Address book'), findsOneWidget);
 
-      // Shop screen shows that vendor's products
+      // Shop screen shows that vendor's products. It asks the API first and
+      // falls back to the bundled list, so give the future a frame to settle.
       await tester.pumpWidget(MaterialApp(
           home: ShopScreen(shop: shops.firstWhere((s) => s.name == 'GadgetHub'))));
+      await tester.pumpAndSettle();
       expect(find.text('Wireless Headphones'), findsOneWidget);
     });
   });

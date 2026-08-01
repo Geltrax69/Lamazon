@@ -37,6 +37,18 @@ Future<List<Shop>> loadShops() async {
   return shops;
 }
 
+/// Everything one shop sells, from the API — which knows about real sellers'
+/// stock, unlike the bundled list below.
+Future<List<Product>> loadShopProducts(String shopName) async {
+  try {
+    final live = await Api.instance.shopProducts(shopName);
+    if (live.isNotEmpty) return live;
+  } catch (e) {
+    logApiFailure('shop products', e);
+  }
+  return productsAtShop(shopName);
+}
+
 /// Everything a shop sells: its own listings, plus items it stocks that are
 /// listed elsewhere — each priced at this shop's price.
 List<Product> productsAtShop(String shopName) {

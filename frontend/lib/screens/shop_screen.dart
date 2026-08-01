@@ -9,13 +9,31 @@ import '../widgets/product_card.dart';
 import 'details_screen.dart';
 
 /// A single vendor's storefront: hero, delivery info, and their products.
-class ShopScreen extends StatelessWidget {
+class ShopScreen extends StatefulWidget {
   final Shop shop;
   const ShopScreen({super.key, required this.shop});
 
   @override
+  State<ShopScreen> createState() => _ShopScreenState();
+}
+
+class _ShopScreenState extends State<ShopScreen> {
+  // What this shop sells comes from the server. Filtering the bundled sample
+  // list — which is what this did — meant a real seller's storefront was
+  // always empty, however much stock they had added.
+  late final Future<List<Product>> _items = loadShopProducts(widget.shop.name);
+
+  @override
   Widget build(BuildContext context) {
-    final items = productsAtShop(shop.name);
+    final shop = widget.shop;
+    return FutureBuilder<List<Product>>(
+      future: _items,
+      builder: (context, snap) => _build(context, shop, snap.data),
+    );
+  }
+
+  Widget _build(BuildContext context, Shop shop, List<Product>? loaded) {
+    final items = loaded ?? const <Product>[];
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
