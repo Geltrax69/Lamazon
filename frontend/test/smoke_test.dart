@@ -203,21 +203,14 @@ void main() {
       expect(find.text('Campus Snacks'), findsOneWidget);
       expect(find.text('Inventory value'), findsOneWidget);
 
-      // The first product brings demo orders: one new, one accepted.
-      expect(Seller.instance.countAt(OrderStage.received), 1);
-      expect(Seller.instance.countAt(OrderStage.accepted), 1);
-      expect(Seller.instance.openOrders, 2);
+      // Orders come from the server now. The dashboard used to invent two
+      // the moment a product was added, so a brand-new store looked like it
+      // had customers — accepting and delivering an order nobody placed.
+      expect(Seller.instance.orders, isEmpty);
 
-      // Accepting then delivering takes the units out of stock.
-      final before =
-          Seller.instance.items.firstWhere((i) => i.id == 'i1').stock;
-      Seller.instance.acceptOrder('o1');
-      expect(Seller.instance.countAt(OrderStage.accepted), 2);
-      Seller.instance.deliverOrder('o1');
-      expect(Seller.instance.countAt(OrderStage.delivered), 1);
-      expect(Seller.instance.items.firstWhere((i) => i.id == 'i1').stock,
-          before - 2);
-      expect(Seller.instance.openOrders, 1);
+      // Nothing reached the server in a widget test, and the screen has to
+      // say so rather than showing a store no shopper can see.
+      expect(Seller.instance.syncError, isNotNull);
 
       // The seller bottom-nav icon used to trigger a web StackOverflowError
       // when the home screen rebuilt after a refresh.

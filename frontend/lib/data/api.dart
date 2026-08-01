@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
 import 'addresses.dart';
+import 'seller.dart';
 import 'session.dart';
 
 /// Where the Go backend lives. Override per build:
@@ -237,6 +238,71 @@ class Api {
     return {'Authorization': 'Bearer $token'};
   }
 
+  /// Reads the store back. Throws [NoStoreYet] when this account has none,
+  /// which is a normal state rather than an error.
+  Future<SellerStore> sellerStore() async {
+    final res = await http
+        .get(_url('/api/seller/store'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode == 404) throw const NoStoreYet();
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final r = jsonDecode(res.body) as Map<String, dynamic>;
+    return SellerStore(
+      name: r['name'] as String? ?? '',
+      photo: null, // the server holds a URL; the picked bytes are local only
+      location: r['location'] as String? ?? '',
+      city: r['city'] as String? ?? '',
+      categories:
+          (r['categories'] as List<dynamic>? ?? const []).cast<String>(),
+    )..photoUrl = r['photoUrl'] as String? ?? '';
+  }
+
+  Future<List<InventoryItem>> sellerItems() async {
+    final res = await http
+        .get(_url('/api/seller/items'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (body['items'] as List<dynamic>? ?? const [])
+        .map((r) => _inventoryItem(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<SellerOrder>> sellerOrders() async {
+    final res = await http
+        .get(_url('/api/seller/orders'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (body['orders'] as List<dynamic>? ?? const []).map((raw) {
+      final r = raw as Map<String, dynamic>;
+      return SellerOrder(
+        id: r['id'] as String,
+        itemId: r['itemId'] as String? ?? '',
+        itemTitle: r['itemTitle'] as String? ?? '',
+        units: (r['units'] as num?)?.toInt() ?? 1,
+        amount: (r['amount'] as num?)?.toDouble() ?? 0,
+        stage: switch (r['stage']) {
+          'accepted' => OrderStage.accepted,
+          'delivered' => OrderStage.delivered,
+          _ => OrderStage.received,
+        },
+      );
+    }).toList();
+  }
+
+  InventoryItem _inventoryItem(Map<String, dynamic> r) => InventoryItem(
+        id: r['id'] as String,
+        title: r['title'] as String? ?? '',
+        description: r['description'] as String? ?? '',
+        category: r['category'] as String? ?? '',
+        price: (r['price'] as num?)?.toDouble() ?? 0,
+        stock: (r['stock'] as num?)?.toInt() ?? 0,
+      )
+        ..serverId = r['id'] as String
+        ..imageUrls =
+            (r['imageUrls'] as List<dynamic>? ?? const []).cast<String>();
+
   /// Opens the store and uploads its logo in one request, so there is no
   /// window where the store exists without its picture. Returns the Cloudinary
   /// URL, or '' when no photo was attached.
@@ -337,4 +403,12 @@ class Api {
 /// Logs why a call fell back, so a silent offline mode is never a mystery.
 void logApiFailure(String what, Object error) {
   debugPrint('API $what failed, using bundled data: $error');
+}
+
+
+/// This account has no store yet — a normal state, not a failure.
+class NoStoreYet implements Exception {
+  const NoStoreYet();
+  @override
+  String toString() => 'no store yet';
 }

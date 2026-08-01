@@ -140,6 +140,39 @@ class Seller extends ChangeNotifier {
       _items.where((i) => i.status != StockStatus.inStock).length;
   double get inventoryValue => _items.fold(0.0, (n, i) => n + i.value);
 
+  /// Set when something did not reach the server. The dashboard shows it,
+  /// because a store that exists only in this tab is not a store — it
+  /// disappears on refresh and no shopper can ever see it.
+  String? _syncError;
+  String? get syncError => _syncError;
+
+  /// Replaces local state with whatever the server holds. This is the truth:
+  /// anything that failed to save simply is not here, rather than lingering
+  /// on screen and looking saved.
+  Future<void> load() async {
+    try {
+      final store = await Api.instance.sellerStore();
+      final items = await Api.instance.sellerItems();
+      final orders = await Api.instance.sellerOrders();
+      _store = store;
+      _items
+        ..clear()
+        ..addAll(items);
+      _orders
+        ..clear()
+        ..addAll(orders);
+      _syncError = null;
+      notifyListeners();
+    } on NoStoreYet {
+      _store = null;
+      _items.clear();
+      _orders.clear();
+      notifyListeners();
+    } catch (e) {
+      logApiFailure('seller load', e);
+    }
+  }
+
   void openStore(SellerStore store) {
     _store = store;
     notifyListeners();
@@ -147,7 +180,8 @@ class Seller extends ChangeNotifier {
   }
 
   /// The screens stay synchronous and local-first: the store shows up at once
-  /// and the network catches up, or logs why it did not.
+  /// and the network catches up. When it does not, [syncError] says so instead
+  /// of leaving a store that only exists on this screen.
   Future<void> _pushStore(SellerStore store) async {
     try {
       store.photoUrl = await Api.instance.createStore(
@@ -157,19 +191,30 @@ class Seller extends ChangeNotifier {
         categories: store.categories,
         photo: store.photo,
       );
+      _syncError = null;
       notifyListeners();
     } catch (e) {
       logApiFailure('store sync', e);
+      _syncError = 'Your store is not saved yet — shoppers cannot see it. '
+          'Check you are signed in, then retry.';
+      notifyListeners();
     }
+  }
+
+  /// Sends anything that never made it. Called by the retry button.
+  Future<void> retrySync() async {
+    final store = _store;
+    if (store == null) return;
+    await _pushStore(store);
+    for (final item in _items.where((i) => i.serverId == null)) {
+      await _pushItem(item);
+    }
+    await load();
   }
 
   void addItem(InventoryItem item) {
     _items.insert(0, item);
     _pushItem(item);
-    // ponytail: no order backend yet, so the first product brings two
-    // demo orders along to make the store page real. Delete this call the
-    // day orders arrive from the shopper side.
-    if (_orders.isEmpty) _seedDemoOrders(item);
     notifyListeners();
   }
 
@@ -188,29 +233,13 @@ class Seller extends ChangeNotifier {
       item.serverId = saved.id;
       item.imageUrls = saved.imageUrls;
       notifyListeners();
+      _syncError = null;
     } catch (e) {
       logApiFailure('item sync', e);
+      _syncError = '"${item.title}" is not saved yet — it will not appear in '
+          'the shop until it is. Check you are signed in, then retry.';
     }
-  }
-
-  void _seedDemoOrders(InventoryItem item) {
-    _orders.addAll([
-      SellerOrder(
-        id: 'o1',
-        itemId: item.id,
-        itemTitle: item.title,
-        units: 2,
-        amount: item.price * 2,
-      ),
-      SellerOrder(
-        id: 'o2',
-        itemId: item.id,
-        itemTitle: item.title,
-        units: 1,
-        amount: item.price,
-        stage: OrderStage.accepted,
-      ),
-    ]);
+    notifyListeners();
   }
 
   void acceptOrder(String id) {

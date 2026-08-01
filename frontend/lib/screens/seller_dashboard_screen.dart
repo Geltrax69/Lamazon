@@ -17,8 +17,22 @@ const _red = Color(0xFFD32F2F);
 
 /// The seller's store page: what it's worth, what's running out, and every
 /// line of stock they can edit.
-class SellerDashboardScreen extends StatelessWidget {
+class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
+
+  @override
+  State<SellerDashboardScreen> createState() => _SellerDashboardScreenState();
+}
+
+class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // What the server holds is the store. Reading it on open means a listing
+    // that failed to save is visibly absent rather than sitting here looking
+    // fine while no shopper can see it.
+    Seller.instance.load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +54,7 @@ class SellerDashboardScreen extends StatelessWidget {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
                       children: [
+                        const _SyncBanner(),
                         const NotifyBanner(),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
@@ -547,6 +562,43 @@ class _StockButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(9),
         ),
         child: Icon(icon, size: 15, color: _ink),
+      ),
+    );
+  }
+}
+
+
+/// Shown when something never reached the server. Silence here is what let a
+/// store exist in one browser tab and nowhere else.
+class _SyncBanner extends StatelessWidget {
+  const _SyncBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Seller.instance.syncError;
+    if (error == null) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDECEC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.triangleAlert, size: 18, color: Color(0xFFD03A3A)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Seller.instance.retrySync(),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
