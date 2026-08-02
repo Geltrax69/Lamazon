@@ -36,13 +36,25 @@ class SellerStore {
   /// the thing actually rendered, so the tile never flickers.
   String photoUrl = '';
 
+  /// Where the store stands with the admin: pending, approved or rejected,
+  /// with the reason when it is the last one. A store that is not approved
+  /// exists — it just cannot hold stock and no shopper can see it.
+  final String status;
+  final String rejectReason;
+
   SellerStore({
     required this.name,
     required this.photo,
     required this.location,
     required this.city,
     required this.categories,
+    this.status = 'pending',
+    this.rejectReason = '',
   });
+
+  bool get approved => status == 'approved';
+  bool get underReview => status == 'pending';
+  bool get rejected => status == 'rejected';
 }
 
 /// One line of stock. ponytail: no variants, cost price or supplier — add
@@ -85,14 +97,19 @@ class InventoryItem {
 
 /// Where an incoming order has got to. Accepting reserves it; delivering
 /// is what actually takes the units out of stock.
-enum OrderStage { received, accepted, delivered }
+enum OrderStage { received, accepted, rejected, picked, delivered }
 
 extension OrderStageInfo on OrderStage {
   String get label => switch (this) {
         OrderStage.received => 'New',
         OrderStage.accepted => 'Accepted',
+        OrderStage.rejected => 'Rejected',
+        OrderStage.picked => 'With the rider',
         OrderStage.delivered => 'Delivered',
       };
+
+  /// Once a rider has it, the shop has nothing left to do.
+  bool get needsSeller => this == OrderStage.received;
 }
 
 class SellerOrder {
@@ -103,6 +120,12 @@ class SellerOrder {
   final double amount;
   OrderStage stage;
 
+  /// Who it is going to, copied onto the order when it was placed.
+  final String receiverName;
+  final String receiverPhone;
+  final String receiverAddress;
+  String rejectReason;
+
   SellerOrder({
     required this.id,
     required this.itemId,
@@ -110,6 +133,10 @@ class SellerOrder {
     required this.units,
     required this.amount,
     this.stage = OrderStage.received,
+    this.receiverName = '',
+    this.receiverPhone = '',
+    this.receiverAddress = '',
+    this.rejectReason = '',
   });
 }
 
@@ -193,6 +220,9 @@ class Seller extends ChangeNotifier {
       );
       _syncError = null;
       notifyListeners();
+      // The server decides the status — a new store comes back pending, and
+      // the screen has to say so rather than showing a shop that is live.
+      await load();
     } catch (e) {
       logApiFailure('store sync', e);
       _syncError = 'Your store is not saved yet — shoppers cannot see it. '
@@ -242,20 +272,34 @@ class Seller extends ChangeNotifier {
     notifyListeners();
   }
 
-  void acceptOrder(String id) {
-    _orders.firstWhere((o) => o.id == id).stage = OrderStage.accepted;
-    notifyListeners();
-  }
+  /// Accepting and rejecting go through the server, because both do more than
+  /// change a label: accepting mints the buyer's delivery code, rejecting
+  /// tells them why and gives the units back. Returns the failure to show, or
+  /// null when it worked.
+  Future<String?> acceptOrder(String id) => _move(id, () async {
+        final saved = await Api.instance.acceptOrder(id);
+        _orders.firstWhere((o) => o.id == id).stage = saved.stage;
+      });
 
-  /// Handing the order over is what removes the units from inventory.
-  void deliverOrder(String id) {
-    final order = _orders.firstWhere((o) => o.id == id);
-    order.stage = OrderStage.delivered;
-    final item = _items.where((i) => i.id == order.itemId).firstOrNull;
-    if (item != null) {
-      item.stock = (item.stock - order.units).clamp(0, 1 << 30);
+  Future<String?> rejectOrder(String id, String reason) => _move(id, () async {
+        final saved = await Api.instance.rejectOrder(id, reason);
+        final order = _orders.firstWhere((o) => o.id == id);
+        order.stage = saved.stage;
+        order.rejectReason = saved.rejectReason;
+      });
+
+  Future<String?> _move(String id, Future<void> Function() call) async {
+    try {
+      await call();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      logApiFailure('order $id', e);
+      // Whatever the server thinks now is the truth; refetch rather than
+      // leaving the screen showing a move that did not happen.
+      await load();
+      return e.toString().replaceFirst('ClientException: ', '');
     }
-    notifyListeners();
   }
 
   /// Edits happen on the live object, so callers mutate then call this.

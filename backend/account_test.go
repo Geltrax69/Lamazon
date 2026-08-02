@@ -109,7 +109,7 @@ func TestAddressBookPersistsAndKeepsOneDefault(t *testing.T) {
 // mean a seller can add stock nobody can buy.
 func TestSellerStockAppearsInTheCatalog(t *testing.T) {
 	h := testAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Food"},
 	})

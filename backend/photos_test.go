@@ -121,7 +121,7 @@ func TestPhotosUploadAndPersist(t *testing.T) {
 	if code, _ := postPhotos(t, h, "/api/seller/store/photo", onePixelPNG); code != http.StatusNotFound {
 		t.Fatalf("photo before store: want 404, got %d", code)
 	}
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Food"},
 	})
@@ -257,6 +257,7 @@ func TestCreateWithPhotosInOneCall(t *testing.T) {
 	if len(store["categories"].([]any)) != 2 {
 		t.Fatalf("repeated field should give 2 categories, got %v", store["categories"])
 	}
+	approveStore(t, h, DefaultOwner)
 
 	code, item := postForm(t, h, "/api/seller/items", map[string][]string{
 		"title": {"Straubery"}, "category": {"Grocery"},
@@ -296,7 +297,7 @@ func TestCreateWithPhotosInOneCall(t *testing.T) {
 // store or an item behind for the seller to wonder about.
 func TestFailedUploadWritesNothing(t *testing.T) {
 	h, _ := photoAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Farm", "location": "L", "city": "LPU", "categories": []string{"Grocery"},
 	})
 
@@ -315,7 +316,7 @@ func TestFailedUploadWritesNothing(t *testing.T) {
 // A bad number in a form is a 400, not a silently zeroed price.
 func TestFormNumbersValidated(t *testing.T) {
 	h, _ := photoAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Farm", "location": "L", "city": "LPU", "categories": []string{"Grocery"},
 	})
 	code, body := postForm(t, h, "/api/seller/items", map[string][]string{

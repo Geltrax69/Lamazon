@@ -110,8 +110,8 @@ func (d *DB) seedIfEmpty(ctx context.Context) error {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO seller_stores (owner, name, location, city, categories)
-			VALUES ($1,$2,$3,$4,$5)`,
+			INSERT INTO seller_stores (owner, name, location, city, categories, status)
+			VALUES ($1,$2,$3,$4,$5,'approved')`,
 			store.Owner, store.Name, store.Location,
 			ServiceableCities[0], store.Categories); err != nil {
 			return err
@@ -161,7 +161,9 @@ const productQuery = `
 		       array_to_string(i.image_urls, E'\n')
 		FROM inventory_items i
 		JOIN seller_stores s ON s.owner = i.owner
-		WHERE i.stock > 0
+		-- Only approved stores reach shoppers: a store still under review is
+		-- real to its owner and to the admin, and to nobody else.
+		WHERE i.stock > 0 AND s.status = 'approved'
 	)
 	SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
 	       p.description, p.photos,
@@ -229,7 +231,8 @@ func (d *DB) shops(ctx context.Context) ([]Shop, error) {
 		       s.photo_url,
 		       COALESCE(s.categories[1], 'All')
 		FROM seller_stores s
-		WHERE NOT EXISTS (SELECT 1 FROM shops sh WHERE sh.name = s.name)
+		WHERE s.status = 'approved'
+		  AND NOT EXISTS (SELECT 1 FROM shops sh WHERE sh.name = s.name)
 		ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -256,9 +259,11 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 	var s SellerStore
 	var categories string
 	err := d.sql.QueryRowContext(ctx, `
-		SELECT owner, name, location, city, array_to_string(categories, ','), photo_url
+		SELECT owner, name, location, city, array_to_string(categories, ','),
+		       photo_url, status, reject_reason
 		FROM seller_stores WHERE owner = $1`, owner).
-		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &categories, &s.PhotoURL)
+		Scan(&s.Owner, &s.Name, &s.Location, &s.City, &categories, &s.PhotoURL,
+			&s.Status, &s.RejectReason)
 	if err != nil {
 		return s, err
 	}
@@ -296,14 +301,14 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	return out, rows.Err()
 }
 
-// orders reads every order against this seller's stock, newest first.
+// orders reads every order against this seller's stock, newest first. Scoped
+// by store_owner rather than by joining the item, so an item deleted after
+// the fact does not take its order history with it.
 func (d *DB) orders(ctx context.Context, owner string) ([]Order, error) {
 	rows, err := d.sql.QueryContext(ctx, `
-		SELECT o.id, o.item_id, o.item_title, o.units, o.amount, o.stage, o.placed_at
-		FROM orders o
-		JOIN inventory_items i ON i.id = o.item_id
-		WHERE i.owner = $1
-		ORDER BY o.placed_at DESC`, owner)
+		SELECT `+orderColumns+`
+		FROM orders WHERE store_owner = $1
+		ORDER BY placed_at DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -311,9 +316,8 @@ func (d *DB) orders(ctx context.Context, owner string) ([]Order, error) {
 
 	out := make([]Order, 0)
 	for rows.Next() {
-		var o Order
-		if err := rows.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units,
-			&o.Amount, &o.Stage, &o.PlacedAt); err != nil {
+		o, err := scanOrder(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, o)

@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
 import 'addresses.dart';
+import 'orders.dart';
 import 'seller.dart';
 import 'session.dart';
+import 'staff.dart';
 
 /// Where the Go backend lives. Override per build:
 ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.5:8080
@@ -254,6 +256,8 @@ class Api {
       city: r['city'] as String? ?? '',
       categories:
           (r['categories'] as List<dynamic>? ?? const []).cast<String>(),
+      status: r['status'] as String? ?? 'approved',
+      rejectReason: r['rejectReason'] as String? ?? '',
     )..photoUrl = r['photoUrl'] as String? ?? '';
   }
 
@@ -276,20 +280,175 @@ class Api {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return (body['orders'] as List<dynamic>? ?? const []).map((raw) {
       final r = raw as Map<String, dynamic>;
-      return SellerOrder(
+      return _sellerOrder(r);
+    }).toList();
+  }
+
+  SellerOrder _sellerOrder(Map<String, dynamic> r) => SellerOrder(
         id: r['id'] as String,
         itemId: r['itemId'] as String? ?? '',
         itemTitle: r['itemTitle'] as String? ?? '',
         units: (r['units'] as num?)?.toInt() ?? 1,
         amount: (r['amount'] as num?)?.toDouble() ?? 0,
-        stage: switch (r['stage']) {
-          'accepted' => OrderStage.accepted,
-          'delivered' => OrderStage.delivered,
-          _ => OrderStage.received,
-        },
+        stage: stageFrom(r['stage'] as String?),
+        receiverName: r['receiverName'] as String? ?? '',
+        receiverPhone: r['receiverPhone'] as String? ?? '',
+        receiverAddress: r['receiverAddress'] as String? ?? '',
+        rejectReason: r['rejectReason'] as String? ?? '',
       );
-    }).toList();
+
+  /// The shop taking the order on. The backend generates the buyer's delivery
+  /// code here, so the answer is authoritative — the app never invents one.
+  Future<SellerOrder> acceptOrder(String id) async =>
+      _sellerOrder(await _post('/api/seller/orders/$id/accept'));
+
+  Future<SellerOrder> rejectOrder(String id, String reason) async =>
+      _sellerOrder(await _post('/api/seller/orders/$id/reject',
+          body: {'reason': reason}));
+
+  // ---- Buying ------------------------------------------------------------
+
+  /// Places one order against one stock line. [addressId] empty means the
+  /// default address; the backend copies it onto the order.
+  Future<MyOrder> placeOrder({
+    required String itemId,
+    int units = 1,
+    String addressId = '',
+  }) async {
+    final body = await _post('/api/orders', body: {
+      'itemId': itemId,
+      'units': units,
+      if (addressId.isNotEmpty) 'addressId': addressId,
+    }, expect: 201);
+    return MyOrder.fromJson(body);
   }
+
+  /// The buyer's own orders, including the delivery code while one is live.
+  Future<List<MyOrder>> myOrders() async {
+    final res = await http
+        .get(_url('/api/orders'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return (body['orders'] as List<dynamic>? ?? const [])
+        .map((r) => MyOrder.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// One shape for the small JSON POSTs that carry a session.
+  Future<Map<String, dynamic>> _post(String path,
+      {Map<String, Object?> body = const {}, int expect = 200}) async {
+    final res = await http
+        .post(_url(path),
+            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+            body: jsonEncode(body))
+        .timeout(_timeout);
+    if (res.statusCode != expect) throw http.ClientException(_reason(res));
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  // ---- Admin and delivery ------------------------------------------------
+  //
+  // Staff calls carry their own token, never the shopper's: the backend keeps
+  // the two kinds apart on purpose, and so does this.
+
+  Map<String, String> _staffHeader(StaffSession staff) {
+    final token = staff.token;
+    if (token == null) throw http.ClientException('sign in first');
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<Map<String, dynamic>> _staffCall(
+    StaffSession staff,
+    String method,
+    String path, [
+    Map<String, Object?>? body,
+  ]) async {
+    final url = _url(path);
+    final headers = {..._staffHeader(staff), 'Content-Type': 'application/json'};
+    final payload = body == null ? null : jsonEncode(body);
+    final res = await switch (method) {
+      'POST' => http.post(url, headers: headers, body: payload),
+      'DELETE' => http.delete(url, headers: headers),
+      _ => http.get(url, headers: headers),
+    }
+        .timeout(_timeout);
+    if (res.statusCode == 401) {
+      // The token died; sign the panel out rather than looping on errors.
+      await staff.signOut();
+    }
+    if (res.statusCode >= 300) throw http.ClientException(_reason(res));
+    if (res.body.isEmpty) return const {};
+    final decoded = jsonDecode(res.body);
+    return decoded is Map<String, dynamic> ? decoded : {'items': decoded};
+  }
+
+  Future<void> adminLogin(String username, String password) async {
+    final res = await http
+        .post(_url('/api/admin/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'password': password}))
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final r = jsonDecode(res.body) as Map<String, dynamic>;
+    await StaffSession.admin
+        .signIn(r['token'] as String, r['username'] as String);
+  }
+
+  Future<Map<String, dynamic>> adminOverview() =>
+      _staffCall(StaffSession.admin, 'GET', '/api/admin/overview');
+
+  Future<List<dynamic>> adminStores({String status = ''}) async {
+    final body = await _staffCall(StaffSession.admin, 'GET',
+        '/api/admin/stores${status.isEmpty ? '' : '?status=$status'}');
+    return body['items'] as List<dynamic>? ?? const [];
+  }
+
+  Future<void> approveStore(String owner) => _staffCall(StaffSession.admin,
+      'POST', '/api/admin/stores/${Uri.encodeComponent(owner)}/approve');
+
+  Future<void> rejectStore(String owner, String reason) => _staffCall(
+      StaffSession.admin,
+      'POST',
+      '/api/admin/stores/${Uri.encodeComponent(owner)}/reject',
+      {'reason': reason});
+
+  Future<List<dynamic>> riders() async {
+    final body = await _staffCall(StaffSession.admin, 'GET', '/api/admin/riders');
+    return body['items'] as List<dynamic>? ?? const [];
+  }
+
+  /// Returns the PIN, which is shown once and never readable again.
+  Future<String> addRider(String phone, String name) async {
+    final body = await _staffCall(StaffSession.admin, 'POST', '/api/admin/riders',
+        {'phone': phone, 'name': name});
+    return body['pin'] as String? ?? '';
+  }
+
+  Future<void> removeRider(String phone) => _staffCall(
+      StaffSession.admin, 'DELETE', '/api/admin/riders/$phone');
+
+  Future<void> riderLogin(String phone, String pin) async {
+    final res = await http
+        .post(_url('/api/delivery/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'phone': phone, 'pin': pin}))
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final r = jsonDecode(res.body) as Map<String, dynamic>;
+    await StaffSession.rider.signIn(r['token'] as String, r['phone'] as String,
+        r['name'] as String? ?? '');
+  }
+
+  Future<Map<String, dynamic>> riderOrders() =>
+      _staffCall(StaffSession.rider, 'GET', '/api/delivery/orders');
+
+  Future<void> riderPick(String id) => _staffCall(
+      StaffSession.rider, 'POST', '/api/delivery/orders/$id/pick');
+
+  Future<void> riderDeliver(String id, String code) => _staffCall(
+      StaffSession.rider, 'POST', '/api/delivery/orders/$id/deliver',
+      {'code': code});
 
   InventoryItem _inventoryItem(Map<String, dynamic> r) => InventoryItem(
         id: r['id'] as String,

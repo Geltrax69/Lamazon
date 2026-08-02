@@ -203,6 +203,16 @@ void main() {
       // Creating the store already navigated to the dashboard.
       await tester.pump();
       expect(find.text('Campus Snacks'), findsOneWidget);
+
+      // A brand-new store is waiting on an admin, and the dashboard has to
+      // say so — otherwise the seller sits waiting for orders that cannot
+      // come. Adding stock is exactly what approval gates, so that button is
+      // not offered either.
+      expect(find.text('Your store has been sent for review'), findsOneWidget);
+      expect(find.text('Add product'), findsNothing);
+
+      await tester.scrollUntilVisible(find.text('Inventory value'), 200,
+          scrollable: find.byType(Scrollable).last);
       expect(find.text('Inventory value'), findsOneWidget);
 
       // Orders come from the server now. The dashboard used to invent two
@@ -282,16 +292,22 @@ void main() {
     });
   });
 
-  testWidgets('orders list and tracking render', (tester) async {
+  // Orders come from the server now, so with no server there is nothing to
+  // show — and saying so is the point. The old version asserted a hard-coded
+  // "LMZ-10234" that no real order ever had.
+  testWidgets('orders come from the server, not from a sample list',
+      (tester) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: OrdersScreen()));
-      expect(find.text('LMZ-10234'), findsOneWidget);
-      expect(find.text('On the way'), findsOneWidget);
-
-      await tester.pumpWidget(MaterialApp(
-          home: OrderDetailScreen(order: sampleOrders.first)));
-      expect(find.text('Packed'), findsOneWidget);
-      expect(find.text('Delivery address'), findsOneWidget);
+      await tester.pump();
+      expect(find.text('My Orders'), findsOneWidget);
+      expect(MyOrders.instance.orders, isEmpty);
+      expect(
+        find.textContaining('No orders yet').evaluate().isNotEmpty ||
+            find.textContaining('Loading').evaluate().isNotEmpty ||
+            find.textContaining('Could not reach').evaluate().isNotEmpty,
+        isTrue,
+      );
     });
   });
 
@@ -307,7 +323,7 @@ void main() {
       // The amount is on the button, and the unit price is spelled out
       // whenever the line holds more than one.
       expect(
-        find.text('Make a Payment  ·  ₹${Cart.instance.total.toStringAsFixed(0)}'),
+        find.text('Place order  ·  ₹${Cart.instance.total.toStringAsFixed(0)}'),
         findsOneWidget,
       );
       expect(find.text('2 items'), findsOneWidget);

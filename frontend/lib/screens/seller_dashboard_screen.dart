@@ -55,6 +55,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
                       children: [
                         const _SyncBanner(),
+                        _ReviewBanner(store: store),
                         const NotifyBanner(),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(20),
@@ -279,18 +280,28 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _green,
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SellerProductScreen()),
-        ),
-        icon: const Icon(LucideIcons.plus, size: 18),
-        label: const Text(
-          'Add product',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+      // Adding stock is exactly what approval gates, so the button goes with
+      // it. Showing it and failing the save afterwards would be worse.
+      floatingActionButton: ListenableBuilder(
+        listenable: Seller.instance,
+        builder: (context, _) {
+          if (Seller.instance.store?.approved != true) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton.extended(
+            backgroundColor: _green,
+            foregroundColor: Colors.white,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SellerProductScreen()),
+            ),
+            icon: const Icon(LucideIcons.plus, size: 18),
+            label: const Text(
+              'Add product',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          );
+        },
       ),
     );
   }
@@ -304,8 +315,63 @@ class _OrderRow extends StatelessWidget {
   Color get _stageColor => switch (order.stage) {
     OrderStage.received => _amber,
     OrderStage.accepted => const Color(0xFF2F6FED),
+    OrderStage.picked => const Color(0xFF6A1B9A),
+    OrderStage.rejected => _red,
     OrderStage.delivered => _green,
   };
+
+  /// Asks for the reason, because a rejection without one leaves the customer
+  /// with nothing to do about it.
+  Future<void> _reject(BuildContext context) async {
+    final reason = TextEditingController();
+    final given = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Why can you not take this order?'),
+        content: TextField(
+          controller: reason,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Kitchen is closed, item just ran out',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _red),
+            onPressed: () => Navigator.pop(dialog, reason.text.trim()),
+            child: const Text('Reject order'),
+          ),
+        ],
+      ),
+    );
+    if (given == null || given.isEmpty) return;
+    final failure = await Seller.instance.rejectOrder(order.id, given);
+    if (failure != null && context.mounted) _say(context, failure);
+  }
+
+  Future<void> _accept(BuildContext context) async {
+    final failure = await Seller.instance.acceptOrder(order.id);
+    if (!context.mounted) return;
+    _say(
+      context,
+      failure ??
+          'Accepted. The customer has their delivery code — a rider takes it '
+              'from here.',
+    );
+  }
+
+  void _say(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -366,34 +432,122 @@ class _OrderRow extends StatelessWidget {
                   '₹${order.amount.toStringAsFixed(0)}',
                   style: const TextStyle(fontSize: 12.5, color: _muted),
                 ),
+                if (order.receiverName.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'For ${order.receiverName} · ${order.receiverPhone}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, color: _muted),
+                  ),
+                ],
+                if (order.rejectReason.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Rejected: ${order.rejectReason}',
+                    style: const TextStyle(fontSize: 11.5, color: _red),
+                  ),
+                ],
               ],
             ),
           ),
-          if (order.stage != OrderStage.delivered)
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: order.stage == OrderStage.received
-                    ? _ink
-                    : _green,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+          // Only a brand new order is waiting on the shop. Once it is
+          // accepted the rider owns it, and the shop cannot close it — that
+          // takes the customer's code.
+          if (order.stage.needsSeller)
+            Column(
+              children: [
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ink,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  onPressed: () => _accept(context),
+                  child: const Text(
+                    'Accept',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                TextButton(
+                  onPressed: () => _reject(context),
+                  child: const Text(
+                    'Reject',
+                    style: TextStyle(fontSize: 12, color: _red),
+                  ),
                 ),
-              ),
-              onPressed: () => order.stage == OrderStage.received
-                  ? Seller.instance.acceptOrder(order.id)
-                  : Seller.instance.deliverOrder(order.id),
-              child: Text(
-                order.stage == OrderStage.received ? 'Accept' : 'Delivered',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Where the store stands with review. A pending store looks finished to its
+/// owner otherwise, and they would sit waiting for orders that cannot come.
+class _ReviewBanner extends StatelessWidget {
+  final SellerStore store;
+  const _ReviewBanner({required this.store});
+
+  @override
+  Widget build(BuildContext context) {
+    if (store.approved) return const SizedBox.shrink();
+    final rejected = store.rejected;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: (rejected ? _red : _amber).withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            rejected ? LucideIcons.circleAlert : LucideIcons.clock,
+            size: 18,
+            color: rejected ? _red : _amber,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rejected
+                      ? 'Your store was not approved'
+                      : 'Your store has been sent for review',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: rejected ? _red : _amber,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  rejected
+                      ? '${store.rejectReason}\n\nFix that and save the store '
+                          'again to send it back for review.'
+                      : 'An admin is looking at it. You can add products as '
+                          'soon as it is approved — shoppers see it then too.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: _ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

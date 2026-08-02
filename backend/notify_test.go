@@ -91,13 +91,15 @@ func notifyAPI(t *testing.T) (http.Handler, *sentMail, *fakeFCMService) {
 func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 	h, sent, fcm := notifyAPI(t)
 
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Farm", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Grocery"},
 	})
+	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Straubery", "price": 120, "stock": 25})
 
+	sent.count = 0 // the sign-in code and the approval notice are not this test
 	code, _ := call(t, h, http.MethodPost, "/api/push/subscribe", map[string]any{
 		"token": "firebase-token-abc",
 	})
@@ -132,12 +134,13 @@ func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 // Push being unconfigured must not cost the seller their email.
 func TestEmailStillSendsWithoutPush(t *testing.T) {
 	h, sent := mailAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "Farm", "location": "L", "city": "LPU", "categories": []string{"Grocery"},
 	})
+	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Straubery", "price": 120, "stock": 5})
-	sent.count = 0 // the sign-in code test mail does not count here
+	sent.count = 0 // the sign-in code and the approval notice do not count here
 
 	call(t, h, http.MethodPost, "/api/seller/orders",
 		map[string]any{"itemId": item["id"], "units": 1})

@@ -1,0 +1,693 @@
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../data/api.dart';
+import '../data/staff.dart';
+import '../widgets/app_shell.dart';
+
+const _ink = Color(0xFF1A1A1A);
+const _muted = Color(0xFF6B6B6B);
+const _green = Color(0xFF2E7D32);
+const _amber = Color(0xFFEF6C00);
+const _red = Color(0xFFD32F2F);
+
+/// The admin panel, at /admin/log_IN. Password in, and then the three things
+/// an admin actually does: see who is here, decide which stores go live, and
+/// hand out delivery numbers.
+class AdminScreen extends StatelessWidget {
+  const AdminScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: StaffSession.admin,
+      builder: (context, _) => StaffSession.admin.signedIn
+          ? const _AdminHome()
+          : const _AdminLogin(),
+    );
+  }
+}
+
+class _AdminLogin extends StatefulWidget {
+  const _AdminLogin();
+
+  @override
+  State<_AdminLogin> createState() => _AdminLoginState();
+}
+
+class _AdminLoginState extends State<_AdminLogin> {
+  final _user = TextEditingController();
+  final _password = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _user.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.instance.adminLogin(_user.text.trim(), _password.text);
+    } catch (e) {
+      // The server says "wrong username or password" and nothing more, on
+      // purpose — repeat it rather than guessing which half was wrong.
+      setState(() => _error = e.toString().replaceFirst('ClientException: ', ''));
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F1EF),
+      body: ReadableBody(
+        maxWidth: 460,
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(LucideIcons.shieldCheck, size: 40, color: _ink),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Lamazon admin',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Staff only. Sellers and riders sign in elsewhere.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: _muted),
+                  ),
+                  const SizedBox(height: 24),
+                  _Field(controller: _user, label: 'Username'),
+                  const SizedBox(height: 12),
+                  _Field(
+                    controller: _password,
+                    label: 'Password',
+                    obscure: true,
+                    onSubmit: _signIn,
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: const TextStyle(fontSize: 12.5, color: _red),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ink,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                    ),
+                    onPressed: _busy ? null : _signIn,
+                    child: Text(_busy ? 'Signing in…' : 'Sign in'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminHome extends StatefulWidget {
+  const _AdminHome();
+
+  @override
+  State<_AdminHome> createState() => _AdminHomeState();
+}
+
+class _AdminHomeState extends State<_AdminHome> {
+  Map<String, dynamic>? _overview;
+  List<dynamic> _stores = const [];
+  List<dynamic> _riders = const [];
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final overview = await Api.instance.adminOverview();
+      final stores = await Api.instance.adminStores();
+      final riders = await Api.instance.riders();
+      if (!mounted) return;
+      setState(() {
+        _overview = overview;
+        _stores = stores;
+        _riders = riders;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() =>
+            _error = e.toString().replaceFirst('ClientException: ', ''));
+      }
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _approve(String owner) async {
+    await Api.instance.approveStore(owner);
+    await _load();
+  }
+
+  Future<void> _reject(String owner) async {
+    final reason = TextEditingController();
+    final given = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Why is this store not approved?'),
+        content: TextField(
+          controller: reason,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'The seller sees this, so make it actionable',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _red),
+            onPressed: () => Navigator.pop(dialog, reason.text.trim()),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (given == null || given.isEmpty) return;
+    await Api.instance.rejectStore(owner, given);
+    await _load();
+  }
+
+  /// The PIN exists for exactly one moment — this dialog. It is not stored in
+  /// readable form anywhere, so an admin who closes this hands out a new one.
+  Future<void> _addRider() async {
+    final phone = TextEditingController();
+    final name = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Add a delivery number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: phone,
+              autofocus: true,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Mobile number'),
+            ),
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final pin = await Api.instance.addRider(phone.text, name.text);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const Text('Give them this PIN'),
+          content: Text(
+            '$pin\n\nThey sign in at /delivery with their number and this PIN. '
+            'It is shown once — adding the number again issues a new one.',
+            style: const TextStyle(fontSize: 15, height: 1.5),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('ClientException: ', '')),
+        ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = _overview;
+    final pending = _stores
+        .where((s) => (s as Map<String, dynamic>)['status'] == 'pending')
+        .toList();
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F1EF),
+      body: ReadableBody(
+        maxWidth: 820,
+        child: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Admin',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Refresh',
+                      onPressed: _load,
+                      icon: const Icon(LucideIcons.refreshCw, size: 18),
+                    ),
+                    TextButton(
+                      onPressed: StaffSession.admin.signOut,
+                      child: const Text('Sign out'),
+                    ),
+                  ],
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(_error!,
+                        style: const TextStyle(color: _red, fontSize: 13)),
+                  ),
+                if (_loading && o == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                if (o != null) ...[
+                  Row(
+                    children: [
+                      _Tile(label: 'Users', value: '${o['users']}'),
+                      const SizedBox(width: 10),
+                      _Tile(label: 'Sellers', value: '${o['sellers']}'),
+                      const SizedBox(width: 10),
+                      _Tile(
+                        label: 'Awaiting review',
+                        value: '${o['pendingStores']}',
+                        color: (o['pendingStores'] as num) > 0 ? _amber : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _Tile(label: 'Riders', value: '${o['riders']}'),
+                      const SizedBox(width: 10),
+                      _Tile(label: 'Orders', value: '${o['orders']}'),
+                      const SizedBox(width: 10),
+                      const Spacer(),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 26),
+                _Heading('Stores awaiting review (${pending.length})'),
+                if (pending.isEmpty)
+                  const _Empty('Nothing waiting. Every store has been looked at.')
+                else
+                  for (final s in pending)
+                    _StoreCard(
+                      store: s as Map<String, dynamic>,
+                      onApprove: () => _approve(s['owner'] as String),
+                      onReject: () => _reject(s['owner'] as String),
+                    ),
+                const SizedBox(height: 26),
+                _Heading('All stores (${_stores.length})'),
+                for (final s in _stores)
+                  if ((s as Map<String, dynamic>)['status'] != 'pending')
+                    _StoreCard(
+                      store: s,
+                      onApprove: s['status'] == 'approved'
+                          ? null
+                          : () => _approve(s['owner'] as String),
+                      onReject: s['status'] == 'rejected'
+                          ? null
+                          : () => _reject(s['owner'] as String),
+                    ),
+                const SizedBox(height: 26),
+                Row(
+                  children: [
+                    Expanded(child: _Heading('Delivery (${_riders.length})')),
+                    TextButton.icon(
+                      onPressed: _addRider,
+                      icon: const Icon(LucideIcons.plus, size: 16),
+                      label: const Text('Add number'),
+                    ),
+                  ],
+                ),
+                if (_riders.isEmpty)
+                  const _Empty('No delivery numbers yet.')
+                else
+                  for (final r in _riders)
+                    _RiderRow(
+                      rider: r as Map<String, dynamic>,
+                      onRemove: () async {
+                        await Api.instance.removeRider(r['phone'] as String);
+                        await _load();
+                      },
+                    ),
+                const SizedBox(height: 26),
+                _Heading('People (${(o?['people'] as List?)?.length ?? 0})'),
+                for (final p in (o?['people'] as List<dynamic>? ?? const []))
+                  _PersonRow(person: p as Map<String, dynamic>),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StoreCard extends StatelessWidget {
+  final Map<String, dynamic> store;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  const _StoreCard({required this.store, this.onApprove, this.onReject});
+
+  Color get _colour => switch (store['status']) {
+        'approved' => _green,
+        'rejected' => _red,
+        _ => _amber,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final categories =
+        (store['categories'] as List<dynamic>? ?? const []).join(', ');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  store['name'] as String? ?? '',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _colour.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${store['status']}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _colour,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${store['owner']} · ${store['phone'] ?? ''}',
+            style: const TextStyle(fontSize: 12, color: _muted),
+          ),
+          Text(
+            '${store['location']}, ${store['city']} · $categories · '
+            '${store['items']} products',
+            style: const TextStyle(fontSize: 12, color: _muted),
+          ),
+          if ((store['rejectReason'] as String? ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Reason: ${store['rejectReason']}',
+                style: const TextStyle(fontSize: 12, color: _red),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (onApprove != null)
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: _green),
+                  onPressed: onApprove,
+                  child: const Text('Approve'),
+                ),
+              const SizedBox(width: 10),
+              if (onReject != null)
+                OutlinedButton(
+                  onPressed: onReject,
+                  child: const Text('Reject', style: TextStyle(color: _red)),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RiderRow extends StatelessWidget {
+  final Map<String, dynamic> rider;
+  final VoidCallback onRemove;
+  const _RiderRow({required this.rider, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = rider['active'] == true;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${rider['name']?.toString().isEmpty ?? true ? 'Rider' : rider['name']} · ${rider['phone']}',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${rider['delivered']} delivered · ${rider['carrying']} carrying'
+                  '${active ? '' : ' · switched off'}',
+                  style: const TextStyle(fontSize: 12, color: _muted),
+                ),
+              ],
+            ),
+          ),
+          if (active)
+            IconButton(
+              tooltip: 'Switch off',
+              onPressed: onRemove,
+              icon: const Icon(LucideIcons.userX, size: 18, color: _red),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonRow extends StatelessWidget {
+  final Map<String, dynamic> person;
+  const _PersonRow({required this.person});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = person['storeName'] as String? ?? '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  person['email'] as String? ?? '',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                Text(
+                  [
+                    person['id'],
+                    if ((person['name'] as String? ?? '').isNotEmpty)
+                      person['name'],
+                    if ((person['phone'] as String? ?? '').isNotEmpty)
+                      person['phone'],
+                    if (store.isNotEmpty) '$store (${person['storeStatus']})',
+                  ].join(' · '),
+                  style: const TextStyle(fontSize: 11.5, color: _muted),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            store.isEmpty ? 'Buyer' : 'Buyer + Seller',
+            style: const TextStyle(fontSize: 11.5, color: _muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  const _Tile({required this.label, required this.value, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color ?? _ink,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: _muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  final String text;
+  const _Heading(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      );
+}
+
+class _Empty extends StatelessWidget {
+  final String text;
+  const _Empty(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
+      );
+}
+
+class _Field extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool obscure;
+  final VoidCallback? onSubmit;
+  const _Field({
+    required this.controller,
+    required this.label,
+    this.obscure = false,
+    this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      onSubmitted: onSubmit == null ? null : (_) => onSubmit!(),
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}

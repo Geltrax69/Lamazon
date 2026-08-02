@@ -35,7 +35,8 @@ func testDB(t *testing.T) *DB {
 	// Seller data is per-test; the catalog is shared read-only seed.
 	if _, err := db.sql.Exec(
 		`TRUNCATE orders, inventory_items, seller_stores, login_codes,
-		  auth_sessions, push_subscriptions, addresses, users CASCADE`); err != nil {
+		  auth_sessions, push_subscriptions, addresses, users,
+		  admins, riders, staff_sessions CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	lastTestDB = db
@@ -111,14 +112,78 @@ func call(t *testing.T, h http.Handler, method, path string, body any) (int, map
 			t.Fatal(err)
 		}
 	}
+	return callAs(t, h, testToken, method, path, body)
+}
+
+// callAs is call() for someone who is not the signed-in shopper: an admin, a
+// rider, or a second seller.
+func callAs(t *testing.T, h http.Handler, token, method, path string, body any) (int, map[string]any) {
+	t.Helper()
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			t.Fatal(err)
+		}
+	}
 	req := httptest.NewRequest(method, path, &buf)
-	req.Header.Set("Authorization", "Bearer "+testToken)
+	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	var out map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &out) // arrays decode as nil, fine
 	return rec.Code, out
+}
+
+// adminSignIn puts an admin in the table the way boot does, then signs in
+// through the real endpoint — so the password path is exercised, not skipped.
+func adminSignIn(t *testing.T, h http.Handler) string {
+	t.Helper()
+	hash, err := hashPassword("Sup3r$ecret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lastTestDB.sql.Exec(
+		`INSERT INTO admins (username, pass_hash) VALUES ('boss', $1)
+		 ON CONFLICT (username) DO UPDATE SET pass_hash = EXCLUDED.pass_hash`,
+		hash); err != nil {
+		t.Fatal(err)
+	}
+	code, body := callAs(t, h, "", http.MethodPost, "/api/admin/login",
+		map[string]string{"username": "boss", "password": "Sup3r$ecret"})
+	if code != http.StatusOK {
+		t.Fatalf("admin login: want 200, got %d (%v)", code, body["error"])
+	}
+	return body["token"].(string)
+}
+
+// openApprovedStore is the state most seller tests want to start from: a
+// store that exists and has been through review.
+func openApprovedStore(t *testing.T, h http.Handler, fields map[string]any) {
+	t.Helper()
+	if code, body := call(t, h, http.MethodPost, "/api/seller/store", fields); code != http.StatusCreated {
+		t.Fatalf("create store: want 201, got %d (%v)", code, body["error"])
+	}
+	approveStore(t, h, DefaultOwner)
+}
+
+// approveStore takes a store through review the way an admin would.
+func approveStore(t *testing.T, h http.Handler, owner string) {
+	t.Helper()
+	admin := adminSignIn(t, h)
+	if code, body := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/stores/"+owner+"/approve", nil); code != http.StatusOK {
+		t.Fatalf("approve store: want 200, got %d (%v)", code, body["error"])
+	}
+}
+
+// somewhereToDeliver saves the address every order needs.
+func somewhereToDeliver(t *testing.T, h http.Handler) {
+	t.Helper()
+	call(t, h, http.MethodPost, "/api/addresses", map[string]any{
+		"line": "Block 32, Room 214", "city": "LPU",
+		"name": "Lalit Singh", "phone": "9876543210",
+	})
 }
 
 func callList(t *testing.T, h http.Handler, path string) []any {
@@ -132,6 +197,30 @@ func callList(t *testing.T, h http.Handler, path string) []any {
 		t.Fatalf("%s: %v (%s)", path, err, rec.Body.String())
 	}
 	return out
+}
+
+// callListAs and callAs2 are callList and call for a staff token: one returns
+// a bare array, the other an object.
+func callListAs(t *testing.T, h http.Handler, token, path string) []any {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var out []any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("%s: %v (%s)", path, err, rec.Body.String())
+	}
+	return out
+}
+
+func callAs2(t *testing.T, h http.Handler, token, path string) map[string]any {
+	t.Helper()
+	code, body := callAs(t, h, token, http.MethodGet, path, nil)
+	if code != http.StatusOK {
+		t.Fatalf("%s: want 200, got %d (%v)", path, code, body["error"])
+	}
+	return body
 }
 
 func TestCatalogFilters(t *testing.T) {
@@ -221,12 +310,30 @@ func TestSellerLifecycle(t *testing.T) {
 		t.Fatalf("unserved city: want 400, got %d", code)
 	}
 
-	if code, _ := call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	code, created := call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
 		"name": "Campus Snacks", "location": "Block 32", "city": "lpu",
 		"categories": []string{"Food"},
-	}); code != http.StatusCreated {
+	})
+	if code != http.StatusCreated {
 		t.Fatalf("create store: want 201, got %d", code)
 	}
+	// A new store waits for review, and cannot stock anything until it is
+	// through — otherwise the seller fills a shelf nobody can see.
+	if created["status"] != "pending" {
+		t.Fatalf("a new store starts pending, got %v", created["status"])
+	}
+	if code, _ := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{
+		"title": "Too Soon", "price": 10, "stock": 1,
+	}); code != http.StatusForbidden {
+		t.Fatalf("stock before approval: want 403, got %d", code)
+	}
+
+	admin := adminSignIn(t, h)
+	if code, body := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/stores/"+DefaultOwner+"/approve", nil); code != http.StatusOK {
+		t.Fatalf("approve: want 200, got %d (%v)", code, body["error"])
+	}
+	somewhereToDeliver(t, h)
 
 	// Reading the store back must round-trip the categories array.
 	code, store := call(t, h, http.MethodGet, "/api/seller/store", nil)
@@ -299,7 +406,7 @@ func TestSellerLifecycle(t *testing.T) {
 
 func TestStockNeverGoesNegative(t *testing.T) {
 	h := testAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"},
 	})
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
@@ -320,9 +427,10 @@ func TestStockNeverGoesNegative(t *testing.T) {
 // statement, the read-then-insert let every one of them through.
 func TestConcurrentOrdersCannotOversell(t *testing.T) {
 	h := testAPI(t)
-	call(t, h, http.MethodPost, "/api/seller/store", map[string]any{
+	openApprovedStore(t, h, map[string]any{
 		"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"},
 	})
+	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Samosa", "price": 20, "stock": 5})
 	id := item["id"].(string)

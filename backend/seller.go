@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -52,16 +49,30 @@ func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// COALESCE keeps an existing photo when this call did not carry one.
-	if _, err := a.db.sql.ExecContext(r.Context(), `
+	//
+	// Editing a store that was rejected sends it back for review; editing an
+	// approved one does not, so a live shop is not taken down by a typo fix.
+	if err := a.db.sql.QueryRowContext(r.Context(), `
 		INSERT INTO seller_stores (owner, name, location, city, categories, photo_url)
 		VALUES ($1,$2,$3,$4,$5,$6)
 		ON CONFLICT (owner) DO UPDATE SET
 			name = EXCLUDED.name, location = EXCLUDED.location,
 			city = EXCLUDED.city, categories = EXCLUDED.categories,
-			photo_url = COALESCE(NULLIF(EXCLUDED.photo_url, ''), seller_stores.photo_url)`,
-		in.Owner, in.Name, in.Location, in.City, in.Categories, in.PhotoURL); err != nil {
+			photo_url = COALESCE(NULLIF(EXCLUDED.photo_url, ''), seller_stores.photo_url),
+			status = CASE WHEN seller_stores.status = 'rejected'
+			              THEN 'pending' ELSE seller_stores.status END,
+			reject_reason = CASE WHEN seller_stores.status = 'rejected'
+			                     THEN '' ELSE seller_stores.reject_reason END
+		RETURNING status, reject_reason`,
+		in.Owner, in.Name, in.Location, in.City, in.Categories, in.PhotoURL).
+		Scan(&in.Status, &in.RejectReason); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if in.Status == "pending" {
+		a.notify(r.Context(), in.Owner, in.Name+" has been sent for review",
+			"Thanks for opening "+in.Name+" on Lamazon. An admin is looking at it "+
+				"now — you can add stock as soon as it is approved.")
 	}
 	writeJSON(w, http.StatusCreated, in)
 }
@@ -78,6 +89,32 @@ func (a *API) handleGetStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, store)
+}
+
+// requireApprovedStore is the gate on every write to inventory: a store that
+// nobody has approved yet cannot hold stock, because that stock would be
+// invisible to shoppers and look broken to the seller.
+func (a *API) requireApprovedStore(w http.ResponseWriter, r *http.Request) (SellerStore, bool) {
+	store, err := a.db.store(r.Context(), a.owner(r))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusConflict, "open a store before adding stock")
+		return store, false
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return store, false
+	}
+	switch store.Status {
+	case "pending":
+		writeError(w, http.StatusForbidden,
+			"your store is still being reviewed — you can add stock once it is approved")
+		return store, false
+	case "rejected":
+		writeError(w, http.StatusForbidden,
+			"your store was not approved: "+store.RejectReason)
+		return store, false
+	}
+	return store, true
 }
 
 // GET /api/seller/items — inventory plus the derived summary.
@@ -109,6 +146,10 @@ func (a *API) handleItems(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/seller/items — add a line of stock.
 func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
+	store, ok := a.requireApprovedStore(w, r)
+	if !ok {
+		return
+	}
 	in, photos, err := decodeItem(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -127,22 +168,11 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Photos are named after the store, so the store is what says whether
-	// this seller may add stock at all — a clearer 409 than a foreign key
-	// violation, and it happens before anything is uploaded.
+	// Photos are named after the store, which the gate above already read.
 	in.ImageURLs = []string{}
 	if len(photos) > 0 {
 		if a.cloud == nil {
 			writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
-			return
-		}
-		store, err := a.db.store(r.Context(), a.owner(r))
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusConflict, "open a store before adding stock")
-			return
-		}
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		for n, img := range photos {
@@ -197,12 +227,14 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case in.Stock != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
-		         WHERE id = $1 RETURNING id, title, description, category, price, stock,
+		         WHERE id = $1 AND owner = $3
+		         RETURNING id, title, description, category, price, stock,
 		         array_to_string(image_urls, E'\n')`
 		arg = *in.Stock
 	case in.Delta != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
-		         WHERE id = $1 RETURNING id, title, description, category, price, stock,
+		         WHERE id = $1 AND owner = $3
+		         RETURNING id, title, description, category, price, stock,
 		         array_to_string(image_urls, E'\n')`
 		arg = *in.Delta
 	default:
@@ -212,7 +244,7 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 
 	var it InventoryItem
 	var urls string
-	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg).Scan(
+	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg, a.owner(r)).Scan(
 		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.Stock, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
@@ -231,7 +263,7 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	res, err := a.db.sql.ExecContext(r.Context(),
-		`DELETE FROM inventory_items WHERE id = $1`, id)
+		`DELETE FROM inventory_items WHERE id = $1 AND owner = $2`, id, a.owner(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -241,193 +273,4 @@ func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// GET /api/seller/orders
-func (a *API) handleOrders(w http.ResponseWriter, r *http.Request) {
-	orders, err := a.db.orders(r.Context(), a.owner(r))
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	counts := map[OrderStage]int{}
-	for _, o := range orders {
-		counts[o.Stage]++
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"orders": orders,
-		"counts": map[string]int{
-			"received":  counts[StageReceived],
-			"accepted":  counts[StageAccepted],
-			"delivered": counts[StageDelivered],
-		},
-	})
-}
-
-// POST /api/seller/orders — a buyer orders against a stock line.
-func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ItemID string `json:"itemId"`
-		Units  int    `json:"units"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-	if in.Units <= 0 {
-		in.Units = 1
-	}
-
-	// Check and insert inside one transaction, holding the item row. FOR
-	// UPDATE makes concurrent orders for the same item queue up, and because
-	// each statement takes a fresh snapshot, the reserved sum below sees
-	// whatever the previous holder committed. A single statement would not:
-	// its CTEs would all read the snapshot from before the lock was granted.
-	tx, err := a.db.sql.BeginTx(r.Context(), nil)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer tx.Rollback() //nolint:errcheck // no-op once committed
-
-	var title string
-	var price float64
-	var stock int
-	err = tx.QueryRowContext(r.Context(),
-		`SELECT title, price, stock FROM inventory_items WHERE id = $1 FOR UPDATE`,
-		in.ItemID).Scan(&title, &price, &stock)
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "no item with id "+in.ItemID)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// Undelivered orders already claim units, so the fifth buyer of five
-	// units is the last one served.
-	var reserved int
-	if err := tx.QueryRowContext(r.Context(), `
-		SELECT COALESCE(sum(units), 0) FROM orders
-		WHERE item_id = $1 AND stage <> 'delivered'`, in.ItemID).Scan(&reserved); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if stock-reserved < in.Units {
-		writeError(w, http.StatusConflict, "not enough stock")
-		return
-	}
-
-	var o Order
-	if err := tx.QueryRowContext(r.Context(), `
-		INSERT INTO orders (item_id, item_title, units, amount, stage)
-		VALUES ($1,$2,$3,$4,'received')
-		RETURNING id, item_id, item_title, units, amount, stage, placed_at`,
-		in.ItemID, title, in.Units, price*float64(in.Units)).
-		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
-			&o.PlacedAt); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// The seller hears about it only once the order is committed, and a
-	// notification that fails never undoes a real order.
-	a.notifyOwnerOfOrder(r.Context(), in.ItemID, o)
-	writeJSON(w, http.StatusCreated, o)
-}
-
-// notifyOwnerOfOrder tells whoever owns the stock that someone bought it.
-func (a *API) notifyOwnerOfOrder(ctx context.Context, itemID string, o Order) {
-	var owner, storeName string
-	if err := a.db.sql.QueryRowContext(ctx, `
-		SELECT s.owner, s.name FROM inventory_items i
-		JOIN seller_stores s ON s.owner = i.owner WHERE i.id = $1`, itemID).
-		Scan(&owner, &storeName); err != nil {
-		log.Printf("order %s: no one to notify: %v", o.ID, err)
-		return
-	}
-	a.notify(ctx, owner,
-		fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
-		fmt.Sprintf("%s just received an order.\n\n%d × %s\nTotal ₹%.0f\n\n"+
-			"Open Lamazon to accept it.",
-			storeName, o.Units, o.ItemTitle, o.Amount))
-}
-
-// POST /api/seller/orders/{id}/accept — reserves, stock untouched.
-func (a *API) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	var o Order
-	err := a.db.sql.QueryRowContext(r.Context(), `
-		UPDATE orders SET stage = 'accepted'
-		WHERE id = $1 AND stage <> 'delivered'
-		RETURNING id, item_id, item_title, units, amount, stage, placed_at`, id).
-		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt)
-	a.finishStage(w, r, id, o, err)
-}
-
-// POST /api/seller/orders/{id}/deliver — the hand-over, and the only thing
-// that removes units from inventory. Both writes share a transaction so a
-// half-delivered order cannot exist.
-func (a *API) handleDeliverOrder(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	tx, err := a.db.sql.BeginTx(r.Context(), nil)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer tx.Rollback() //nolint:errcheck // no-op once committed
-
-	var o Order
-	err = tx.QueryRowContext(r.Context(), `
-		UPDATE orders SET stage = 'delivered'
-		WHERE id = $1 AND stage <> 'delivered'
-		RETURNING id, item_id, item_title, units, amount, stage, placed_at`, id).
-		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		a.alreadyDeliveredOrMissing(w, r, id)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if _, err := tx.ExecContext(r.Context(),
-		`UPDATE inventory_items SET stock = GREATEST(stock - $2, 0) WHERE id = $1`,
-		o.ItemID, o.Units); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, o)
-}
-
-func (a *API) finishStage(w http.ResponseWriter, r *http.Request, id string, o Order, err error) {
-	if errors.Is(err, sql.ErrNoRows) {
-		a.alreadyDeliveredOrMissing(w, r, id)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, o)
-}
-
-// Separating "already delivered" from "never existed" keeps 409 meaningful.
-func (a *API) alreadyDeliveredOrMissing(w http.ResponseWriter, r *http.Request, id string) {
-	var exists bool
-	if err := a.db.sql.QueryRowContext(r.Context(),
-		`SELECT true FROM orders WHERE id = $1`, id).Scan(&exists); err == nil && exists {
-		writeError(w, http.StatusConflict, "order already delivered")
-		return
-	}
-	writeError(w, http.StatusNotFound, "no order with id "+id)
 }

@@ -2,9 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
 import 'data/session.dart';
+import 'data/urls.dart';
+import 'data/staff.dart';
 import 'widgets/app_shell.dart';
+import 'screens/admin_screen.dart';
+import 'screens/delivery_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
@@ -22,7 +25,12 @@ void main() async {
   // The stored session decides whether the login screen shows at all, so it
   // has to be read before the first frame.
   WidgetsFlutterBinding.ensureInitialized();
+  // Real paths rather than /#/: the staff panels are URLs people type, and
+  // Vercel already rewrites everything to index.html.
+  useCleanUrls();
   await Session.instance.restore();
+  await StaffSession.admin.restore();
+  await StaffSession.rider.restore();
   runApp(const LamazonApp());
 }
 
@@ -41,6 +49,13 @@ class LamazonApp extends StatelessWidget {
       ),
       // One place to keep every screen phone-shaped, however wide the window.
       builder: (context, child) => AppShell(child: child!),
+      // The staff panels are their own entrances, on purpose: nothing in the
+      // shopper's app links to them, and neither one uses a shopper session.
+      routes: {
+        '/admin/log_IN': (_) => const AdminScreen(),
+        '/admin': (_) => const AdminScreen(),
+        '/delivery': (_) => const DeliveryScreen(),
+      },
       home: Session.instance.onboarded
           ? const HomeScreen()
           : const LoginScreen(),

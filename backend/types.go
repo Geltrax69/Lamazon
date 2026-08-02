@@ -38,6 +38,10 @@ type SellerStore struct {
 	City       string   `json:"city"`
 	Categories []string `json:"categories"`
 	PhotoURL   string   `json:"photoUrl"` // Cloudinary, empty until uploaded
+	// pending until an admin looks at it, then approved or rejected with a
+	// reason. Only an approved store is visible to shoppers or may hold stock.
+	Status       string `json:"status"`
+	RejectReason string `json:"rejectReason,omitempty"`
 }
 
 // InventoryItem is one line of a seller's stock.
@@ -71,9 +75,17 @@ type OrderStage string
 const (
 	StageReceived  OrderStage = "received"
 	StageAccepted  OrderStage = "accepted"
+	StageRejected  OrderStage = "rejected"
+	StagePicked    OrderStage = "picked"
 	StageDelivered OrderStage = "delivered"
 )
 
+// Order is one line bought from one store, and the whole trail behind it:
+// who it is for, which store owes it, which rider has it.
+//
+// The receiver is copied in at the moment of ordering rather than joined from
+// the address book — editing an address later must not redirect a bag that is
+// already out.
 type Order struct {
 	ID        string     `json:"id"`
 	ItemID    string     `json:"itemId"`
@@ -82,6 +94,22 @@ type Order struct {
 	Amount    float64    `json:"amount"`
 	Stage     OrderStage `json:"stage"`
 	PlacedAt  time.Time  `json:"placedAt"`
+
+	StoreOwner string `json:"storeOwner,omitempty"`
+	StoreName  string `json:"storeName,omitempty"`
+	BuyerEmail string `json:"buyerEmail,omitempty"`
+
+	ReceiverName    string `json:"receiverName,omitempty"`
+	ReceiverPhone   string `json:"receiverPhone,omitempty"`
+	ReceiverAddress string `json:"receiverAddress,omitempty"`
+
+	RejectReason string `json:"rejectReason,omitempty"`
+	RiderPhone   string `json:"riderPhone,omitempty"`
+
+	// The four digits the buyer reads out at the door. Filled in only on the
+	// buyer's own copy of the order; the rider is never told it, which is the
+	// whole point of it.
+	DeliveryCode string `json:"deliveryCode,omitempty"`
 }
 
 // DefaultOwner stands in until the app sends a real session. Callers can

@@ -145,6 +145,95 @@ ALTER TABLE inventory_items
 ALTER TABLE orders
     ALTER COLUMN id SET DEFAULT 'order-' || nextval('order_ids');
 
+-- A store is not a storefront until a person has looked at it. New stores
+-- arrive pending and stay invisible to shoppers, and their owner cannot add
+-- stock, until an admin approves them.
+--
+-- The two ALTERs are deliberate: adding the column with 'approved' backfills
+-- every store that existed before review was a thing (they are already live,
+-- and pending them would empty the catalogue), then the default flips so
+-- everything opened from now on waits.
+ALTER TABLE seller_stores
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE seller_stores
+    ALTER COLUMN status SET DEFAULT 'pending';
+ALTER TABLE seller_stores
+    ADD COLUMN IF NOT EXISTS reject_reason TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE seller_stores DROP CONSTRAINT IF EXISTS seller_stores_status_check;
+ALTER TABLE seller_stores ADD CONSTRAINT seller_stores_status_check
+    CHECK (status IN ('pending', 'approved', 'rejected'));
+
+-- Whoever runs Lamazon. Passwords are PBKDF2-SHA256 with a per-row salt, so
+-- the table never holds anything usable. Seeded from ADMIN_USER /
+-- ADMIN_PASSWORD at boot, never from source.
+CREATE TABLE IF NOT EXISTS admins (
+    username   TEXT PRIMARY KEY,
+    pass_hash  TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A delivery rider, created by an admin who types in their number. The PIN is
+-- generated here and shown to the admin once; the rider signs in with number
+-- and PIN at /delivery.
+CREATE TABLE IF NOT EXISTS riders (
+    phone      TEXT PRIMARY KEY,
+    name       TEXT        NOT NULL DEFAULT '',
+    pin_hash   TEXT        NOT NULL,
+    active     BOOLEAN     NOT NULL DEFAULT true,
+    delivered  INTEGER     NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Staff sign-ins (admin and rider) share one table: same shape, same
+-- expiry, and one place to look when a token has to be revoked.
+CREATE TABLE IF NOT EXISTS staff_sessions (
+    token_hash TEXT PRIMARY KEY,
+    role       TEXT        NOT NULL CHECK (role IN ('admin', 'rider')),
+    subject    TEXT        NOT NULL, -- admin username, or rider phone
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- An order carries who it is for, frozen at the moment it was placed: a later
+-- edit to the address book must not redirect a bag already on its way.
+-- store_owner is copied for the same reason, and is what every seller-side
+-- query filters on, so one seller can never touch another's order.
+ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS buyer_email      TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS store_owner      TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS store_name       TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS receiver_name    TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS receiver_phone   TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS receiver_address TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS reject_reason    TEXT NOT NULL DEFAULT '',
+    -- The four digits the buyer reads out at the door. Kept in the clear
+    -- because the buyer has to be able to read it back in the app; it is only
+    -- ever sent to them, never to the rider, which is what makes typing it
+    -- proof that the two of them met.
+    ADD COLUMN IF NOT EXISTS delivery_code    TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS rider_phone      TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS accepted_at      TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS picked_at        TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS delivered_at     TIMESTAMPTZ;
+
+-- Rejected, picked: the stages the workflow gained. Dropped first so the
+-- file stays runnable on every boot.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_stage_check;
+ALTER TABLE orders ADD CONSTRAINT orders_stage_check
+    CHECK (stage IN ('received', 'accepted', 'rejected', 'picked', 'delivered'));
+
+-- Orders placed before the column existed still belong to someone; the item
+-- says who, and without this they would vanish from their seller's list.
+UPDATE orders o SET store_owner = i.owner
+FROM inventory_items i WHERE i.id = o.item_id AND o.store_owner = '';
+UPDATE orders o SET store_name = s.name
+FROM seller_stores s WHERE s.owner = o.store_owner AND o.store_name = '';
+
+CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders (buyer_email);
+CREATE INDEX IF NOT EXISTS idx_orders_store ON orders (store_owner);
+CREATE INDEX IF NOT EXISTS idx_orders_rider ON orders (rider_phone);
+
 CREATE INDEX IF NOT EXISTS idx_offers_product ON offers (product_id);
 CREATE INDEX IF NOT EXISTS idx_items_owner ON inventory_items (owner);
 CREATE INDEX IF NOT EXISTS idx_orders_item ON orders (item_id);

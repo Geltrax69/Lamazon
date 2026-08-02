@@ -70,16 +70,22 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
 		return
 	}
+	if _, ok := a.requireApprovedStore(w, r); !ok {
+		return
+	}
 	id := r.PathValue("id")
 
 	// The folder comes from the store, the name from the item, so both have
-	// to exist before anything is uploaded.
+	// to exist before anything is uploaded — and the item has to be this
+	// seller's, or an id guessed from someone else's shop would upload into
+	// their listing.
 	var storeName, title string
 	var existing int
 	err := a.db.sql.QueryRowContext(r.Context(), `
 		SELECT s.name, i.title, cardinality(i.image_urls)
 		FROM inventory_items i JOIN seller_stores s ON s.owner = i.owner
-		WHERE i.id = $1`, id).Scan(&storeName, &title, &existing)
+		WHERE i.id = $1 AND i.owner = $2`, id, a.owner(r)).
+		Scan(&storeName, &title, &existing)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
 		return
@@ -110,8 +116,10 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 	// sees the same list a later GET will return.
 	var saved string
 	if err := a.db.sql.QueryRowContext(r.Context(), `
-		UPDATE inventory_items SET image_urls = image_urls || $2::text[] WHERE id = $1
-		RETURNING array_to_string(image_urls, E'\n')`, id, urls).Scan(&saved); err != nil {
+		UPDATE inventory_items SET image_urls = image_urls || $2::text[]
+		WHERE id = $1 AND owner = $3
+		RETURNING array_to_string(image_urls, E'\n')`, id, urls, a.owner(r)).
+		Scan(&saved); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

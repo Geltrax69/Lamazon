@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/addresses.dart';
 import '../data/cart.dart';
+import '../data/orders.dart';
+import '../data/session.dart';
 import '../widgets/product_card.dart';
+import 'location_screen.dart';
+import 'orders_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _green = Color(0xFF1D4A3C); // deep green from the design
@@ -288,9 +293,83 @@ class _QtyControls extends StatelessWidget {
   }
 }
 
-class _CheckoutPanel extends StatelessWidget {
+class _CheckoutPanel extends StatefulWidget {
   final Cart cart;
   const _CheckoutPanel({required this.cart});
+
+  @override
+  State<_CheckoutPanel> createState() => _CheckoutPanelState();
+}
+
+class _CheckoutPanelState extends State<_CheckoutPanel> {
+  bool _placing = false;
+
+  Cart get cart => widget.cart;
+
+  /// Placing the order is the point at which the app stops being a browse
+  /// and starts owing someone a delivery, so everything it needs is checked
+  /// first: signed in, an address to deliver to, and lines a real shop
+  /// actually stocks.
+  Future<void> _placeOrder() async {
+    if (!Session.instance.loggedIn) {
+      _say('Sign in first — an order has to belong to someone.');
+      return;
+    }
+    // Whatever they picked, or the default — the server lists that one first.
+    final address = AddressBook.instance.selected ??
+        AddressBook.instance.addresses.firstOrNull;
+    if (address == null) {
+      _say('Add a delivery address first.');
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LocationScreen()),
+      );
+      return;
+    }
+
+    setState(() => _placing = true);
+    final failures = await MyOrders.instance.place(
+      [
+        for (final line in cart.items)
+          (itemId: line.product.id, title: line.product.name, qty: line.qty),
+      ],
+      addressId: address.id,
+    );
+    if (!mounted) return;
+    setState(() => _placing = false);
+
+    // Whatever went through is a real order and the cart must not keep it.
+    final placed = cart.items.length - failures.length;
+    if (placed > 0) {
+      for (final line in [...cart.items]) {
+        if (!failures.any((f) => f.startsWith(line.product.name))) {
+          cart.remove(line.product.id);
+        }
+      }
+    }
+    if (failures.isEmpty) {
+      _say('Order placed. The shop will accept it in a moment.');
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const OrdersScreen()),
+      );
+      return;
+    }
+    _say(failures.length == 1
+        ? failures.first
+        : '${failures.length} items could not be ordered: '
+            '${failures.join('; ')}');
+  }
+
+  void _say(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -364,16 +443,7 @@ class _CheckoutPanel extends StatelessWidget {
           _summaryRow('Total', cart.total, bold: true),
           const SizedBox(height: 14),
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text('Payment flow coming soon (demo)'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-            },
+            onTap: _placing ? null : _placeOrder,
             child: Container(
               height: 52,
               alignment: Alignment.center,
@@ -384,7 +454,9 @@ class _CheckoutPanel extends StatelessWidget {
               // The amount rides on the button, so nobody pays without
               // seeing what they are paying.
               child: Text(
-                'Make a Payment  ·  ₹${cart.total.toStringAsFixed(0)}',
+                _placing
+                    ? 'Placing your order…'
+                    : 'Place order  ·  ₹${cart.total.toStringAsFixed(0)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,

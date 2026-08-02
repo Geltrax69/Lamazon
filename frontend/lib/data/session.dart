@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'addresses.dart';
 import 'api.dart';
+import 'orders.dart';
 import 'seller.dart';
 
 /// Sign-in state from the emailed-code flow, persisted so a browser refresh
@@ -129,6 +130,8 @@ class Session extends ChangeNotifier {
     _token = null;
     _user = null;
     AddressBook.instance.clear();
+    // Orders belong to the person who placed them, not to the browser.
+    MyOrders.instance.clear();
     _refreshToken = null;
     _expiresAt = null;
     _skipped = true;

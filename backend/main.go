@@ -23,6 +23,15 @@ func main() {
 	}
 	defer db.Close()
 
+	// The admin account comes from the environment on every boot, so changing
+	// ADMIN_PASSWORD and restarting is how the password is rotated.
+	if err := db.seedAdmin(context.Background()); err != nil {
+		log.Fatalf("admin: %v", err)
+	}
+	if os.Getenv("ADMIN_USER") == "" {
+		log.Print("ADMIN_USER/ADMIN_PASSWORD unset: no admin can sign in")
+	}
+
 	mail := mailerFromEnv()
 	if mail == nil {
 		log.Print("RESEND_API_KEY/EMAIL_SEND unset: sign-in codes go to this log")
@@ -111,11 +120,34 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/seller/items/{id}/photos", s.handleItemPhotos)
 	mux.HandleFunc("DELETE /api/seller/items/{id}", s.handleDeleteItem)
 	mux.HandleFunc("GET /api/seller/orders", s.handleOrders)
-	mux.HandleFunc("POST /api/seller/orders", s.handlePlaceOrder)
 	mux.HandleFunc("POST /api/seller/orders/{id}/accept", s.handleAcceptOrder)
+	mux.HandleFunc("POST /api/seller/orders/{id}/reject", s.handleRejectOrder)
 	mux.HandleFunc("POST /api/seller/orders/{id}/deliver", s.handleDeliverOrder)
 
-	return withCORS(withGzip(s.withAuth(mux)))
+	// Buyer. /api/seller/orders used to take the POST as well; it stays as an
+	// alias so an app mid-update keeps working.
+	mux.HandleFunc("POST /api/orders", s.handlePlaceOrder)
+	mux.HandleFunc("POST /api/seller/orders", s.handlePlaceOrder)
+	mux.HandleFunc("GET /api/orders", s.handleMyOrders)
+
+	// Admin. Everything but the login needs an admin token, checked in
+	// withStaff below.
+	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
+	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
+	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
+	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
+	mux.HandleFunc("POST /api/admin/stores/{owner}/reject", s.handleRejectStore)
+	mux.HandleFunc("GET /api/admin/riders", s.handleListRiders)
+	mux.HandleFunc("POST /api/admin/riders", s.handleAddRider)
+	mux.HandleFunc("DELETE /api/admin/riders/{phone}", s.handleRemoveRider)
+
+	// Delivery panel.
+	mux.HandleFunc("POST /api/delivery/login", s.handleRiderLogin)
+	mux.HandleFunc("GET /api/delivery/orders", s.handleRiderOrders)
+	mux.HandleFunc("POST /api/delivery/orders/{id}/pick", s.handleRiderPick)
+	mux.HandleFunc("POST /api/delivery/orders/{id}/deliver", s.handleRiderDeliver)
+
+	return withCORS(withGzip(s.withStaff(s.withAuth(mux))))
 }
 
 // Everything under /api/seller/ belongs to one signed-in address, so the
@@ -126,10 +158,46 @@ const sellerPrefix = "/api/seller/"
 // The public key itself is not a secret and stays open.
 func needsSession(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, sellerPrefix) ||
+		strings.HasPrefix(r.URL.Path, "/api/orders") ||
 		r.URL.Path == "/api/me" ||
 		strings.HasPrefix(r.URL.Path, "/api/addresses") ||
 		r.URL.Path == "/api/push/subscribe" ||
 		r.URL.Path == "/api/push/test"
+}
+
+// withStaff guards the admin and delivery panels. They are not shopper
+// sessions: an admin signs in with a password and a rider with a PIN, and the
+// token carries which of the two it is, so an admin token cannot close a
+// delivery and a rider token cannot approve a store.
+func (s *API) withStaff(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var role string
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/admin/"):
+			role = "admin"
+		case strings.HasPrefix(r.URL.Path, "/api/delivery/"):
+			role = "rider"
+		default:
+			next.ServeHTTP(w, r)
+			return
+		}
+		// The two login endpoints are how a token is got in the first place.
+		if strings.HasSuffix(r.URL.Path, "/login") || r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "sign in first")
+			return
+		}
+		subject, err := s.db.staffSubject(r.Context(), role, strings.TrimSpace(token))
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "session expired — sign in again")
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), staffKey{}, subject)))
+	})
 }
 
 type ownerKey struct{}
