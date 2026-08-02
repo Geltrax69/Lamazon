@@ -143,6 +143,7 @@ class _AdminHomeState extends State<_AdminHome> {
   Map<String, dynamic>? _overview;
   List<dynamic> _stores = const [];
   List<dynamic> _riders = const [];
+  List<dynamic> _orders = const [];
   String? _error;
   bool _loading = true;
 
@@ -158,11 +159,13 @@ class _AdminHomeState extends State<_AdminHome> {
       final overview = await Api.instance.adminOverview();
       final stores = await Api.instance.adminStores();
       final riders = await Api.instance.riders();
+      final orders = await Api.instance.adminOrders();
       if (!mounted) return;
       setState(() {
         _overview = overview;
         _stores = stores;
         _riders = riders;
+        _orders = orders;
         _error = null;
       });
     } catch (e) {
@@ -276,6 +279,56 @@ class _AdminHomeState extends State<_AdminHome> {
           content: Text(e.toString().replaceFirst('ClientException: ', '')),
         ));
     }
+  }
+
+  /// Orders hand themselves to a rider when the shop accepts them, so this is
+  /// the exception: the rider who did not turn up. Only orders nobody has
+  /// picked up can be moved — after that the bag is physically with someone
+  /// and the database says so.
+  Future<void> _assign(Map<String, dynamic> order) async {
+    final active = _riders.where((r) => r['active'] == true).toList();
+    if (active.isEmpty) {
+      _say('Add a delivery number first.');
+      return;
+    }
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (dialog) => SimpleDialog(
+        title: Text('Who takes #${(order['id'] as String).toUpperCase()}?'),
+        children: [
+          for (final r in active)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialog, r['phone'] as String),
+              child: Text(
+                '${(r['name'] as String?)?.isEmpty ?? true ? 'Rider' : r['name']} · '
+                '${r['phone']}  (${r['carrying']} carrying)',
+              ),
+            ),
+          const Divider(),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialog, ''),
+            child: const Text('Leave it open to any rider'),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    try {
+      await Api.instance.assignOrder(order['id'] as String, chosen);
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+    await _load();
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ));
   }
 
   @override
@@ -399,6 +452,22 @@ class _AdminHomeState extends State<_AdminHome> {
                       },
                     ),
                 const SizedBox(height: 26),
+                _Heading('Orders (${_orders.length})'),
+                const _Note(
+                  'Accepted orders go to a rider automatically — whoever is '
+                  'carrying the least, picked at random between equals. '
+                  'Reassign only when someone does not turn up.',
+                ),
+                if (_orders.isEmpty)
+                  const _Empty('No orders yet.')
+                else
+                  for (final ord in _orders)
+                    _AdminOrderRow(
+                      order: ord as Map<String, dynamic>,
+                      riders: _riders,
+                      onAssign: () => _assign(ord),
+                    ),
+                const SizedBox(height: 26),
                 _Heading('People (${(o?['people'] as List?)?.length ?? 0})'),
                 for (final p in (o?['people'] as List<dynamic>? ?? const []))
                   _PersonRow(person: p as Map<String, dynamic>),
@@ -498,6 +567,123 @@ class _StoreCard extends StatelessWidget {
                 OutlinedButton(
                   onPressed: onReject,
                   child: const Text('Reject', style: TextStyle(color: _red)),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One order with its stage and whoever is carrying it. Assigning is only
+/// offered while it can still change hands.
+class _AdminOrderRow extends StatelessWidget {
+  final Map<String, dynamic> order;
+  final List<dynamic> riders;
+  final VoidCallback onAssign;
+  const _AdminOrderRow({
+    required this.order,
+    required this.riders,
+    required this.onAssign,
+  });
+
+  Color get _colour => switch (order['stage']) {
+        'delivered' => _green,
+        'rejected' => _red,
+        'picked' => const Color(0xFF6A1B9A),
+        'accepted' => const Color(0xFF2F6FED),
+        _ => _amber,
+      };
+
+  String _nameOf(String phone) {
+    if (phone.isEmpty) return '';
+    final match = riders
+        .cast<Map<String, dynamic>>()
+        .where((r) => r['phone'] == phone)
+        .firstOrNull;
+    final name = match?['name'] as String? ?? '';
+    return name.isEmpty ? phone : '$name · $phone';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = order['stage'] as String;
+    final carrier = order['riderPhone'] as String? ?? '';
+    final assigned = order['assignedTo'] as String? ?? '';
+    final canAssign = stage == 'received' || stage == 'accepted';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '#${(order['id'] as String).toUpperCase()} · '
+                  '${order['units']} × ${order['itemTitle']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _colour.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  stage,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _colour,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${order['storeName']} → ${order['receiverName']} · '
+            '${order['receiverPhone']}',
+            style: const TextStyle(fontSize: 12, color: _muted),
+          ),
+          Text(
+            '${order['receiverAddress']}',
+            style: const TextStyle(fontSize: 11.5, color: _muted),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  carrier.isNotEmpty
+                      ? 'Carried by ${_nameOf(carrier)}'
+                      : assigned.isNotEmpty
+                          ? 'Assigned to ${_nameOf(assigned)}'
+                          : 'Open to any rider',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: assigned.isEmpty && carrier.isEmpty ? _muted : _ink,
+                  ),
+                ),
+              ),
+              if (canAssign)
+                TextButton(
+                  onPressed: onAssign,
+                  child: Text(assigned.isEmpty ? 'Assign rider' : 'Reassign'),
                 ),
             ],
           ),
@@ -646,6 +832,22 @@ class _Heading extends StatelessWidget {
         child: Text(
           text,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      );
+}
+
+/// A line of explanation under a heading, for the rules that are not visible
+/// in the data itself.
+class _Note extends StatelessWidget {
+  final String text;
+  const _Note(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 12, height: 1.4, color: _muted),
         ),
       );
 }

@@ -413,6 +413,17 @@ class Api {
       '/api/admin/stores/${Uri.encodeComponent(owner)}/reject',
       {'reason': reason});
 
+  Future<List<dynamic>> adminOrders({String stage = ''}) async {
+    final body = await _staffCall(StaffSession.admin, 'GET',
+        '/api/admin/orders${stage.isEmpty ? '' : '?stage=$stage'}');
+    return body['items'] as List<dynamic>? ?? const [];
+  }
+
+  /// Puts a rider's name on an order, or clears it with an empty number.
+  Future<void> assignOrder(String id, String phone) => _staffCall(
+      StaffSession.admin, 'POST', '/api/admin/orders/$id/assign',
+      {'phone': phone});
+
   Future<List<dynamic>> riders() async {
     final body = await _staffCall(StaffSession.admin, 'GET', '/api/admin/riders');
     return body['items'] as List<dynamic>? ?? const [];

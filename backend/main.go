@@ -137,6 +137,8 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/reject", s.handleRejectStore)
+	mux.HandleFunc("GET /api/admin/orders", s.handleAdminOrders)
+	mux.HandleFunc("POST /api/admin/orders/{id}/assign", s.handleAssignOrder)
 	mux.HandleFunc("GET /api/admin/riders", s.handleListRiders)
 	mux.HandleFunc("POST /api/admin/riders", s.handleAddRider)
 	mux.HandleFunc("DELETE /api/admin/riders/{phone}", s.handleRemoveRider)

@@ -339,7 +339,10 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                 const SizedBox(height: 24),
                 const _Heading('Ready to collect'),
                 if (waiting.isEmpty)
-                  const _Empty('No accepted orders waiting.')
+                  const _Empty(
+                    'Nothing right now. Orders land here on their own when a '
+                    'shop accepts one — pull down to check again.',
+                  )
                 else
                   for (final o in waiting)
                     _OrderCard(
@@ -391,6 +394,26 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // An assigned order is yours whether or not you get there
+              // first, and it is worth saying so.
+              if ((order['assignedTo'] as String? ?? '').isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Yours',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: _green,
+                    ),
+                  ),
+                ),
               Text(
                 '₹${(order['amount'] as num).toStringAsFixed(0)}',
                 style: const TextStyle(

@@ -106,6 +106,10 @@ type Order struct {
 	RejectReason string `json:"rejectReason,omitempty"`
 	RiderPhone   string `json:"riderPhone,omitempty"`
 
+	// Who the admin put on it, before anyone picks it up. Empty means the
+	// first rider to claim it gets it.
+	AssignedTo string `json:"assignedTo,omitempty"`
+
 	// The four digits the buyer reads out at the door. Filled in only on the
 	// buyer's own copy of the order; the rider is never told it, which is the
 	// whole point of it.

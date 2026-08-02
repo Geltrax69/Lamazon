@@ -478,20 +478,41 @@ func (a *API) handleRemoveRider(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ---- delivery panel ------------------------------------------------------
+// pickRider chooses who gets the next order: at random, but out of whoever is
+// carrying the least, so two riders on shift end up with roughly half each
+// rather than one of them doing all of it by luck. Empty when nobody is
+// signed up — the order then goes to whichever rider claims it first.
+//
+// ponytail: no shifts, no zones, no distance. Add those the day this campus
+// is too big for "whoever is free".
+func (d *DB) pickRider(ctx context.Context) (string, error) {
+	var phone string
+	err := d.sql.QueryRowContext(ctx, `
+		SELECT r.phone FROM riders r
+		WHERE r.active
+		ORDER BY (SELECT count(*) FROM orders o
+		          WHERE o.stage IN ('accepted', 'picked')
+		            AND (o.rider_phone = r.phone OR o.assigned_to = r.phone)),
+		         random()
+		LIMIT 1`).Scan(&phone)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return phone, err
+}
 
-// GET /api/delivery/orders — what this rider can pick up, and what they are
-// already carrying. Nobody else's: an order another rider claimed is gone
-// from this list the moment they claim it.
-func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
-	phone := a.staffOf(r)
+// ---- admin: orders and who carries them ----------------------------------
+
+// GET /api/admin/orders?stage= — everything, newest first, with who is on it.
+func (a *API) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
+	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
 	rows, err := a.db.sql.QueryContext(r.Context(), `
-		SELECT id, item_title, units, amount, stage, placed_at, store_name,
-		       receiver_name, receiver_phone, receiver_address, rider_phone
-		FROM orders
-		WHERE (stage = 'accepted' AND rider_phone = '')
-		   OR (stage = 'picked' AND rider_phone = $1)
-		ORDER BY (stage = 'picked') DESC, placed_at`, phone)
+		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		       o.store_name, o.receiver_name, o.receiver_phone,
+		       o.receiver_address, o.rider_phone, o.assigned_to, o.buyer_email
+		FROM orders o
+		WHERE ($1::text = '' OR o.stage = $1)
+		ORDER BY o.placed_at DESC LIMIT 200`, stage)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -503,7 +524,105 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 		var o Order
 		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
 			&o.PlacedAt, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
-			&o.ReceiverAddress, &o.RiderPhone); err != nil {
+			&o.ReceiverAddress, &o.RiderPhone, &o.AssignedTo, &o.BuyerEmail); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		out = append(out, o)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// POST /api/admin/orders/{id}/assign — put a rider's name on an order, or
+// clear it by sending an empty number.
+//
+// Assigning is not the same as picking up. It says who should collect it;
+// rider_phone still only fills in when someone actually has the bag, so an
+// order already on a run cannot be reassigned out from under them.
+func (a *API) handleAssignOrder(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	phone := normalisePhone(in.Phone)
+
+	if phone != "" {
+		var active bool
+		err := a.db.sql.QueryRowContext(r.Context(),
+			`SELECT active FROM riders WHERE phone = $1`, phone).Scan(&active)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "no rider on "+phone)
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !active {
+			writeError(w, http.StatusConflict, "that rider is switched off")
+			return
+		}
+	}
+
+	id := r.PathValue("id")
+	var stage string
+	err := a.db.sql.QueryRowContext(r.Context(), `
+		UPDATE orders SET assigned_to = $2
+		WHERE id = $1 AND stage IN ('received', 'accepted')
+		RETURNING stage`, id, phone).Scan(&stage)
+	if errors.Is(err, sql.ErrNoRows) {
+		var exists string
+		if scanErr := a.db.sql.QueryRowContext(r.Context(),
+			`SELECT stage FROM orders WHERE id = $1`, id).Scan(&exists); scanErr == nil {
+			writeError(w, http.StatusConflict,
+				"that order is already "+exists+" — too late to reassign it")
+			return
+		}
+		writeError(w, http.StatusNotFound, "no order with id "+id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"id": id, "assignedTo": phone, "stage": stage,
+	})
+}
+
+// ---- delivery panel ------------------------------------------------------
+
+// GET /api/delivery/orders — what this rider can pick up, and what they are
+// already carrying. Nobody else's: an order another rider claimed is gone
+// from this list the moment they claim it, and one the admin put on someone
+// else's name never appears at all.
+func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
+	phone := a.staffOf(r)
+	rows, err := a.db.sql.QueryContext(r.Context(), `
+		SELECT id, item_title, units, amount, stage, placed_at, store_name,
+		       receiver_name, receiver_phone, receiver_address, rider_phone,
+		       assigned_to
+		FROM orders
+		WHERE (stage = 'accepted' AND rider_phone = ''
+		       AND (assigned_to = '' OR assigned_to = $1))
+		   OR (stage = 'picked' AND rider_phone = $1)
+		-- Yours first, then the open pool.
+		ORDER BY (stage = 'picked') DESC, (assigned_to = $1) DESC, placed_at`, phone)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+
+	out := make([]Order, 0)
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+			&o.PlacedAt, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
+			&o.ReceiverAddress, &o.RiderPhone, &o.AssignedTo); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -535,7 +654,8 @@ func countStage(orders []Order, stage OrderStage) int {
 
 // POST /api/delivery/orders/{id}/pick — claiming it. The WHERE clause is the
 // claim: whichever rider's UPDATE lands first gets the order, and the second
-// one is told it is gone rather than both riding to the same door.
+// one is told it is gone rather than both riding to the same door. An order
+// the admin assigned can only be claimed by the rider it was assigned to.
 func (a *API) handleRiderPick(w http.ResponseWriter, r *http.Request) {
 	phone := a.staffOf(r)
 	id := r.PathValue("id")
@@ -543,15 +663,16 @@ func (a *API) handleRiderPick(w http.ResponseWriter, r *http.Request) {
 	err := a.db.sql.QueryRowContext(r.Context(), `
 		UPDATE orders SET stage = 'picked', rider_phone = $2, picked_at = now()
 		WHERE id = $1 AND stage = 'accepted' AND rider_phone = ''
+		  AND (assigned_to = '' OR assigned_to = $2)
 		RETURNING id, item_title, units, amount, stage, placed_at, store_name,
-		          receiver_name, receiver_phone, receiver_address, buyer_email`,
+		          receiver_name, receiver_phone, receiver_address, buyer_email,
+		          assigned_to`,
 		id, phone).
 		Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt,
 			&o.StoreName, &o.ReceiverName, &o.ReceiverPhone, &o.ReceiverAddress,
-			&o.BuyerEmail)
+			&o.BuyerEmail, &o.AssignedTo)
 	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusConflict,
-			"that order is not waiting for pick-up any more")
+		a.explainFailedPick(w, r, id, phone)
 		return
 	}
 	if err != nil {
@@ -564,6 +685,27 @@ func (a *API) handleRiderPick(w http.ResponseWriter, r *http.Request) {
 			o.ItemTitle, o.StoreName))
 	o.BuyerEmail = ""
 	writeJSON(w, http.StatusOK, o)
+}
+
+// A pick can fail because someone beat them to it, or because the order has
+// somebody else's name on it. The second one is worth saying out loud, or a
+// rider stands in a shop wondering why the button does nothing.
+func (a *API) explainFailedPick(w http.ResponseWriter, r *http.Request, id, phone string) {
+	var stage, assigned, rider string
+	switch err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT stage, assigned_to, rider_phone FROM orders WHERE id = $1`, id).
+		Scan(&stage, &assigned, &rider); {
+	case errors.Is(err, sql.ErrNoRows):
+		writeError(w, http.StatusNotFound, "no order with id "+id)
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	case assigned != "" && assigned != phone:
+		writeError(w, http.StatusForbidden,
+			"that order is assigned to another rider")
+	default:
+		writeError(w, http.StatusConflict,
+			"that order is not waiting for pick-up any more")
+	}
 }
 
 // POST /api/delivery/orders/{id}/deliver — the code is the hand-over. The

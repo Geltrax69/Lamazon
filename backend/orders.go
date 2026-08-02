@@ -28,13 +28,14 @@ import (
 // column list and the Scan cannot drift apart.
 const orderColumns = `id, item_id, item_title, units, amount, stage, placed_at,
 	store_owner, store_name, receiver_name, receiver_phone, receiver_address,
-	reject_reason, rider_phone`
+	reject_reason, rider_phone, assigned_to`
 
 func scanOrder(row interface{ Scan(...any) error }) (Order, error) {
 	var o Order
 	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName,
-		&o.ReceiverPhone, &o.ReceiverAddress, &o.RejectReason, &o.RiderPhone)
+		&o.ReceiverPhone, &o.ReceiverAddress, &o.RejectReason, &o.RiderPhone,
+		&o.AssignedTo)
 	return o, err
 }
 
@@ -187,7 +188,7 @@ func (a *API) handleMyOrders(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount,
 			&o.Stage, &o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName,
 			&o.ReceiverPhone, &o.ReceiverAddress, &o.RejectReason, &o.RiderPhone,
-			&o.DeliveryCode); err != nil {
+			&o.AssignedTo, &o.DeliveryCode); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -221,26 +222,37 @@ func (a *API) handleOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/seller/orders/{id}/accept — the seller takes the order on. Stock
-// is untouched; what changes is that a delivery code now exists, and the
-// buyer is the only one told it.
+// is untouched; what changes is that a delivery code now exists, the buyer is
+// the only one told it, and a rider now has the job.
 func (a *API) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
 	code, err := fourDigits()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// Accepting is the moment there is something to carry, so this is where a
+	// rider gets it. With nobody signed up the order stays open to whoever
+	// turns up, which is also what happens if every rider is switched off.
+	rider, err := a.db.pickRider(r.Context())
+	if err != nil {
+		log.Printf("order %s: choosing a rider: %v", r.PathValue("id"), err)
+	}
+
 	id := r.PathValue("id")
 	var buyer string
 	row := a.db.sql.QueryRowContext(r.Context(), `
-		UPDATE orders SET stage = 'accepted', accepted_at = now(), delivery_code = $3
+		UPDATE orders SET stage = 'accepted', accepted_at = now(), delivery_code = $3,
+			-- An admin who already put a name on it wins; otherwise take the
+			-- one drawn above.
+			assigned_to = CASE WHEN assigned_to <> '' THEN assigned_to ELSE $4 END
 		WHERE id = $1 AND store_owner = $2 AND stage = 'received'
 		RETURNING `+orderColumns+`, buyer_email`,
-		id, a.owner(r), code)
+		id, a.owner(r), code, rider)
 
 	var o Order
 	err = row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
-		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &buyer)
+		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &o.AssignedTo, &buyer)
 	if !a.orderMoved(w, r, id, err) {
 		return
 	}
@@ -273,7 +285,7 @@ func (a *API) handleRejectOrder(w http.ResponseWriter, r *http.Request) {
 	var o Order
 	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
-		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &buyer)
+		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &o.AssignedTo, &buyer)
 	if !a.orderMoved(w, r, id, err) {
 		return
 	}

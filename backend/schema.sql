@@ -213,6 +213,10 @@ ALTER TABLE orders
     -- proof that the two of them met.
     ADD COLUMN IF NOT EXISTS delivery_code    TEXT NOT NULL DEFAULT '',
     ADD COLUMN IF NOT EXISTS rider_phone      TEXT NOT NULL DEFAULT '',
+    -- Who the admin wants on this one. Separate from rider_phone, which is
+    -- only set when a rider actually has the bag: an order can be spoken for
+    -- before anyone has picked it up. Empty means anyone may take it.
+    ADD COLUMN IF NOT EXISTS assigned_to      TEXT NOT NULL DEFAULT '',
     ADD COLUMN IF NOT EXISTS accepted_at      TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS picked_at        TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS delivered_at     TIMESTAMPTZ;

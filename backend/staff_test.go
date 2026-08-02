@@ -209,6 +209,125 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 	}
 }
 
+// Accepting an order hands it to a rider by itself. With two on shift each
+// order lands on exactly one panel — never both, never neither.
+func TestAcceptingAnOrderHandsItToARider(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{
+		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
+		"categories": []string{"Food"},
+	})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items",
+		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 20})
+
+	admin := adminSignIn(t, h)
+	tokens := map[string]string{}
+	for _, phone := range []string{"9111111111", "9222222222"} {
+		pin := addRider(t, h, admin, phone)
+		_, login := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+			map[string]string{"phone": phone, "pin": pin})
+		tokens[phone] = login["token"].(string)
+	}
+
+	// Six orders, so a run of all-one-rider would be a 1-in-32 fluke rather
+	// than the assertion being loose.
+	seen := map[string]int{}
+	for range 6 {
+		_, order := call(t, h, http.MethodPost, "/api/orders",
+			map[string]any{"itemId": item["id"], "units": 1})
+		id := order["id"].(string)
+		_, accepted := call(t, h, http.MethodPost,
+			"/api/seller/orders/"+id+"/accept", nil)
+		assigned, _ := accepted["assignedTo"].(string)
+		if assigned == "" {
+			t.Fatal("accepting with riders on shift should hand the order to one")
+		}
+		seen[assigned]++
+
+		// It is on that rider's panel, and on nobody else's.
+		on := 0
+		for phone, token := range tokens {
+			for _, o := range callAs2(t, h, token, "/api/delivery/orders")["orders"].([]any) {
+				if o.(map[string]any)["id"] == id {
+					on++
+					if phone != assigned {
+						t.Fatalf("order %s showed on %s, assigned to %s", id, phone, assigned)
+					}
+				}
+			}
+		}
+		if on != 1 {
+			t.Fatalf("order %s is on %d panels, want exactly 1", id, on)
+		}
+	}
+	// Spread, not a pile: least-loaded first means both get work.
+	if len(seen) != 2 {
+		t.Fatalf("six orders across two riders should reach both, got %v", seen)
+	}
+}
+
+// An order with a rider's name on it is theirs alone — nobody else sees it,
+// and nobody else can pick it up.
+func TestAssignedOrdersGoToThatRiderOnly(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{
+		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
+		"categories": []string{"Food"},
+	})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items",
+		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 10})
+	_, order := call(t, h, http.MethodPost, "/api/orders",
+		map[string]any{"itemId": item["id"], "units": 1})
+	id := order["id"].(string)
+
+	admin := adminSignIn(t, h)
+	minePIN := addRider(t, h, admin, "9111111111")
+	otherPIN := addRider(t, h, admin, "9222222222")
+	_, mineLogin := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": minePIN})
+	_, otherLogin := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9222222222", "pin": otherPIN})
+	mine := mineLogin["token"].(string)
+	other := otherLogin["token"].(string)
+
+	// Assigning an unknown number is refused rather than quietly saved.
+	if code, _ := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/orders/"+id+"/assign",
+		map[string]string{"phone": "9333333333"}); code != http.StatusNotFound {
+		t.Fatalf("assign to a stranger: want 404, got %d", code)
+	}
+	// Assignment can happen before the shop has even accepted.
+	if code, body := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/orders/"+id+"/assign",
+		map[string]string{"phone": "9111111111"}); code != http.StatusOK {
+		t.Fatalf("assign: want 200, got %d (%v)", code, body["error"])
+	}
+	call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
+
+	if got := callAs2(t, h, other, "/api/delivery/orders")["orders"].([]any); len(got) != 0 {
+		t.Fatalf("an assigned order showed on another rider's panel: %d", len(got))
+	}
+	if got := callAs2(t, h, mine, "/api/delivery/orders")["orders"].([]any); len(got) != 1 {
+		t.Fatalf("the assigned rider should see it, got %d", len(got))
+	}
+	if code, body := callAs(t, h, other, http.MethodPost,
+		"/api/delivery/orders/"+id+"/pick", nil); code != http.StatusForbidden {
+		t.Fatalf("wrong rider picking up: want 403, got %d (%v)", code, body["error"])
+	}
+	if code, body := callAs(t, h, mine, http.MethodPost,
+		"/api/delivery/orders/"+id+"/pick", nil); code != http.StatusOK {
+		t.Fatalf("assigned rider picking up: want 200, got %d (%v)", code, body["error"])
+	}
+	// Once it is on a run it cannot be reassigned out from under them.
+	if code, _ := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/orders/"+id+"/assign",
+		map[string]string{"phone": "9222222222"}); code != http.StatusConflict {
+		t.Fatalf("reassigning a picked order: want 409, got %d", code)
+	}
+}
+
 // A rejected order tells the buyer why, and gives its units back.
 func TestRejectingAnOrderFreesTheStock(t *testing.T) {
 	h := testAPI(t)
