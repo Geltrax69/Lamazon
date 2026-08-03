@@ -435,12 +435,7 @@ func (a *API) handleAddRider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "enter a 10-digit mobile number")
 		return
 	}
-	pin, err := fourDigits()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	hash, err := hashPassword(pin)
+	pin, hash, err := newPIN()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -456,6 +451,124 @@ func (a *API) handleAddRider(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"phone": phone, "name": strings.TrimSpace(in.Name), "pin": pin,
 	})
+}
+
+// POST /api/admin/riders/{phone}/pin — a forgotten PIN, or one that has been
+// seen by too many people. The old one stops working immediately, and so does
+// every panel already signed in on it.
+func (a *API) handleResetRiderPIN(w http.ResponseWriter, r *http.Request) {
+	phone := normalisePhone(r.PathValue("phone"))
+	pin, hash, err := newPIN()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE riders SET pin_hash = $2 WHERE phone = $1`, phone, hash)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no rider on "+phone)
+		return
+	}
+	a.db.sql.ExecContext(r.Context(),
+		`DELETE FROM staff_sessions WHERE role = 'rider' AND subject = $1`, phone)
+	writeJSON(w, http.StatusOK, map[string]string{"phone": phone, "pin": pin})
+}
+
+// POST /api/admin/riders/{phone}/number — the same person, a new SIM.
+//
+// The number is the rider's identity everywhere: their row, the orders they
+// are carrying, the ones they have already delivered. Moving it in one
+// transaction is what keeps those together — a rider who changed their number
+// halfway through a run would otherwise be two riders, one holding a bag
+// nobody can close and one with a delivered count of zero.
+func (a *API) handleChangeRiderNumber(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	old := normalisePhone(r.PathValue("phone"))
+	next := normalisePhone(in.Phone)
+	if len(next) != 10 {
+		writeError(w, http.StatusBadRequest, "enter a 10-digit mobile number")
+		return
+	}
+	if next == old {
+		writeError(w, http.StatusBadRequest, "that is already their number")
+		return
+	}
+	var taken bool
+	if err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT true FROM riders WHERE phone = $1`, next).Scan(&taken); err == nil {
+		writeError(w, http.StatusConflict, next+" already belongs to a rider")
+		return
+	}
+
+	// A new number means a new PIN: whoever had the old one may still have it.
+	pin, hash, err := newPIN()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	tx, err := a.db.sql.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	res, err := tx.ExecContext(r.Context(),
+		`UPDATE riders SET phone = $2, pin_hash = $3 WHERE phone = $1`,
+		old, next, hash)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no rider on "+old)
+		return
+	}
+	// Everything that points at a rider points at them by number, so all of
+	// it moves: the run they are on, and the history behind it.
+	if _, err := tx.ExecContext(r.Context(), `
+		UPDATE orders SET
+			rider_phone = CASE WHEN rider_phone = $1 THEN $2 ELSE rider_phone END,
+			assigned_to = CASE WHEN assigned_to = $1 THEN $2 ELSE assigned_to END
+		WHERE rider_phone = $1 OR assigned_to = $1`, old, next); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// The old number's sessions die with it rather than following the row.
+	if _, err := tx.ExecContext(r.Context(),
+		`DELETE FROM staff_sessions WHERE role = 'rider' AND subject = $1`,
+		old); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"phone": next, "previous": old, "pin": pin,
+	})
+}
+
+// newPIN is the four digits and the hash that outlives them.
+func newPIN() (pin, hash string, err error) {
+	pin, err = fourDigits()
+	if err != nil {
+		return "", "", err
+	}
+	hash, err = hashPassword(pin)
+	return pin, hash, err
 }
 
 // DELETE /api/admin/riders/{phone} — switched off rather than deleted, so the

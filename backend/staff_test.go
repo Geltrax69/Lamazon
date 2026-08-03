@@ -209,6 +209,87 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 	}
 }
 
+// A rider changes their SIM mid-run: the number moves, and everything that
+// points at them by number moves with it — the bag in their hand, the count
+// behind them, and the PIN, which does not survive the move.
+func TestChangingARidersNumberTakesTheirWorkWithThem(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{
+		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
+		"categories": []string{"Food"},
+	})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items",
+		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 10})
+
+	admin := adminSignIn(t, h)
+	oldPIN := addRider(t, h, admin, "9111111111")
+	_, login := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": oldPIN})
+	oldToken := login["token"].(string)
+
+	_, order := call(t, h, http.MethodPost, "/api/orders",
+		map[string]any{"itemId": item["id"], "units": 1})
+	id := order["id"].(string)
+	call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
+	callAs(t, h, oldToken, http.MethodPost, "/api/delivery/orders/"+id+"/pick", nil)
+
+	// A number already in use is refused rather than merging two riders.
+	addRider(t, h, admin, "9222222222")
+	if code, _ := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/riders/9111111111/number",
+		map[string]string{"phone": "9222222222"}); code != http.StatusConflict {
+		t.Fatalf("moving onto a taken number: want 409, got %d", code)
+	}
+
+	code, moved := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/riders/9111111111/number",
+		map[string]string{"phone": "9333333333"})
+	if code != http.StatusOK {
+		t.Fatalf("change number: want 200, got %d (%v)", code, moved["error"])
+	}
+	newPIN, _ := moved["pin"].(string)
+	if len(newPIN) != 4 || newPIN == oldPIN {
+		t.Fatalf("a moved number should come with a fresh PIN, got %q", moved["pin"])
+	}
+
+	// The old number is gone: its session, its PIN, and the number itself.
+	if code, _ := callAs(t, h, oldToken, http.MethodGet, "/api/delivery/orders", nil); code != http.StatusUnauthorized {
+		t.Fatalf("the old session should be dead, got %d", code)
+	}
+	if code, _ := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": oldPIN}); code != http.StatusUnauthorized {
+		t.Fatalf("the old number should not sign in, got %d", code)
+	}
+
+	// The new one picks up exactly where they left off, mid-delivery.
+	_, fresh := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9333333333", "pin": newPIN})
+	newToken, ok := fresh["token"].(string)
+	if !ok {
+		t.Fatalf("the new number should sign in: %v", fresh["error"])
+	}
+	carrying := callAs2(t, h, newToken, "/api/delivery/orders")["orders"].([]any)
+	if len(carrying) != 1 || carrying[0].(map[string]any)["id"] != id {
+		t.Fatalf("the order in their hand did not follow them: %v", carrying)
+	}
+
+	// And a PIN reset is the same story without the number changing.
+	_, reset := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/riders/9333333333/pin", nil)
+	resetPIN, _ := reset["pin"].(string)
+	if resetPIN == newPIN || len(resetPIN) != 4 {
+		t.Fatal("a reset must issue a different PIN")
+	}
+	if code, _ := callAs(t, h, newToken, http.MethodGet, "/api/delivery/orders", nil); code != http.StatusUnauthorized {
+		t.Fatalf("a reset must sign the rider out, got %d", code)
+	}
+	if code, _ := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9333333333", "pin": resetPIN}); code != http.StatusOK {
+		t.Fatalf("the new PIN should work, got %d", code)
+	}
+}
+
 // Accepting an order hands it to a rider by itself. With two on shift each
 // order lands on exactly one panel — never both, never neither.
 func TestAcceptingAnOrderHandsItToARider(t *testing.T) {

@@ -257,23 +257,7 @@ class _AdminHomeState extends State<_AdminHome> {
     try {
       final pin = await Api.instance.addRider(phone.text, name.text);
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (dialog) => AlertDialog(
-          title: const Text('Give them this PIN'),
-          content: Text(
-            '$pin\n\nThey sign in at /delivery with their number and this PIN. '
-            'It is shown once — adding the number again issues a new one.',
-            style: const TextStyle(fontSize: 15, height: 1.5),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(dialog),
-              child: const Text('Done'),
-            ),
-          ],
-        ),
-      );
+      await _showPIN(pin, phone.text.trim());
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -286,6 +270,119 @@ class _AdminHomeState extends State<_AdminHome> {
         );
     }
   }
+
+  /// The PIN exists for one moment: this dialog. Nothing stores it in
+  /// readable form, so an admin who closes this issues another one.
+  Future<void> _showPIN(String pin, String phone) => showDialog<void>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Give them this PIN'),
+      content: Text(
+        '$pin\n\nThey sign in at /delivery with $phone and this PIN. '
+        'It is shown once — issuing another replaces it.',
+        style: const TextStyle(fontSize: 15, height: 1.5),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(dialog),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _resetPin(Map<String, dynamic> rider) async {
+    final phone = rider['phone'] as String;
+    final ok = await _confirm(
+      'New PIN for $phone?',
+      'Their old PIN stops working straight away, and they are signed out of '
+          'the delivery panel until they use the new one.',
+      'Issue PIN',
+    );
+    if (!ok) return;
+    try {
+      final pin = await Api.instance.resetRiderPin(phone);
+      if (!mounted) return;
+      await _showPIN(pin, phone);
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+    await _load();
+  }
+
+  /// The same rider on a new SIM. Everything of theirs is keyed by the
+  /// number, so the server moves the run and the history together — this
+  /// side only has to ask for the new one.
+  Future<void> _changeNumber(Map<String, dynamic> rider) async {
+    final old = rider['phone'] as String;
+    final next = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text('Move $old to a new number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Their deliveries, their count and anything in their hand right '
+              'now come with them. They get a new PIN.',
+              style: TextStyle(fontSize: 13, color: _muted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: next,
+              autofocus: true,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'New mobile number'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Move'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final pin = await Api.instance.changeRiderNumber(old, next.text.trim());
+      if (!mounted) return;
+      await _showPIN(pin, next.text.trim());
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+    await _load();
+  }
+
+  Future<bool> _confirm(String title, String body, String action) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: Text(title),
+          content: Text(
+            body,
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 
   /// Orders hand themselves to a rider when the shop accepts them, so this is
   /// the exception: the rider who did not turn up. Only orders nobody has
@@ -574,7 +671,17 @@ class _AdminHomeState extends State<_AdminHome> {
             for (final r in _riders.cast<Map<String, dynamic>>())
               _RiderRow(
                 rider: r,
+                onResetPin: () => _resetPin(r),
+                onChangeNumber: () => _changeNumber(r),
                 onRemove: () async {
+                  if (!await _confirm(
+                    'Switch off ${r['phone']}?',
+                    'They stop getting new orders and are signed out. What '
+                        'they have already delivered stays on their name.',
+                    'Switch off',
+                  )) {
+                    return;
+                  }
                   await Api.instance.removeRider(r['phone'] as String);
                   await _load();
                 },
@@ -861,8 +968,15 @@ class _AdminOrderRow extends StatelessWidget {
 
 class _RiderRow extends StatelessWidget {
   final Map<String, dynamic> rider;
+  final VoidCallback onResetPin;
+  final VoidCallback onChangeNumber;
   final VoidCallback onRemove;
-  const _RiderRow({required this.rider, required this.onRemove});
+  const _RiderRow({
+    required this.rider,
+    required this.onResetPin,
+    required this.onChangeNumber,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -895,12 +1009,26 @@ class _RiderRow extends StatelessWidget {
               ],
             ),
           ),
-          if (active)
-            IconButton(
-              tooltip: 'Switch off',
-              onPressed: onRemove,
-              icon: const Icon(LucideIcons.userX, size: 18, color: _red),
-            ),
+          PopupMenuButton<String>(
+            icon: const Icon(LucideIcons.ellipsisVertical, size: 18),
+            onSelected: (choice) => switch (choice) {
+              'pin' => onResetPin(),
+              'number' => onChangeNumber(),
+              _ => onRemove(),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'pin', child: Text('New PIN')),
+              const PopupMenuItem(
+                value: 'number',
+                child: Text('Change number'),
+              ),
+              if (active)
+                const PopupMenuItem(
+                  value: 'off',
+                  child: Text('Switch off', style: TextStyle(color: _red)),
+                ),
+            ],
+          ),
         ],
       ),
     );

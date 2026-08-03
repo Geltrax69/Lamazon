@@ -436,6 +436,22 @@ class Api {
     return body['pin'] as String? ?? '';
   }
 
+  /// A fresh PIN for a rider who lost theirs. Returns the four digits, which
+  /// are shown once and never readable again.
+  Future<String> resetRiderPin(String phone) async {
+    final body = await _staffCall(
+        StaffSession.admin, 'POST', '/api/admin/riders/$phone/pin');
+    return body['pin'] as String? ?? '';
+  }
+
+  /// Moves a rider to a new number, taking their run and their history with
+  /// them. Returns the new PIN.
+  Future<String> changeRiderNumber(String phone, String next) async {
+    final body = await _staffCall(StaffSession.admin, 'POST',
+        '/api/admin/riders/$phone/number', {'phone': next});
+    return body['pin'] as String? ?? '';
+  }
+
   Future<void> removeRider(String phone) => _staffCall(
       StaffSession.admin, 'DELETE', '/api/admin/riders/$phone');
 
