@@ -99,6 +99,11 @@ type Order struct {
 	StoreName  string `json:"storeName,omitempty"`
 	BuyerEmail string `json:"buyerEmail,omitempty"`
 
+	// Where the rider collects. Read from the store rather than copied onto
+	// the order: a shop that moves should move for orders already in flight,
+	// which is the opposite of what we want for the delivery address.
+	StoreAddress string `json:"storeAddress,omitempty"`
+
 	ReceiverName    string `json:"receiverName,omitempty"`
 	ReceiverPhone   string `json:"receiverPhone,omitempty"`
 	ReceiverAddress string `json:"receiverAddress,omitempty"`

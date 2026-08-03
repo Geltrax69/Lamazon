@@ -797,15 +797,22 @@ func (a *API) handleAssignOrder(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 	phone := a.staffOf(r)
 	rows, err := a.db.sql.QueryContext(r.Context(), `
-		SELECT id, item_title, units, amount, stage, placed_at, store_name,
-		       receiver_name, receiver_phone, receiver_address, rider_phone,
-		       assigned_to
-		FROM orders
-		WHERE (stage = 'accepted' AND rider_phone = ''
-		       AND (assigned_to = '' OR assigned_to = $1))
-		   OR (stage = 'picked' AND rider_phone = $1)
+		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		       o.store_name,
+		       -- LEFT JOIN: a store deleted out from under an order in flight
+		       -- still leaves a rider holding it, and a card with no pickup
+		       -- line beats no card at all.
+		       trim(both ', ' FROM concat_ws(', ', s.location, s.city)),
+		       o.receiver_name, o.receiver_phone, o.receiver_address,
+		       o.rider_phone, o.assigned_to
+		FROM orders o
+		LEFT JOIN seller_stores s ON s.owner = o.store_owner
+		WHERE (o.stage = 'accepted' AND o.rider_phone = ''
+		       AND (o.assigned_to = '' OR o.assigned_to = $1))
+		   OR (o.stage = 'picked' AND o.rider_phone = $1)
 		-- Yours first, then the open pool.
-		ORDER BY (stage = 'picked') DESC, (assigned_to = $1) DESC, placed_at`, phone)
+		ORDER BY (o.stage = 'picked') DESC, (o.assigned_to = $1) DESC,
+		         o.placed_at`, phone)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -816,8 +823,9 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var o Order
 		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
-			&o.PlacedAt, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
-			&o.ReceiverAddress, &o.RiderPhone, &o.AssignedTo); err != nil {
+			&o.PlacedAt, &o.StoreName, &o.StoreAddress, &o.ReceiverName,
+			&o.ReceiverPhone, &o.ReceiverAddress, &o.RiderPhone,
+			&o.AssignedTo); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

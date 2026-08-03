@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
@@ -195,34 +196,100 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
     final typed = await showDialog<String>(
       context: context,
       builder: (dialog) => AlertDialog(
-        title: const Text('Delivery code'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        title: const Text(
+          'Delivery code',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Ask the customer for their 4 digits. The order only closes if '
               'they match.',
-              style: TextStyle(fontSize: 13, color: _muted),
+              style: TextStyle(fontSize: 13, height: 1.4, color: _muted),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
+            // The four digits are the whole dialog, so they get typed like a
+            // code rather than like a sentence: wide, spaced, centred.
             TextField(
               controller: code,
               autofocus: true,
               keyboardType: TextInputType.number,
               maxLength: 4,
-              decoration: const InputDecoration(hintText: '0000'),
+              textAlign: TextAlign.center,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: const TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 14,
+              ),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: '0000',
+                hintStyle: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 14,
+                  color: Colors.black.withValues(alpha: 0.18),
+                ),
+                // letterSpacing trails after the last digit too; half of it
+                // back on the left is what keeps the four looking centred.
+                contentPadding: const EdgeInsets.fromLTRB(14, 16, 0, 16),
+                filled: true,
+                fillColor: const Color(0xFFF4F4F4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _green, width: 1.5),
+                ),
+              ),
+              onSubmitted: (v) => v.trim().length == 4
+                  ? Navigator.pop(dialog, v.trim())
+                  : null,
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
+            style: TextButton.styleFrom(foregroundColor: _muted),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: _green),
-            onPressed: () => Navigator.pop(dialog, code.text.trim()),
-            child: const Text('Delivered'),
+          // Enabled only on four digits: a short code is a typo, and letting
+          // it through spends one of the rider's attempts on it.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: code,
+            builder: (context, value, child) => FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _green,
+                padding: const EdgeInsets.symmetric(horizontal: 22),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+              ),
+              onPressed: value.text.trim().length == 4
+                  ? () => Navigator.pop(dialog, code.text.trim())
+                  : null,
+              child: const Text(
+                'Delivered',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
         ],
       ),
@@ -424,11 +491,6 @@ class _OrderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'From ${order['storeName']}',
-            style: const TextStyle(fontSize: 12.5, color: _muted),
-          ),
           const SizedBox(height: 8),
           Text(
             '${order['units']} × ${order['itemTitle']}',
@@ -438,24 +500,24 @@ class _OrderCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1),
           ),
-          const Text(
-            'Deliver to',
-            style: TextStyle(fontSize: 11.5, color: _muted),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${order['receiverName']}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-          ),
-          Text(
-            '${order['receiverPhone']}',
-            style: const TextStyle(fontSize: 13, color: _ink),
-          ),
-          Text(
-            '${order['receiverAddress']}',
-            style: const TextStyle(fontSize: 13, height: 1.35, color: _muted),
+          // Both ends of the run, in the order they happen. The shop was a
+          // name and nothing else, which is a place to go only if you already
+          // know where it is.
+          _Stop(
+            icon: LucideIcons.store,
+            label: 'Collect from',
+            name: '${order['storeName']}',
+            address: order['storeAddress'] as String? ?? '',
           ),
           const SizedBox(height: 12),
+          _Stop(
+            icon: LucideIcons.mapPin,
+            label: 'Deliver to',
+            name: '${order['receiverName']}',
+            phone: '${order['receiverPhone']}',
+            address: '${order['receiverAddress']}',
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -473,6 +535,66 @@ class _OrderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One end of the run: where to go, and who is there. The address is what the
+/// rider is actually reading, so it gets the room.
+class _Stop extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String name;
+  final String? phone;
+  final String address;
+  const _Stop({
+    required this.icon,
+    required this.label,
+    required this.name,
+    required this.address,
+    this.phone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2, right: 10),
+          child: Icon(icon, size: 15, color: _muted),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(fontSize: 11.5, color: _muted)),
+              const SizedBox(height: 2),
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (phone != null && phone!.isNotEmpty)
+                Text(phone!, style: const TextStyle(fontSize: 13, color: _ink)),
+              // A store with no address on file says so, rather than leaving a
+              // gap the rider reads as "same as always".
+              Text(
+                address.isEmpty ? 'Address not on file — call the shop' : address,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: _muted,
+                  fontStyle: address.isEmpty ? FontStyle.italic : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
