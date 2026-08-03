@@ -134,6 +134,7 @@ func routes(s *API) http.Handler {
 	// withStaff below.
 	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
+	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/reject", s.handleRejectStore)
@@ -149,6 +150,7 @@ func routes(s *API) http.Handler {
 	// Delivery panel.
 	mux.HandleFunc("POST /api/delivery/login", s.handleRiderLogin)
 	mux.HandleFunc("GET /api/delivery/orders", s.handleRiderOrders)
+	mux.HandleFunc("GET /api/delivery/history", s.handleRiderHistory)
 	mux.HandleFunc("POST /api/delivery/orders/{id}/pick", s.handleRiderPick)
 	mux.HandleFunc("POST /api/delivery/orders/{id}/deliver", s.handleRiderDeliver)
 

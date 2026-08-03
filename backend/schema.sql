@@ -247,3 +247,16 @@ CREATE INDEX IF NOT EXISTS idx_products_tab ON products (tab);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products (category);
 -- Placing an order sums this seller's outstanding units for one item.
 CREATE INDEX IF NOT EXISTS idx_orders_item_stage ON orders (item_id, stage);
+
+-- What the item costs before the discount. Zero means the seller did not set
+-- one, which is the honest default: every existing row predates the field, and
+-- backfilling it from price would invent a 0% discount on all of them.
+--
+-- The check is what stops a "discount" that raises the price. Equal is allowed
+-- so a seller can clear a sale by matching the two rather than by knowing to
+-- type a zero.
+ALTER TABLE inventory_items
+    ADD COLUMN IF NOT EXISTS mrp NUMERIC(10, 2) NOT NULL DEFAULT 0;
+ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_mrp_check;
+ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_mrp_check
+    CHECK (mrp = 0 OR mrp >= price);

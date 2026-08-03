@@ -57,8 +57,16 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<(List<Product>, List<Shop>)> _future = _load();
   int _tab = 0;
 
-  Future<(List<Product>, List<Shop>)> _load() async =>
-      (await loadCatalog(), await loadShops());
+  /// Kept aside so the drawer can list every category without waiting on a
+  /// second load. Assigned before the FutureBuilder rebuilds, so no setState.
+  List<Product> _all = const [];
+
+  Future<(List<Product>, List<Shop>)> _load() async {
+    final items = await loadCatalog();
+    final shops = await loadShops();
+    _all = items;
+    return (items, shops);
+  }
 
   @override
   void initState() {
@@ -84,6 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = _tabs[_tab].color;
     return Scaffold(
       backgroundColor: kBg,
+      drawer: _MenuDrawer(
+        products: _all,
+        activeTab: _tab,
+        onTab: (i) => setState(() => _tab = i),
+      ),
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 350),
         decoration: BoxDecoration(
@@ -234,6 +247,24 @@ class _TopBar extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // Every category is one tap from here, instead of scrolling the row
+        // and hoping the one you want is in the current tab.
+        Builder(
+          builder: (context) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: Scaffold.of(context).openDrawer,
+            child: Container(
+              width: 42,
+              height: 42,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(LucideIcons.menu, size: 19),
+            ),
+          ),
+        ),
         // Location + how fast the porter reaches this address. Tapping opens
         // the saved addresses so the delivery point can be switched.
         Expanded(
@@ -378,6 +409,188 @@ class _TabBar extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The whole catalogue, one tap deep: the six tabs, then every category in
+/// them. The row on the home screen only shows the current tab's categories
+/// and only as many as fit; this is the version you can actually browse.
+class _MenuDrawer extends StatelessWidget {
+  final List<Product> products;
+  final int activeTab;
+  final ValueChanged<int> onTab;
+  const _MenuDrawer({
+    required this.products,
+    required this.activeTab,
+    required this.onTab,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Grouped by tab so a category sits under the department it belongs to,
+    // and sorted so the list does not reshuffle when the catalogue changes.
+    final byTab = <String, Set<String>>{};
+    for (final p in products) {
+      if (p.category.isEmpty) continue;
+      byTab.putIfAbsent(p.tab, () => <String>{}).add(p.category);
+    }
+
+    return Drawer(
+      backgroundColor: kBg,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Browse',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(LucideIcons.x, size: 19),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final (i, tab) in _tabs.indexed) ...[
+              _DrawerTab(
+                tab: tab,
+                selected: i == activeTab,
+                onTap: () {
+                  onTab(i);
+                  Navigator.pop(context);
+                },
+              ),
+              // The 'All' tab is every department at once, so listing its
+              // categories here would repeat the whole drawer under it.
+              if (i != 0)
+                for (final name in (byTab[tab.name]?.toList()?..sort()) ??
+                    const <String>[])
+                  _DrawerCategory(
+                    name: name,
+                    color: tab.color,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SearchScreen(initialQuery: name),
+                        ),
+                      );
+                    },
+                  ),
+              const SizedBox(height: 6),
+            ],
+            if (products.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  'Categories appear here once the catalogue loads.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerTab extends StatelessWidget {
+  final _Tab tab;
+  final bool selected;
+  final VoidCallback onTap;
+  const _DrawerTab({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = tab.color ?? const Color(0xFF1A1A1A);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? accent.withValues(alpha: 0.14) : null,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(tab.icon, size: 18, color: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                tab.name,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? accent : const Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerCategory extends StatelessWidget {
+  final String name;
+  final Color? color;
+  final VoidCallback onTap;
+  const _DrawerCategory({
+    required this.name,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        // Indented under its tab: the nesting is the only thing saying which
+        // department a category belongs to.
+        padding: const EdgeInsets.fromLTRB(42, 8, 12, 8),
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: color ?? const Color(0xFF6B6B6B),
+                shape: BoxShape.circle,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF3A3A3A)),
+              ),
+            ),
+            const Icon(
+              LucideIcons.chevronRight,
+              size: 14,
+              color: Color(0xFF9A9A9A),
+            ),
+          ],
+        ),
       ),
     );
   }

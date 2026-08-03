@@ -59,6 +59,14 @@ func decodeItem(r *http.Request) (InventoryItem, [][]byte, error) {
 		return in, nil, errors.New("price must be a number")
 	}
 	in.Price = price
+	// Optional, unlike price: an item with no discount simply omits it.
+	if s := strings.TrimSpace(r.FormValue("mrp")); s != "" {
+		mrp, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return in, nil, errors.New("MRP must be a number")
+		}
+		in.MRP = mrp
+	}
 	if s := strings.TrimSpace(r.FormValue("stock")); s != "" {
 		stock, err := strconv.Atoi(s)
 		if err != nil {

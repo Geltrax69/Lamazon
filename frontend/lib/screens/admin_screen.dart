@@ -143,6 +143,7 @@ class _AdminHome extends StatefulWidget {
 
 class _AdminHomeState extends State<_AdminHome> {
   Map<String, dynamic>? _overview;
+  Map<String, dynamic>? _insights;
   List<dynamic> _stores = const [];
   List<dynamic> _riders = const [];
   List<dynamic> _orders = const [];
@@ -159,13 +160,19 @@ class _AdminHomeState extends State<_AdminHome> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final overview = await Api.instance.adminOverview();
-      final stores = await Api.instance.adminStores();
-      final riders = await Api.instance.riders();
-      final orders = await Api.instance.adminOrders();
+      // Five independent reads. In series this was five round trips of
+      // waiting before anything drew.
+      final (overview, insights, stores, riders, orders) = await (
+        Api.instance.adminOverview(),
+        Api.instance.adminInsights(),
+        Api.instance.adminStores(),
+        Api.instance.riders(),
+        Api.instance.adminOrders(),
+      ).wait;
       if (!mounted) return;
       setState(() {
         _overview = overview;
+        _insights = insights;
         _stores = stores;
         _riders = riders;
         _orders = orders;
@@ -618,6 +625,8 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.approved: _storesWith('approved').length,
     _Tab.rejected: _storesWith('rejected').length,
     _Tab.orders: _orders.length,
+    _Tab.insights:
+        (_insights?['topStores'] as List?)?.length ?? 0,
     _Tab.delivery: _riders.length,
     _Tab.people: (_overview?['people'] as List?)?.length ?? 0,
   };
@@ -693,6 +702,72 @@ class _AdminHomeState extends State<_AdminHome> {
               ),
         ];
 
+      case _Tab.insights:
+        final stores = (_insights?['topStores'] as List<dynamic>? ?? const [])
+            .cast<Map<String, dynamic>>();
+        final items = (_insights?['topItems'] as List<dynamic>? ?? const [])
+            .cast<Map<String, dynamic>>();
+        final totals =
+            _insights?['totals'] as Map<String, dynamic>? ?? const {};
+        return [
+          const _Note(
+            'Rejected orders are left out: a shop turning work away is '
+            'not a shop selling. Revenue counts delivered orders only.',
+          ),
+          Row(
+            children: [
+              _Stat(
+                label: 'Orders placed',
+                value: '${totals['placed'] ?? 0}',
+              ),
+              const SizedBox(width: 10),
+              _Stat(
+                label: 'Delivered',
+                value: '${totals['delivered'] ?? 0}',
+                color: _green,
+              ),
+              const SizedBox(width: 10),
+              _Stat(
+                label: 'Revenue',
+                value: '₹${((totals['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const _InsightHeading('Stores by orders'),
+          if (stores.isEmpty)
+            const _Empty('No orders yet, so nothing to rank.')
+          else
+            for (final (i, s) in stores.indexed)
+              _RankRow(
+                rank: i + 1,
+                title: s['name'] as String? ?? '',
+                subtitle:
+                    '${s['units']} units · ${s['delivered']} delivered',
+                trailing: '${s['orders']} orders',
+                note: '₹${((s['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                // The bar is read against the top row, not against a total:
+                // "half of what the leader does" is the comparison an admin
+                // actually makes.
+                fraction: _share(s['orders'], stores.first['orders']),
+              ),
+          const SizedBox(height: 22),
+          const _InsightHeading('Most ordered items'),
+          if (items.isEmpty)
+            const _Empty('No orders yet, so nothing to rank.')
+          else
+            for (final (i, it) in items.indexed)
+              _RankRow(
+                rank: i + 1,
+                title: it['title'] as String? ?? '',
+                subtitle:
+                    '${it['store']} · ${it['orders']} orders',
+                trailing: '${it['units']} units',
+                note: '₹${((it['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                fraction: _share(it['units'], items.first['units']),
+              ),
+        ];
+
       case _Tab.delivery:
         return [
           Row(
@@ -740,6 +815,183 @@ class _AdminHomeState extends State<_AdminHome> {
   }
 }
 
+/// Share of the leader, clamped. The top row is always a full bar, and a zero
+/// leader (no orders at all) gives zero rather than a divide by zero.
+double _share(Object? value, Object? top) {
+  final v = (value as num?)?.toDouble() ?? 0;
+  final t = (top as num?)?.toDouble() ?? 0;
+  if (t <= 0) return 0;
+  return (v / t).clamp(0, 1).toDouble();
+}
+
+class _InsightHeading extends StatelessWidget {
+  final String text;
+  const _InsightHeading(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+    ),
+  );
+}
+
+/// One headline number.
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  const _Stat({required this.label, required this.value, this.color});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          FittedBox(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: color ?? _ink,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11.5, color: _muted),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// A leaderboard line: position, what it is, and a bar the length of its
+/// share of the leader. The bar is what makes a list of numbers a ranking you
+/// can read without doing the arithmetic.
+class _RankRow extends StatelessWidget {
+  final int rank;
+  final String title;
+  final String subtitle;
+  final String trailing;
+  final String note;
+  final double fraction;
+  const _RankRow({
+    required this.rank,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.note,
+    required this.fraction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                margin: const EdgeInsets.only(right: 10),
+                decoration: BoxDecoration(
+                  // The top three are the answer to "who is winning"; the
+                  // rest are context.
+                  color: rank <= 3
+                      ? _ink
+                      : const Color(0xFFE8E8E4),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: rank <= 3 ? Colors.white : _muted,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: _muted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    trailing,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    note,
+                    style: const TextStyle(fontSize: 11.5, color: _muted),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 5,
+              backgroundColor: const Color(0xFFEDEDE9),
+              valueColor: AlwaysStoppedAnimation(
+                rank == 1 ? _green : _ink.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The sections of the panel, in the order they matter: what needs a decision
 /// first, then what has been decided, then the day-to-day.
 enum _Tab {
@@ -747,6 +999,7 @@ enum _Tab {
   approved('Approved'),
   rejected('Rejected'),
   orders('Orders'),
+  insights('Insights'),
   delivery('Delivery'),
   people('People');
 

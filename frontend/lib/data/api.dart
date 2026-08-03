@@ -437,6 +437,11 @@ class Api {
   Future<Map<String, dynamic>> adminOverview() =>
       _staffCall(StaffSession.admin, 'GET', '/api/admin/overview');
 
+  /// Leaderboards, computed server-side: ranking a thousand orders is the
+  /// database's job, not the phone's.
+  Future<Map<String, dynamic>> adminInsights() =>
+      _staffCall(StaffSession.admin, 'GET', '/api/admin/insights');
+
   Future<List<dynamic>> adminStores({String status = ''}) async {
     final body = await _staffCall(
       StaffSession.admin,
@@ -554,6 +559,9 @@ class Api {
   Future<Map<String, dynamic>> riderOrders() =>
       _staffCall(StaffSession.rider, 'GET', '/api/delivery/orders');
 
+  Future<Map<String, dynamic>> riderHistory() =>
+      _staffCall(StaffSession.rider, 'GET', '/api/delivery/history');
+
   Future<void> riderPick(String id) =>
       _staffCall(StaffSession.rider, 'POST', '/api/delivery/orders/$id/pick');
 
@@ -571,6 +579,7 @@ class Api {
           description: r['description'] as String? ?? '',
           category: r['category'] as String? ?? '',
           price: (r['price'] as num?)?.toDouble() ?? 0,
+          mrp: (r['mrp'] as num?)?.toDouble() ?? 0,
           stock: (r['stock'] as num?)?.toInt() ?? 0,
         )
         ..serverId = r['id'] as String
@@ -604,6 +613,7 @@ class Api {
     required String category,
     required double price,
     required int stock,
+    double mrp = 0,
     List<Uint8List> photos = const [],
   }) async {
     final body = await _send('/api/seller/items', {
@@ -611,6 +621,7 @@ class Api {
       'description': description,
       'category': category,
       'price': price,
+      'mrp': mrp,
       'stock': stock,
     }, photos);
     return (
@@ -682,6 +693,7 @@ class Api {
     category: r['category'] as String? ?? '',
     tab: r['tab'] as String? ?? 'All',
     price: (r['price'] as num).toDouble(),
+    mrp: (r['mrp'] as num?)?.toDouble() ?? 0,
     imageUrl: r['imageUrl'] as String? ?? '',
     store: r['store'] as String? ?? '',
     description: r['description'] as String? ?? '',

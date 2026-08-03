@@ -88,12 +88,34 @@ class _DetailsScreenState extends State<DetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            '₹${(p.price * _qty).toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                '₹${(p.price * _qty).toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (p.discounted) ...[
+                                const SizedBox(width: 8),
+                                // The struck-through figure follows the
+                                // stepper too, so the pair stays comparable
+                                // at any quantity.
+                                Text(
+                                  '₹${(p.mrp * _qty).toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Color(0xFF8A8A8A),
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationColor: Color(0xFF8A8A8A),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                DiscountBadge(percent: p.discountPercent),
+                              ],
+                            ],
                           ),
                           Text(
                             _qty == 1

@@ -166,6 +166,13 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	case in.Stock < 0:
 		writeError(w, http.StatusBadRequest, "stock cannot be negative")
 		return
+	// An MRP below the selling price is a markup wearing a discount's badge.
+	// Checked here as well as in the schema so the seller gets a sentence
+	// instead of a constraint violation.
+	case in.MRP != 0 && in.MRP < in.Price:
+		writeError(w, http.StatusBadRequest,
+			"MRP cannot be below the selling price")
+		return
 	}
 
 	// Photos are named after the store, which the gate above already read.
@@ -188,9 +195,11 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 
 	// The id comes from the sequence, so concurrent adds cannot collide.
 	err = a.db.sql.QueryRowContext(r.Context(), `
-		INSERT INTO inventory_items (owner, title, description, category, price, stock, image_urls)
-		VALUES ($1,$2,$3,$4,$5,$6,$7::text[]) RETURNING id`,
-		a.owner(r), in.Title, in.Description, in.Category, in.Price, in.Stock, in.ImageURLs).
+		INSERT INTO inventory_items
+			(owner, title, description, category, price, mrp, stock, image_urls)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id`,
+		a.owner(r), in.Title, in.Description, in.Category, in.Price, in.MRP,
+		in.Stock, in.ImageURLs).
 		Scan(&in.ID)
 	// The foreign key is what enforces "no stock without a store".
 	var pgErr *pgconn.PgError
@@ -228,13 +237,13 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	case in.Stock != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
 		         WHERE id = $1 AND owner = $3
-		         RETURNING id, title, description, category, price, stock,
+		         RETURNING id, title, description, category, price, mrp, stock,
 		         array_to_string(image_urls, E'\n')`
 		arg = *in.Stock
 	case in.Delta != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
 		         WHERE id = $1 AND owner = $3
-		         RETURNING id, title, description, category, price, stock,
+		         RETURNING id, title, description, category, price, mrp, stock,
 		         array_to_string(image_urls, E'\n')`
 		arg = *in.Delta
 	default:
@@ -245,7 +254,8 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	var it InventoryItem
 	var urls string
 	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg, a.owner(r)).Scan(
-		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.Stock, &urls)
+		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.MRP,
+		&it.Stock, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
 		return

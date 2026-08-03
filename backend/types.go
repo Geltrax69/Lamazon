@@ -9,6 +9,10 @@ type Product struct {
 	Category string  `json:"category"`
 	Tab      string  `json:"tab"`
 	Price    float64 `json:"price"`
+	// What it cost before the discount. Zero means there is no discount to
+	// show — not a free item — so the badge and the struck-through line are
+	// both driven off "is this above price", never off "is this set".
+	MRP      float64 `json:"mrp,omitempty"`
 	ImageURL string  `json:"imageUrl"`
 	// Every photo, in upload order. A seller's item can carry several; the
 	// seeded rows have one. imageUrl stays the cover so old callers still work.
@@ -51,6 +55,7 @@ type InventoryItem struct {
 	Description string   `json:"description"`
 	Category    string   `json:"category"`
 	Price       float64  `json:"price"`
+	MRP         float64  `json:"mrp"` // 0 when the seller is not running a discount
 	Stock       int      `json:"stock"`
 	Status      string   `json:"status"`    // derived from stock, never stored
 	ImageURLs   []string `json:"imageUrls"` // Cloudinary, in upload order
@@ -103,6 +108,10 @@ type Order struct {
 	// the order: a shop that moves should move for orders already in flight,
 	// which is the opposite of what we want for the delivery address.
 	StoreAddress string `json:"storeAddress,omitempty"`
+
+	// When it was handed over. Nil until it is, which is what the rider's
+	// history sorts and groups on.
+	DeliveredAt *time.Time `json:"deliveredAt,omitempty"`
 
 	ReceiverName    string `json:"receiverName,omitempty"`
 	ReceiverPhone   string `json:"receiverPhone,omitempty"`

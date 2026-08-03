@@ -294,6 +294,108 @@ func (a *API) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/admin/insights — who is actually selling. Two leaderboards: stores
+// by the orders placed on them, and items by the units that moved.
+//
+// Rejected orders are left out of both. They are a shopper's intent and a
+// shop's refusal, not a sale, and counting them would rank a store that turns
+// everything away alongside one that ships.
+func (a *API) handleAdminInsights(w http.ResponseWriter, r *http.Request) {
+	type storeRow struct {
+		Name      string  `json:"name"`
+		Orders    int     `json:"orders"`
+		Units     int     `json:"units"`
+		Revenue   float64 `json:"revenue"`
+		Delivered int     `json:"delivered"`
+	}
+	stores := make([]storeRow, 0)
+	rows, err := a.db.sql.QueryContext(r.Context(), `
+		SELECT store_name, count(*), COALESCE(sum(units), 0),
+		       COALESCE(sum(amount), 0),
+		       count(*) FILTER (WHERE stage = 'delivered')
+		FROM orders
+		WHERE stage <> 'rejected' AND store_name <> ''
+		GROUP BY store_name
+		ORDER BY count(*) DESC, sum(amount) DESC
+		LIMIT 10`)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for rows.Next() {
+		var s storeRow
+		if err := rows.Scan(&s.Name, &s.Orders, &s.Units, &s.Revenue,
+			&s.Delivered); err != nil {
+			rows.Close()
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		stores = append(stores, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type itemRow struct {
+		Title   string  `json:"title"`
+		Store   string  `json:"store"`
+		Units   int     `json:"units"`
+		Orders  int     `json:"orders"`
+		Revenue float64 `json:"revenue"`
+	}
+	items := make([]itemRow, 0)
+	// Grouped by title and store, not by item_id: a seller who relists the
+	// same thing should not split their own bestseller into two rows.
+	rows, err = a.db.sql.QueryContext(r.Context(), `
+		SELECT item_title, store_name, COALESCE(sum(units), 0), count(*),
+		       COALESCE(sum(amount), 0)
+		FROM orders
+		WHERE stage <> 'rejected'
+		GROUP BY item_title, store_name
+		ORDER BY sum(units) DESC, count(*) DESC
+		LIMIT 10`)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var it itemRow
+		if err := rows.Scan(&it.Title, &it.Store, &it.Units, &it.Orders,
+			&it.Revenue); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var placed, delivered, rejected int
+	var revenue float64
+	a.db.sql.QueryRowContext(r.Context(), `
+		SELECT count(*) FILTER (WHERE stage <> 'rejected'),
+		       count(*) FILTER (WHERE stage = 'delivered'),
+		       count(*) FILTER (WHERE stage = 'rejected'),
+		       COALESCE(sum(amount) FILTER (WHERE stage = 'delivered'), 0)
+		FROM orders`).Scan(&placed, &delivered, &rejected, &revenue)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"topStores": stores,
+		"topItems":  items,
+		"totals": map[string]any{
+			"placed":    placed,
+			"delivered": delivered,
+			"rejected":  rejected,
+			"revenue":   revenue,
+		},
+	})
+}
+
 // GET /api/admin/stores?status=pending — the review queue, or everything.
 func (a *API) handleAdminStores(w http.ResponseWriter, r *http.Request) {
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
@@ -842,6 +944,53 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 		"orders":    out,
 		"carrying":  countStage(out, StagePicked),
 		"available": countStage(out, StageAccepted),
+	})
+}
+
+// GET /api/delivery/history — what this rider has already handed over, newest
+// first. Their own only: the panel is a record of your round, not a league
+// table, and another rider's addresses are none of your business.
+func (a *API) handleRiderHistory(w http.ResponseWriter, r *http.Request) {
+	phone := a.staffOf(r)
+	rows, err := a.db.sql.QueryContext(r.Context(), `
+		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		       o.store_name,
+		       trim(both ', ' FROM concat_ws(', ', s.location, s.city)),
+		       o.receiver_name, o.receiver_phone, o.receiver_address,
+		       o.delivered_at
+		FROM orders o
+		LEFT JOIN seller_stores s ON s.owner = o.store_owner
+		WHERE o.stage = 'delivered' AND o.rider_phone = $1
+		-- delivered_at is null on rows that predate the column; they still
+		-- belong in the list, just at the bottom where their age puts them.
+		ORDER BY o.delivered_at DESC NULLS LAST, o.placed_at DESC
+		LIMIT 100`, phone)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+
+	out := make([]Order, 0)
+	var earned float64
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+			&o.PlacedAt, &o.StoreName, &o.StoreAddress, &o.ReceiverName,
+			&o.ReceiverPhone, &o.ReceiverAddress, &o.DeliveredAt); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		earned += o.Amount
+		out = append(out, o)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"orders": out,
+		"value":  earned,
 	})
 }
 

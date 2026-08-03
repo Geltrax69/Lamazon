@@ -148,13 +148,17 @@ type productFilter struct {
 // out rather than shown as unavailable.
 const productQuery = `
 	WITH catalogue AS (
-		SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
+		SELECT p.id, p.name, p.category, p.tab, p.price,
+		       -- The seeded catalogue has no discounts, and a zero here is
+		       -- what tells the app to show a plain price.
+		       0::numeric AS mrp,
+		       p.image_url, p.store,
 		       p.description, p.image_url AS photos
 		FROM products p
 		UNION ALL
 		SELECT i.id, i.title, COALESCE(NULLIF(i.category, ''), 'Food'),
 		       COALESCE(NULLIF(i.category, ''), 'Food'),
-		       i.price,
+		       i.price, i.mrp,
 		       COALESCE(i.image_urls[1], ''), s.name, i.description,
 		       -- every photo, not just the cover: the details gallery shows
 		       -- all of them, and dropping them here lost the rest silently.
@@ -165,8 +169,8 @@ const productQuery = `
 		-- real to its owner and to the admin, and to nobody else.
 		WHERE i.stock > 0 AND s.status = 'approved'
 	)
-	SELECT p.id, p.name, p.category, p.tab, p.price, p.image_url, p.store,
-	       p.description, p.photos,
+	SELECT p.id, p.name, p.category, p.tab, p.price, p.mrp, p.image_url,
+	       p.store, p.description, p.photos,
 	       COALESCE((SELECT json_agg(json_build_object('store', o.store, 'price', o.price)
 	                                 ORDER BY o.store)
 	                 FROM offers o WHERE o.product_id = p.id), '[]')
@@ -196,7 +200,8 @@ func (d *DB) products(ctx context.Context, f productFilter) ([]Product, error) {
 		var offers []byte
 		var photos string
 		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Tab, &p.Price,
-			&p.ImageURL, &p.Store, &p.Description, &photos, &offers); err != nil {
+			&p.MRP, &p.ImageURL, &p.Store, &p.Description, &photos,
+			&offers); err != nil {
 			return nil, err
 		}
 		p.ImageURLs = splitURLs(photos)
@@ -278,7 +283,7 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 // rather than stored — one less column that can drift out of sync.
 func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
-		SELECT id, title, description, category, price, stock,
+		SELECT id, title, description, category, price, mrp, stock,
 		       array_to_string(image_urls, E'\n')
 		FROM inventory_items WHERE owner = $1 ORDER BY id DESC`, owner)
 	if err != nil {
@@ -291,7 +296,7 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 		var i InventoryItem
 		var urls string
 		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
-			&i.Price, &i.Stock, &urls); err != nil {
+			&i.Price, &i.MRP, &i.Stock, &urls); err != nil {
 			return nil, err
 		}
 		i.Status = stockStatus(i.Stock)

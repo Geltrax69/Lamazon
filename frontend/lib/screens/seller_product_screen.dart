@@ -28,6 +28,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   late final _price = TextEditingController(
     text: widget.existing?.price.toStringAsFixed(0),
   );
+  // Blank rather than "0" when there is no discount: a zero in the box reads
+  // as a price the seller has to clear before typing.
+  late final _mrp = TextEditingController(
+    text: (widget.existing?.mrp ?? 0) > 0
+        ? widget.existing!.mrp.toStringAsFixed(0)
+        : '',
+  );
   late final _stock = TextEditingController(
     text: widget.existing?.stock.toString(),
   );
@@ -41,6 +48,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     _title.dispose();
     _desc.dispose();
     _price.dispose();
+    _mrp.dispose();
     _stock.dispose();
     super.dispose();
   }
@@ -48,12 +56,68 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   double? get _priceValue => double.tryParse(_price.text.trim());
   int? get _stockValue => int.tryParse(_stock.text.trim());
 
+  /// Empty means no discount, which is different from a typo. A blank box
+  /// gives 0; anything unparseable gives null, and the blocker catches it.
+  double? get _mrpValue {
+    final text = _mrp.text.trim();
+    if (text.isEmpty) return 0;
+    return double.tryParse(text);
+  }
+
+  int get _percentOff {
+    final mrp = _mrpValue ?? 0, price = _priceValue ?? 0;
+    if (mrp <= price || mrp <= 0) return 0;
+    return (((mrp - price) / mrp) * 100).round();
+  }
+
   String? get _blocker {
     if (_photos.isEmpty) return 'Add at least one photo';
     if (_title.text.trim().isEmpty) return 'Give the product a title';
     if ((_priceValue ?? 0) <= 0) return 'Set a price above ₹0';
+    if (_mrpValue == null) return 'MRP must be a number, or left blank';
+    if (_mrpValue! > 0 && _mrpValue! < (_priceValue ?? 0)) {
+      return 'MRP cannot be below the selling price';
+    }
     if ((_stockValue ?? -1) < 0) return 'Enter how many units you have';
     return null;
+  }
+
+  /// The percentage is never typed, only shown: it is the one number here
+  /// that is a consequence of the other two rather than a decision.
+  Widget _discountNote() {
+    final mrp = _mrpValue ?? 0, price = _priceValue ?? 0;
+    if (mrp <= 0 || price <= 0) return const SizedBox.shrink();
+    final bad = mrp < price;
+    final same = mrp == price;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          Icon(
+            bad ? LucideIcons.circleAlert : LucideIcons.badgePercent,
+            size: 14,
+            color: bad ? _amber : const Color(0xFF1B7F3B),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              bad
+                  ? 'MRP is below your selling price — buyers would see a '
+                        'markup, not a discount.'
+                  : same
+                  ? 'Same as the selling price, so no discount is shown.'
+                  : 'Buyers see $_percentOff% OFF — '
+                        '₹${(mrp - price).toStringAsFixed(0)} saved.',
+              style: TextStyle(
+                fontSize: 12,
+                color: bad ? _amber : _muted,
+                fontWeight: bad ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _save() {
@@ -66,6 +130,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           description: _desc.text.trim(),
           category: _category,
           price: _priceValue!,
+          mrp: _mrpValue!,
           stock: _stockValue!,
           photos: _photos,
         ),
@@ -76,6 +141,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         ..description = _desc.text.trim()
         ..category = _category
         ..price = _priceValue!
+        ..mrp = _mrpValue!
         ..stock = _stockValue!
         ..photos = _photos;
       Seller.instance.itemChanged();
@@ -128,6 +194,9 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       onChanged: () => setState(() {}),
                     ),
                     const SizedBox(height: 22),
+                    // MRP beside the selling price, because the discount is
+                    // the relationship between them and reading it means
+                    // seeing both at once.
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -135,10 +204,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SellerSection(title: 'Price'),
+                              const SellerSection(
+                                title: 'MRP',
+                                hint: 'Optional',
+                              ),
                               SellerField(
-                                controller: _price,
-                                icon: LucideIcons.indianRupee,
+                                controller: _mrp,
+                                icon: LucideIcons.tag,
                                 hint: '0',
                                 keyboard: TextInputType.number,
                                 onChanged: () => setState(() {}),
@@ -151,11 +223,14 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SellerSection(title: 'Stock'),
+                              const SellerSection(
+                                title: 'Selling price',
+                                hint: 'What they pay',
+                              ),
                               SellerField(
-                                controller: _stock,
-                                icon: LucideIcons.boxes,
-                                hint: 'units',
+                                controller: _price,
+                                icon: LucideIcons.indianRupee,
+                                hint: '0',
                                 keyboard: TextInputType.number,
                                 onChanged: () => setState(() {}),
                               ),
@@ -163,6 +238,16 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    _discountNote(),
+                    const SizedBox(height: 22),
+                    const SellerSection(title: 'Stock'),
+                    SellerField(
+                      controller: _stock,
+                      icon: LucideIcons.boxes,
+                      hint: 'units',
+                      keyboard: TextInputType.number,
+                      onChanged: () => setState(() {}),
                     ),
                     if ((_stockValue ?? 1) == 0) ...[
                       const SizedBox(height: 10),

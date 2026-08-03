@@ -65,6 +65,9 @@ class InventoryItem {
   String description;
   String category;
   double price;
+  /// Price before the discount, 0 when the seller is not running one. Never
+  /// below price — the server rejects that, and so does the form.
+  double mrp;
   int stock;
   List<Uint8List> photos; // first one is the cover
 
@@ -79,11 +82,16 @@ class InventoryItem {
     required this.description,
     required this.category,
     required this.price,
+    this.mrp = 0,
     required this.stock,
     this.photos = const [],
   });
 
   Uint8List? get cover => photos.isEmpty ? null : photos.first;
+
+  bool get discounted => mrp > price;
+  int get discountPercent =>
+      discounted ? (((mrp - price) / mrp) * 100).round() : 0;
 
   StockStatus get status => stock <= 0
       ? StockStatus.out
@@ -257,6 +265,7 @@ class Seller extends ChangeNotifier {
         description: item.description,
         category: item.category,
         price: item.price,
+        mrp: item.mrp,
         stock: item.stock,
         photos: item.photos,
       );

@@ -152,8 +152,10 @@ class _DeliveryHome extends StatefulWidget {
 
 class _DeliveryHomeState extends State<_DeliveryHome> {
   Map<String, dynamic>? _panel;
+  Map<String, dynamic>? _history;
   String? _error;
   bool _loading = true;
+  bool _showHistory = false;
 
   @override
   void initState() {
@@ -164,10 +166,16 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final panel = await Api.instance.riderOrders();
+      // Both at once: the history is a second query, not a second screen, and
+      // waiting for it in series would show a stale run for no reason.
+      final (panel, history) = await (
+        Api.instance.riderOrders(),
+        Api.instance.riderHistory(),
+      ).wait;
       if (mounted) {
         setState(() {
           _panel = panel;
+          _history = history;
           _error = null;
         });
       }
@@ -417,6 +425,13 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                       action: 'Picked up',
                       onAction: () => _pick(o['id'] as String),
                     ),
+                const SizedBox(height: 24),
+                _HistorySection(
+                  history: _history,
+                  expanded: _showHistory,
+                  onToggle: () =>
+                      setState(() => _showHistory = !_showHistory),
+                ),
               ],
             ),
           ),
@@ -537,6 +552,155 @@ class _OrderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What this rider has already handed over. Collapsed by default: the panel
+/// is for the round in front of you, and a hundred finished drops above the
+/// fold would bury it.
+class _HistorySection extends StatelessWidget {
+  final Map<String, dynamic>? history;
+  final bool expanded;
+  final VoidCallback onToggle;
+  const _HistorySection({
+    required this.history,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final orders = (history?['orders'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final value = (history?['value'] as num?)?.toDouble() ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const _Heading('Delivery history'),
+                const SizedBox(width: 8),
+                Icon(
+                  expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                  size: 17,
+                  color: _muted,
+                ),
+                const Spacer(),
+                Text(
+                  orders.isEmpty
+                      ? 'None yet'
+                      : '${orders.length} · ₹${value.toStringAsFixed(0)}',
+                  style: const TextStyle(fontSize: 12.5, color: _muted),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded) ...[
+          const SizedBox(height: 8),
+          if (orders.isEmpty)
+            const _Empty('Nothing delivered yet. Finished drops land here.')
+          else
+            for (final o in orders) _HistoryRow(order: o),
+        ],
+      ],
+    );
+  }
+}
+
+/// A finished drop, at a glance. No buttons: nothing about it can change any
+/// more, and a row that cannot act should not look like one that can.
+class _HistoryRow extends StatelessWidget {
+  final Map<String, dynamic> order;
+  const _HistoryRow({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final when = DateTime.tryParse(order['deliveredAt'] as String? ?? '');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2, right: 10),
+            child: Icon(LucideIcons.circleCheckBig, size: 16, color: _green),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '#${(order['id'] as String).toUpperCase()} · '
+                  '${order['units']} × ${order['itemTitle']}',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${order['storeName']} → ${order['receiverName']}',
+                  style: const TextStyle(fontSize: 12.5, color: _muted),
+                ),
+                Text(
+                  '${order['receiverAddress']}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.3,
+                    color: _muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹${(order['amount'] as num).toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: _green,
+                ),
+              ),
+              if (when != null)
+                Text(
+                  _shortDate(when.toLocal()),
+                  style: const TextStyle(fontSize: 11.5, color: _muted),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+const _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/// ponytail: "3 Aug, 18:40" by hand rather than pulling in intl for one line.
+/// Swap it for DateFormat if the panel ever needs a second locale.
+String _shortDate(DateTime d) {
+  final hh = d.hour.toString().padLeft(2, '0');
+  final mm = d.minute.toString().padLeft(2, '0');
+  return '${d.day} ${_months[d.month - 1]}, $hh:$mm';
 }
 
 /// One end of the run: where to go, and who is there. The address is what the

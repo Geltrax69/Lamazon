@@ -38,6 +38,15 @@ class ProductCard extends StatelessWidget {
                   right: 10,
                   child: WishlistHeart(productId: product.id),
                 ),
+                // Bottom-left, where it sits over the image rather than over
+                // the product: the top corners are the heart's and the part
+                // of a photo people frame their subject in.
+                if (product.discounted)
+                  Positioned(
+                    left: 10,
+                    bottom: 10,
+                    child: DiscountBadge(percent: product.discountPercent),
+                  ),
               ],
             ),
           ),
@@ -59,13 +68,7 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '₹${product.price.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
+                    PriceLine(product: product),
                   ],
                 ),
               ),
@@ -74,6 +77,67 @@ class ProductCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The saving, as a shopper reads it. One shape everywhere it appears, so a
+/// card, a details page and a cart line cannot drift apart.
+class DiscountBadge extends StatelessWidget {
+  final int percent;
+  final double fontSize;
+  const DiscountBadge({super.key, required this.percent, this.fontSize = 11});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: fontSize * 0.7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD32F2F),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$percent% OFF',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+/// Price, with the old one struck through beside it when there is a discount.
+/// Wraps rather than ellipsising: on a narrow card the saving is the point,
+/// and half a struck-through number reads as a mistake.
+class PriceLine extends StatelessWidget {
+  final Product product;
+  final double fontSize;
+  const PriceLine({super.key, required this.product, this.fontSize = 15});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      children: [
+        Text(
+          '₹${product.price.toStringAsFixed(0)}',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: fontSize),
+        ),
+        if (product.discounted)
+          Text(
+            '₹${product.mrp.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: fontSize - 2,
+              color: const Color(0xFF8A8A8A),
+              decoration: TextDecoration.lineThrough,
+              decorationColor: const Color(0xFF8A8A8A),
+            ),
+          ),
+      ],
     );
   }
 }
