@@ -49,3 +49,11 @@ backend/backend
 
 # Local secrets (Cloudinary). Never commit.
 .env
+.firebase-service-account.json
+
+# Not frontend/web/firebase-env.js — that one is the Firebase *web* config,
+# which ships inside the JS bundle anyway. Ignoring it only meant Vercel built
+# without it and served index.html in its place, so push never initialised.
+
+# Playwright MCP scratch output
+.playwright-mcp/

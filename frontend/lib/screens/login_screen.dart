@@ -55,11 +55,16 @@ class _LoginScreenState extends State<LoginScreen> {
     } on http.ClientException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
-      // Offline: the app still works on bundled data, so let people browse.
+      // Say so. This used to wave the person through as a guest, on the
+      // theory that browsing beats a dead end — but from where they sit,
+      // asking for a code and being handed the shop with no code and no
+      // message is indistinguishable from the button not working.
       logApiFailure('login code', e);
-      Session.instance.skip();
-      _go();
-      return;
+      setState(
+        () => _error =
+            'Could not reach the server, so no code went out. Try again, or '
+            'use Skip login to browse.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -72,8 +77,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      final tokens = await Api.instance
-          .verifyLoginCode(_email.text.trim(), _code.text.trim());
+      final tokens = await Api.instance.verifyLoginCode(
+        _email.text.trim(),
+        _code.text.trim(),
+      );
       await Session.instance.signIn(tokens);
       _go();
     } on http.ClientException catch (e) {
@@ -256,8 +263,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                           : 'Enter email address',
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
+                                            vertical: 16,
+                                          ),
                                     ),
                                     style: const TextStyle(
                                       fontSize: 16,
@@ -292,8 +299,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _busy
                                     ? 'Please wait…'
                                     : _codeSent
-                                        ? 'Verify code'
-                                        : 'Send me a code',
+                                    ? 'Verify code'
+                                    : 'Send me a code',
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
