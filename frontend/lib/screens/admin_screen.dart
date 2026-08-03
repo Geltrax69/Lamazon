@@ -58,7 +58,9 @@ class _AdminLoginState extends State<_AdminLogin> {
     } catch (e) {
       // The server says "wrong username or password" and nothing more, on
       // purpose — repeat it rather than guessing which half was wrong.
-      setState(() => _error = e.toString().replaceFirst('ClientException: ', ''));
+      setState(
+        () => _error = e.toString().replaceFirst('ClientException: ', ''),
+      );
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -144,6 +146,7 @@ class _AdminHomeState extends State<_AdminHome> {
   List<dynamic> _stores = const [];
   List<dynamic> _riders = const [];
   List<dynamic> _orders = const [];
+  _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
 
@@ -170,8 +173,9 @@ class _AdminHomeState extends State<_AdminHome> {
       });
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _error = e.toString().replaceFirst('ClientException: ', ''));
+        setState(
+          () => _error = e.toString().replaceFirst('ClientException: ', ''),
+        );
       }
     }
     if (mounted) setState(() => _loading = false);
@@ -275,9 +279,11 @@ class _AdminHomeState extends State<_AdminHome> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(e.toString().replaceFirst('ClientException: ', '')),
-        ));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('ClientException: ', '')),
+          ),
+        );
     }
   }
 
@@ -325,18 +331,15 @@ class _AdminHomeState extends State<_AdminHome> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     final o = _overview;
-    final pending = _stores
-        .where((s) => (s as Map<String, dynamic>)['status'] == 'pending')
-        .toList();
+    final counts = _counts();
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
@@ -372,8 +375,10 @@ class _AdminHomeState extends State<_AdminHome> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!,
-                        style: const TextStyle(color: _red, fontSize: 13)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: _red, fontSize: 13),
+                    ),
                   ),
                 if (_loading && o == null)
                   const Padding(
@@ -381,98 +386,259 @@ class _AdminHomeState extends State<_AdminHome> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 if (o != null) ...[
+                  // The numbers are also the way in: tapping one opens the
+                  // list behind it, so a count is never a dead end.
                   Row(
                     children: [
-                      _Tile(label: 'Users', value: '${o['users']}'),
-                      const SizedBox(width: 10),
-                      _Tile(label: 'Sellers', value: '${o['sellers']}'),
+                      _Tile(
+                        label: 'People',
+                        value: '${o['users']}',
+                        onTap: () => _show(_Tab.people),
+                      ),
                       const SizedBox(width: 10),
                       _Tile(
-                        label: 'Awaiting review',
-                        value: '${o['pendingStores']}',
-                        color: (o['pendingStores'] as num) > 0 ? _amber : null,
+                        label: 'Sellers',
+                        value: '${o['sellers']}',
+                        onTap: () => _show(_Tab.approved),
+                      ),
+                      const SizedBox(width: 10),
+                      _Tile(
+                        label: 'To review',
+                        value: '${counts[_Tab.review]}',
+                        color: counts[_Tab.review]! > 0 ? _amber : null,
+                        onTap: () => _show(_Tab.review),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _Tile(label: 'Riders', value: '${o['riders']}'),
+                      _Tile(
+                        label: 'Riders',
+                        value: '${o['riders']}',
+                        onTap: () => _show(_Tab.delivery),
+                      ),
                       const SizedBox(width: 10),
-                      _Tile(label: 'Orders', value: '${o['orders']}'),
+                      _Tile(
+                        label: 'Orders',
+                        value: '${o['orders']}',
+                        onTap: () => _show(_Tab.orders),
+                      ),
                       const SizedBox(width: 10),
-                      const Spacer(),
+                      _Tile(
+                        label: 'Rejected',
+                        value: '${counts[_Tab.rejected]}',
+                        onTap: () => _show(_Tab.rejected),
+                      ),
                     ],
                   ),
                 ],
-                const SizedBox(height: 26),
-                _Heading('Stores awaiting review (${pending.length})'),
-                if (pending.isEmpty)
-                  const _Empty('Nothing waiting. Every store has been looked at.')
-                else
-                  for (final s in pending)
-                    _StoreCard(
-                      store: s as Map<String, dynamic>,
-                      onApprove: () => _approve(s['owner'] as String),
-                      onReject: () => _reject(s['owner'] as String),
-                    ),
-                const SizedBox(height: 26),
-                _Heading('All stores (${_stores.length})'),
-                for (final s in _stores)
-                  if ((s as Map<String, dynamic>)['status'] != 'pending')
-                    _StoreCard(
-                      store: s,
-                      onApprove: s['status'] == 'approved'
-                          ? null
-                          : () => _approve(s['owner'] as String),
-                      onReject: s['status'] == 'rejected'
-                          ? null
-                          : () => _reject(s['owner'] as String),
-                    ),
-                const SizedBox(height: 26),
-                Row(
-                  children: [
-                    Expanded(child: _Heading('Delivery (${_riders.length})')),
-                    TextButton.icon(
-                      onPressed: _addRider,
-                      icon: const Icon(LucideIcons.plus, size: 16),
-                      label: const Text('Add number'),
-                    ),
-                  ],
+                const SizedBox(height: 22),
+                // One list at a time. Six sections stacked down one page meant
+                // scrolling past everything to reach anything.
+                SizedBox(
+                  height: 38,
+                  child: ListView(
+                    key: const PageStorageKey('admin-tabs'),
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final tab in _Tab.values)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _Pill(
+                            label: '${tab.label} (${counts[tab]})',
+                            selected: _tab == tab,
+                            onTap: () => _show(tab),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                if (_riders.isEmpty)
-                  const _Empty('No delivery numbers yet.')
-                else
-                  for (final r in _riders)
-                    _RiderRow(
-                      rider: r as Map<String, dynamic>,
-                      onRemove: () async {
-                        await Api.instance.removeRider(r['phone'] as String);
-                        await _load();
-                      },
-                    ),
-                const SizedBox(height: 26),
-                _Heading('Orders (${_orders.length})'),
-                const _Note(
-                  'Accepted orders go to a rider automatically — whoever is '
-                  'carrying the least, picked at random between equals. '
-                  'Reassign only when someone does not turn up.',
-                ),
-                if (_orders.isEmpty)
-                  const _Empty('No orders yet.')
-                else
-                  for (final ord in _orders)
-                    _AdminOrderRow(
-                      order: ord as Map<String, dynamic>,
-                      riders: _riders,
-                      onAssign: () => _assign(ord),
-                    ),
-                const SizedBox(height: 26),
-                _Heading('People (${(o?['people'] as List?)?.length ?? 0})'),
-                for (final p in (o?['people'] as List<dynamic>? ?? const []))
-                  _PersonRow(person: p as Map<String, dynamic>),
+                const SizedBox(height: 16),
+                ..._section(),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _show(_Tab tab) => setState(() => _tab = tab);
+
+  List<Map<String, dynamic>> _storesWith(String status) => _stores
+      .cast<Map<String, dynamic>>()
+      .where((s) => s['status'] == status)
+      .toList();
+
+  Map<_Tab, int> _counts() => {
+    _Tab.review: _storesWith('pending').length,
+    _Tab.approved: _storesWith('approved').length,
+    _Tab.rejected: _storesWith('rejected').length,
+    _Tab.orders: _orders.length,
+    _Tab.delivery: _riders.length,
+    _Tab.people: (_overview?['people'] as List?)?.length ?? 0,
+  };
+
+  /// What the chosen button shows. Each branch is one list plus the line of
+  /// context it needs — the rules that are not visible in the rows themselves.
+  List<Widget> _section() {
+    switch (_tab) {
+      case _Tab.review:
+        final pending = _storesWith('pending');
+        return [
+          const _Note(
+            'A store stays invisible to shoppers, and its owner '
+            'cannot add stock, until it is approved here.',
+          ),
+          if (pending.isEmpty)
+            const _Empty('Nothing waiting. Every store has been looked at.')
+          else
+            for (final s in pending)
+              _StoreCard(
+                store: s,
+                onApprove: () => _approve(s['owner'] as String),
+                onReject: () => _reject(s['owner'] as String),
+              ),
+        ];
+
+      case _Tab.approved:
+        final live = _storesWith('approved');
+        return [
+          const _Note('Live on the shop page and taking orders.'),
+          if (live.isEmpty)
+            const _Empty('No approved stores yet.')
+          else
+            for (final s in live)
+              _StoreCard(
+                store: s,
+                onReject: () => _reject(s['owner'] as String),
+              ),
+        ];
+
+      case _Tab.rejected:
+        final out = _storesWith('rejected');
+        return [
+          const _Note(
+            'The seller sees the reason and can edit their store to '
+            'send it back for another look.',
+          ),
+          if (out.isEmpty)
+            const _Empty('Nothing rejected.')
+          else
+            for (final s in out)
+              _StoreCard(
+                store: s,
+                onApprove: () => _approve(s['owner'] as String),
+              ),
+        ];
+
+      case _Tab.orders:
+        return [
+          const _Note(
+            'Accepted orders go to a rider automatically — whoever '
+            'is carrying the least, picked at random between equals. '
+            'Reassign only when someone does not turn up.',
+          ),
+          if (_orders.isEmpty)
+            const _Empty('No orders yet.')
+          else
+            for (final ord in _orders.cast<Map<String, dynamic>>())
+              _AdminOrderRow(
+                order: ord,
+                riders: _riders,
+                onAssign: () => _assign(ord),
+              ),
+        ];
+
+      case _Tab.delivery:
+        return [
+          Row(
+            children: [
+              const Expanded(
+                child: _Note(
+                  'Riders sign in at /delivery with their number '
+                  'and the PIN issued when you add them.',
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _addRider,
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('Add number'),
+              ),
+            ],
+          ),
+          if (_riders.isEmpty)
+            const _Empty('No delivery numbers yet.')
+          else
+            for (final r in _riders.cast<Map<String, dynamic>>())
+              _RiderRow(
+                rider: r,
+                onRemove: () async {
+                  await Api.instance.removeRider(r['phone'] as String);
+                  await _load();
+                },
+              ),
+        ];
+
+      case _Tab.people:
+        final people = (_overview?['people'] as List<dynamic>? ?? const [])
+            .cast<Map<String, dynamic>>();
+        return [
+          const _Note(
+            'Everyone who has signed in. Selling is not a setting — '
+            'it follows from owning a store.',
+          ),
+          if (people.isEmpty)
+            const _Empty('Nobody has signed in yet.')
+          else
+            for (final p in people) _PersonRow(person: p),
+        ];
+    }
+  }
+}
+
+/// The sections of the panel, in the order they matter: what needs a decision
+/// first, then what has been decided, then the day-to-day.
+enum _Tab {
+  review('To review'),
+  approved('Approved'),
+  rejected('Rejected'),
+  orders('Orders'),
+  delivery('Delivery'),
+  people('People');
+
+  final String label;
+  const _Tab(this.label);
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Pill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? _ink : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : _muted,
           ),
         ),
       ),
@@ -487,15 +653,16 @@ class _StoreCard extends StatelessWidget {
   const _StoreCard({required this.store, this.onApprove, this.onReject});
 
   Color get _colour => switch (store['status']) {
-        'approved' => _green,
-        'rejected' => _red,
-        _ => _amber,
-      };
+    'approved' => _green,
+    'rejected' => _red,
+    _ => _amber,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final categories =
-        (store['categories'] as List<dynamic>? ?? const []).join(', ');
+    final categories = (store['categories'] as List<dynamic>? ?? const []).join(
+      ', ',
+    );
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -518,8 +685,7 @@ class _StoreCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: _colour.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -589,12 +755,12 @@ class _AdminOrderRow extends StatelessWidget {
   });
 
   Color get _colour => switch (order['stage']) {
-        'delivered' => _green,
-        'rejected' => _red,
-        'picked' => const Color(0xFF6A1B9A),
-        'accepted' => const Color(0xFF2F6FED),
-        _ => _amber,
-      };
+    'delivered' => _green,
+    'rejected' => _red,
+    'picked' => const Color(0xFF6A1B9A),
+    'accepted' => const Color(0xFF2F6FED),
+    _ => _amber,
+  };
 
   String _nameOf(String phone) {
     if (phone.isEmpty) return '';
@@ -671,8 +837,8 @@ class _AdminOrderRow extends StatelessWidget {
                   carrier.isNotEmpty
                       ? 'Carried by ${_nameOf(carrier)}'
                       : assigned.isNotEmpty
-                          ? 'Assigned to ${_nameOf(assigned)}'
-                          : 'Open to any rider',
+                      ? 'Assigned to ${_nameOf(assigned)}'
+                      : 'Open to any rider',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -748,34 +914,58 @@ class _PersonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = person['storeName'] as String? ?? '';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+    final seller = store.isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          // The badge sits on the same line as the address but cannot be
+          // pushed into it: a long address wraps inside its own half.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   person['email'] as String? ?? '',
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                Text(
-                  [
-                    person['id'],
-                    if ((person['name'] as String? ?? '').isNotEmpty)
-                      person['name'],
-                    if ((person['phone'] as String? ?? '').isNotEmpty)
-                      person['phone'],
-                    if (store.isNotEmpty) '$store (${person['storeStatus']})',
-                  ].join(' · '),
-                  style: const TextStyle(fontSize: 11.5, color: _muted),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (seller ? _green : _muted).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
-            ),
+                child: Text(
+                  seller ? 'Buyer + Seller' : 'Buyer',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: seller ? _green : _muted,
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 3),
           Text(
-            store.isEmpty ? 'Buyer' : 'Buyer + Seller',
+            [
+              person['id'],
+              if ((person['name'] as String? ?? '').isNotEmpty) person['name'],
+              if ((person['phone'] as String? ?? '').isNotEmpty)
+                person['phone'],
+              if (seller) '$store (${person['storeStatus']})',
+            ].join(' · '),
             style: const TextStyle(fontSize: 11.5, color: _muted),
           ),
         ],
@@ -788,68 +978,61 @@ class _Tile extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  const _Tile({required this.label, required this.value, this.color});
+  final VoidCallback? onTap;
+  const _Tile({
+    required this.label,
+    required this.value,
+    this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: color ?? _ink,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: color ?? _ink,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: _muted),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: _muted),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Heading extends StatelessWidget {
-  final String text;
-  const _Heading(this.text);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-      );
-}
-
-/// A line of explanation under a heading, for the rules that are not visible
-/// in the data itself.
 class _Note extends StatelessWidget {
   final String text;
   const _Note(this.text);
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 12, height: 1.4, color: _muted),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 12, height: 1.4, color: _muted),
+    ),
+  );
 }
 
 class _Empty extends StatelessWidget {
@@ -858,9 +1041,9 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
-      );
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
+  );
 }
 
 class _Field extends StatelessWidget {
