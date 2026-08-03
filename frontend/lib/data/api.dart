@@ -48,6 +48,11 @@ class Api {
   static const _timeout = Duration(seconds: 5);
   static const _uploadTimeout = Duration(seconds: 60);
 
+  /// Sign-in waits on the mail provider, not just on us, and the first send
+  /// after a cold start pays for DNS and TLS to it as well. Five seconds is
+  /// the budget for a database read; this one is somebody else's network.
+  static const _authTimeout = Duration(seconds: 20);
+
   Uri _url(String path, [Map<String, String>? query]) =>
       Uri.parse('$apiBaseUrl$path').replace(queryParameters: query);
 
@@ -111,7 +116,7 @@ class Api {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'email': email}),
         )
-        .timeout(_timeout);
+        .timeout(_authTimeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
   }
 
@@ -123,7 +128,7 @@ class Api {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'email': email, 'code': code}),
         )
-        .timeout(_timeout);
+        .timeout(_authTimeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     return AuthTokens.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
