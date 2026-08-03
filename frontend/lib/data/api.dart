@@ -32,11 +32,11 @@ class AuthTokens {
   });
 
   factory AuthTokens.fromJson(Map<String, dynamic> r) => AuthTokens(
-        email: r['email'] as String,
-        token: r['token'] as String,
-        refreshToken: r['refreshToken'] as String,
-        expiresIn: (r['expiresIn'] as num).toInt(),
-      );
+    email: r['email'] as String,
+    token: r['token'] as String,
+    refreshToken: r['refreshToken'] as String,
+    expiresIn: (r['expiresIn'] as num).toInt(),
+  );
 }
 
 /// Thin client over the Go API. ponytail: plain http + dartjson, no codegen
@@ -72,18 +72,22 @@ class Api {
   Future<List<Shop>> shops() async {
     final rows = await _getList('/api/shops');
     return rows
-        .map((r) => Shop(
-              name: r['name'] as String,
-              tagline: r['tagline'] as String? ?? '',
-              imageUrl: r['imageUrl'] as String? ?? '',
-              tab: r['tab'] as String? ?? 'All',
-            ))
+        .map(
+          (r) => Shop(
+            name: r['name'] as String,
+            tagline: r['tagline'] as String? ?? '',
+            imageUrl: r['imageUrl'] as String? ?? '',
+            tab: r['tab'] as String? ?? 'All',
+          ),
+        )
         .toList();
   }
 
   /// Everything one shop sells, priced at that shop.
   Future<List<Product>> shopProducts(String shop) async {
-    final rows = await _getList('/api/shops/${Uri.encodeComponent(shop)}/products');
+    final rows = await _getList(
+      '/api/shops/${Uri.encodeComponent(shop)}/products',
+    );
     return rows.map((r) => _product(r as Map<String, dynamic>)).toList();
   }
 
@@ -92,7 +96,8 @@ class Api {
         .get(_url('/api/locations/check', {'city': city}))
         .timeout(_timeout);
     if (res.statusCode != 200) return false;
-    return (jsonDecode(res.body) as Map<String, dynamic>)['serviceable'] == true;
+    return (jsonDecode(res.body) as Map<String, dynamic>)['serviceable'] ==
+        true;
   }
 
   // ---- Sign in ----------------------------------------------------------
@@ -101,9 +106,11 @@ class Api {
   /// reason (bad address, or a resend too soon after the last one).
   Future<void> requestLoginCode(String email) async {
     final res = await http
-        .post(_url('/api/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}))
+        .post(
+          _url('/api/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
   }
@@ -111,9 +118,11 @@ class Api {
   /// Trades the code for a token pair.
   Future<AuthTokens> verifyLoginCode(String email, String code) async {
     final res = await http
-        .post(_url('/api/login/verify'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email, 'code': code}))
+        .post(
+          _url('/api/login/verify'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email, 'code': code}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     return AuthTokens.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -123,9 +132,11 @@ class Api {
   /// token too, so whatever comes back replaces both.
   Future<AuthTokens> refreshSession(String refreshToken) async {
     final res = await http
-        .post(_url('/api/login/refresh'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': refreshToken}))
+        .post(
+          _url('/api/login/refresh'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'refreshToken': refreshToken}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     return AuthTokens.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -155,10 +166,12 @@ class Api {
 
   Future<void> updateMe({String? name, String? phone}) async {
     final res = await http
-        .patch(_url('/api/me'),
-            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
-            // Null means "leave it alone"; the backend COALESCEs on its side.
-            body: jsonEncode({'name': ?name, 'phone': ?phone}))
+        .patch(
+          _url('/api/me'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          // Null means "leave it alone"; the backend COALESCEs on its side.
+          body: jsonEncode({'name': ?name, 'phone': ?phone}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
   }
@@ -176,16 +189,18 @@ class Api {
   /// Returns the saved address, whose id comes from the server.
   Future<Address> addAddress(Address a) async {
     final res = await http
-        .post(_url('/api/addresses'),
-            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'label': a.label.title,
-              'line': a.line,
-              'city': a.city,
-              'pincode': a.pincode,
-              'name': a.name,
-              'phone': a.phone,
-            }))
+        .post(
+          _url('/api/addresses'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'label': a.label.title,
+            'line': a.line,
+            'city': a.city,
+            'pincode': a.pincode,
+            'name': a.name,
+            'phone': a.phone,
+          }),
+        )
         .timeout(_timeout);
     if (res.statusCode != 201) throw http.ClientException(_reason(res));
     return Address.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -205,15 +220,18 @@ class Api {
   Future<String> pushPublicKey() async {
     final res = await http.get(_url('/api/push/key')).timeout(_timeout);
     if (res.statusCode != 200) return '';
-    return (jsonDecode(res.body) as Map<String, dynamic>)['publicKey'] as String;
+    return (jsonDecode(res.body) as Map<String, dynamic>)['publicKey']
+        as String;
   }
 
   /// Files this browser under the signed-in address, so orders can reach it.
   Future<void> subscribeToPush(Map<String, dynamic> subscription) async {
     final res = await http
-        .post(_url('/api/push/subscribe'),
-            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
-            body: jsonEncode(subscription))
+        .post(
+          _url('/api/push/subscribe'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode(subscription),
+        )
         .timeout(_timeout);
     if (res.statusCode != 204) throw http.ClientException(_reason(res));
   }
@@ -254,8 +272,8 @@ class Api {
       photo: null, // the server holds a URL; the picked bytes are local only
       location: r['location'] as String? ?? '',
       city: r['city'] as String? ?? '',
-      categories:
-          (r['categories'] as List<dynamic>? ?? const []).cast<String>(),
+      categories: (r['categories'] as List<dynamic>? ?? const [])
+          .cast<String>(),
       status: r['status'] as String? ?? 'approved',
       rejectReason: r['rejectReason'] as String? ?? '',
     )..photoUrl = r['photoUrl'] as String? ?? '';
@@ -285,17 +303,17 @@ class Api {
   }
 
   SellerOrder _sellerOrder(Map<String, dynamic> r) => SellerOrder(
-        id: r['id'] as String,
-        itemId: r['itemId'] as String? ?? '',
-        itemTitle: r['itemTitle'] as String? ?? '',
-        units: (r['units'] as num?)?.toInt() ?? 1,
-        amount: (r['amount'] as num?)?.toDouble() ?? 0,
-        stage: stageFrom(r['stage'] as String?),
-        receiverName: r['receiverName'] as String? ?? '',
-        receiverPhone: r['receiverPhone'] as String? ?? '',
-        receiverAddress: r['receiverAddress'] as String? ?? '',
-        rejectReason: r['rejectReason'] as String? ?? '',
-      );
+    id: r['id'] as String,
+    itemId: r['itemId'] as String? ?? '',
+    itemTitle: r['itemTitle'] as String? ?? '',
+    units: (r['units'] as num?)?.toInt() ?? 1,
+    amount: (r['amount'] as num?)?.toDouble() ?? 0,
+    stage: stageFrom(r['stage'] as String?),
+    receiverName: r['receiverName'] as String? ?? '',
+    receiverPhone: r['receiverPhone'] as String? ?? '',
+    receiverAddress: r['receiverAddress'] as String? ?? '',
+    rejectReason: r['rejectReason'] as String? ?? '',
+  );
 
   /// The shop taking the order on. The backend generates the buyer's delivery
   /// code here, so the answer is authoritative — the app never invents one.
@@ -303,8 +321,9 @@ class Api {
       _sellerOrder(await _post('/api/seller/orders/$id/accept'));
 
   Future<SellerOrder> rejectOrder(String id, String reason) async =>
-      _sellerOrder(await _post('/api/seller/orders/$id/reject',
-          body: {'reason': reason}));
+      _sellerOrder(
+        await _post('/api/seller/orders/$id/reject', body: {'reason': reason}),
+      );
 
   // ---- Buying ------------------------------------------------------------
 
@@ -315,11 +334,15 @@ class Api {
     int units = 1,
     String addressId = '',
   }) async {
-    final body = await _post('/api/orders', body: {
-      'itemId': itemId,
-      'units': units,
-      if (addressId.isNotEmpty) 'addressId': addressId,
-    }, expect: 201);
+    final body = await _post(
+      '/api/orders',
+      body: {
+        'itemId': itemId,
+        'units': units,
+        if (addressId.isNotEmpty) 'addressId': addressId,
+      },
+      expect: 201,
+    );
     return MyOrder.fromJson(body);
   }
 
@@ -336,12 +359,17 @@ class Api {
   }
 
   /// One shape for the small JSON POSTs that carry a session.
-  Future<Map<String, dynamic>> _post(String path,
-      {Map<String, Object?> body = const {}, int expect = 200}) async {
+  Future<Map<String, dynamic>> _post(
+    String path, {
+    Map<String, Object?> body = const {},
+    int expect = 200,
+  }) async {
     final res = await http
-        .post(_url(path),
-            headers: {...await _authHeader(), 'Content-Type': 'application/json'},
-            body: jsonEncode(body))
+        .post(
+          _url(path),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
         .timeout(_timeout);
     if (res.statusCode != expect) throw http.ClientException(_reason(res));
     return jsonDecode(res.body) as Map<String, dynamic>;
@@ -365,14 +393,16 @@ class Api {
     Map<String, Object?>? body,
   ]) async {
     final url = _url(path);
-    final headers = {..._staffHeader(staff), 'Content-Type': 'application/json'};
+    final headers = {
+      ..._staffHeader(staff),
+      'Content-Type': 'application/json',
+    };
     final payload = body == null ? null : jsonEncode(body);
     final res = await switch (method) {
       'POST' => http.post(url, headers: headers, body: payload),
       'DELETE' => http.delete(url, headers: headers),
       _ => http.get(url, headers: headers),
-    }
-        .timeout(_timeout);
+    }.timeout(_timeout);
     if (res.statusCode == 401) {
       // The token died; sign the panel out rather than looping on errors.
       await staff.signOut();
@@ -385,54 +415,79 @@ class Api {
 
   Future<void> adminLogin(String username, String password) async {
     final res = await http
-        .post(_url('/api/admin/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'username': username, 'password': password}))
+        .post(
+          _url('/api/admin/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'username': username, 'password': password}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     final r = jsonDecode(res.body) as Map<String, dynamic>;
-    await StaffSession.admin
-        .signIn(r['token'] as String, r['username'] as String);
+    await StaffSession.admin.signIn(
+      r['token'] as String,
+      r['username'] as String,
+    );
   }
 
   Future<Map<String, dynamic>> adminOverview() =>
       _staffCall(StaffSession.admin, 'GET', '/api/admin/overview');
 
   Future<List<dynamic>> adminStores({String status = ''}) async {
-    final body = await _staffCall(StaffSession.admin, 'GET',
-        '/api/admin/stores${status.isEmpty ? '' : '?status=$status'}');
+    final body = await _staffCall(
+      StaffSession.admin,
+      'GET',
+      '/api/admin/stores${status.isEmpty ? '' : '?status=$status'}',
+    );
     return body['items'] as List<dynamic>? ?? const [];
   }
 
-  Future<void> approveStore(String owner) => _staffCall(StaffSession.admin,
-      'POST', '/api/admin/stores/${Uri.encodeComponent(owner)}/approve');
+  Future<void> approveStore(String owner) => _staffCall(
+    StaffSession.admin,
+    'POST',
+    '/api/admin/stores/${Uri.encodeComponent(owner)}/approve',
+  );
 
   Future<void> rejectStore(String owner, String reason) => _staffCall(
-      StaffSession.admin,
-      'POST',
-      '/api/admin/stores/${Uri.encodeComponent(owner)}/reject',
-      {'reason': reason});
+    StaffSession.admin,
+    'POST',
+    '/api/admin/stores/${Uri.encodeComponent(owner)}/reject',
+    {'reason': reason},
+  );
 
   Future<List<dynamic>> adminOrders({String stage = ''}) async {
-    final body = await _staffCall(StaffSession.admin, 'GET',
-        '/api/admin/orders${stage.isEmpty ? '' : '?stage=$stage'}');
+    final body = await _staffCall(
+      StaffSession.admin,
+      'GET',
+      '/api/admin/orders${stage.isEmpty ? '' : '?stage=$stage'}',
+    );
     return body['items'] as List<dynamic>? ?? const [];
   }
 
   /// Puts a rider's name on an order, or clears it with an empty number.
   Future<void> assignOrder(String id, String phone) => _staffCall(
-      StaffSession.admin, 'POST', '/api/admin/orders/$id/assign',
-      {'phone': phone});
+    StaffSession.admin,
+    'POST',
+    '/api/admin/orders/$id/assign',
+    {'phone': phone},
+  );
 
   Future<List<dynamic>> riders() async {
-    final body = await _staffCall(StaffSession.admin, 'GET', '/api/admin/riders');
+    final body = await _staffCall(
+      StaffSession.admin,
+      'GET',
+      '/api/admin/riders',
+    );
     return body['items'] as List<dynamic>? ?? const [];
   }
 
   /// Returns the PIN, which is shown once and never readable again.
   Future<String> addRider(String phone, String name) async {
-    final body = await _staffCall(StaffSession.admin, 'POST', '/api/admin/riders',
-        {'phone': phone, 'name': name});
+    final body = await _staffCall(
+      StaffSession.admin,
+      'POST',
+      '/api/admin/riders',
+      {'phone': phone, 'name': name},
+    );
     return body['pin'] as String? ?? '';
   }
 
@@ -440,54 +495,82 @@ class Api {
   /// are shown once and never readable again.
   Future<String> resetRiderPin(String phone) async {
     final body = await _staffCall(
-        StaffSession.admin, 'POST', '/api/admin/riders/$phone/pin');
+      StaffSession.admin,
+      'POST',
+      '/api/admin/riders/$phone/pin',
+    );
     return body['pin'] as String? ?? '';
   }
 
   /// Moves a rider to a new number, taking their run and their history with
   /// them. Returns the new PIN.
   Future<String> changeRiderNumber(String phone, String next) async {
-    final body = await _staffCall(StaffSession.admin, 'POST',
-        '/api/admin/riders/$phone/number', {'phone': next});
+    final body = await _staffCall(
+      StaffSession.admin,
+      'POST',
+      '/api/admin/riders/$phone/number',
+      {'phone': next},
+    );
     return body['pin'] as String? ?? '';
   }
 
-  Future<void> removeRider(String phone) => _staffCall(
-      StaffSession.admin, 'DELETE', '/api/admin/riders/$phone');
+  /// Off, not gone: they stop being handed orders and are signed out, and
+  /// their deliveries stay on their name.
+  Future<void> removeRider(String phone) =>
+      _staffCall(StaffSession.admin, 'DELETE', '/api/admin/riders/$phone');
+
+  Future<void> restoreRider(String phone) =>
+      _staffCall(StaffSession.admin, 'POST', '/api/admin/riders/$phone/on');
+
+  /// Gone for good. Refused while they are carrying something.
+  Future<void> deleteRider(String phone) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/riders/$phone?forever=true',
+  );
 
   Future<void> riderLogin(String phone, String pin) async {
     final res = await http
-        .post(_url('/api/delivery/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'phone': phone, 'pin': pin}))
+        .post(
+          _url('/api/delivery/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'phone': phone, 'pin': pin}),
+        )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     final r = jsonDecode(res.body) as Map<String, dynamic>;
-    await StaffSession.rider.signIn(r['token'] as String, r['phone'] as String,
-        r['name'] as String? ?? '');
+    await StaffSession.rider.signIn(
+      r['token'] as String,
+      r['phone'] as String,
+      r['name'] as String? ?? '',
+    );
   }
 
   Future<Map<String, dynamic>> riderOrders() =>
       _staffCall(StaffSession.rider, 'GET', '/api/delivery/orders');
 
-  Future<void> riderPick(String id) => _staffCall(
-      StaffSession.rider, 'POST', '/api/delivery/orders/$id/pick');
+  Future<void> riderPick(String id) =>
+      _staffCall(StaffSession.rider, 'POST', '/api/delivery/orders/$id/pick');
 
   Future<void> riderDeliver(String id, String code) => _staffCall(
-      StaffSession.rider, 'POST', '/api/delivery/orders/$id/deliver',
-      {'code': code});
+    StaffSession.rider,
+    'POST',
+    '/api/delivery/orders/$id/deliver',
+    {'code': code},
+  );
 
-  InventoryItem _inventoryItem(Map<String, dynamic> r) => InventoryItem(
-        id: r['id'] as String,
-        title: r['title'] as String? ?? '',
-        description: r['description'] as String? ?? '',
-        category: r['category'] as String? ?? '',
-        price: (r['price'] as num?)?.toDouble() ?? 0,
-        stock: (r['stock'] as num?)?.toInt() ?? 0,
-      )
+  InventoryItem _inventoryItem(Map<String, dynamic> r) =>
+      InventoryItem(
+          id: r['id'] as String,
+          title: r['title'] as String? ?? '',
+          description: r['description'] as String? ?? '',
+          category: r['category'] as String? ?? '',
+          price: (r['price'] as num?)?.toDouble() ?? 0,
+          stock: (r['stock'] as num?)?.toInt() ?? 0,
+        )
         ..serverId = r['id'] as String
-        ..imageUrls =
-            (r['imageUrls'] as List<dynamic>? ?? const []).cast<String>();
+        ..imageUrls = (r['imageUrls'] as List<dynamic>? ?? const [])
+            .cast<String>();
 
   /// Opens the store and uploads its logo in one request, so there is no
   /// window where the store exists without its picture. Returns the Cloudinary
@@ -527,13 +610,21 @@ class Api {
     }, photos);
     return (
       id: body['id'] as String,
-      imageUrls: (body['imageUrls'] as List<dynamic>? ?? const []).cast<String>(),
+      imageUrls: (body['imageUrls'] as List<dynamic>? ?? const [])
+          .cast<String>(),
     );
   }
 
   /// Extra photos for an item that already exists — the edit screen's path.
-  Future<List<String>> addItemPhotos(String itemId, List<Uint8List> photos) async {
-    final body = await _send('/api/seller/items/$itemId/photos', const {}, photos);
+  Future<List<String>> addItemPhotos(
+    String itemId,
+    List<Uint8List> photos,
+  ) async {
+    final body = await _send(
+      '/api/seller/items/$itemId/photos',
+      const {},
+      photos,
+    );
     return (body['imageUrls'] as List<dynamic>).cast<String>();
   }
 
@@ -541,28 +632,38 @@ class Api {
   /// multipart when there is. The backend accepts both, so the app never has
   /// to sequence two calls and reconcile a half-done result.
   Future<Map<String, dynamic>> _send(
-      String path, Map<String, Object?> fields, List<Uint8List> photos) async {
+    String path,
+    Map<String, Object?> fields,
+    List<Uint8List> photos,
+  ) async {
     final auth = await _authHeader();
     final http.Response res;
     if (photos.isEmpty) {
       res = await http
-          .post(_url(path),
-              headers: {...auth, 'Content-Type': 'application/json'},
-              body: jsonEncode(fields))
+          .post(
+            _url(path),
+            headers: {...auth, 'Content-Type': 'application/json'},
+            body: jsonEncode(fields),
+          )
           .timeout(_timeout);
     } else {
       final req = http.MultipartRequest('POST', _url(path))
         ..headers.addAll(auth);
       // MultipartRequest.fields is a Map, so a repeated key is impossible —
       // list values go as one comma-separated field and the backend splits it.
-      fields.forEach((k, v) =>
-          req.fields[k] = v is List ? v.join(',') : '$v');
+      fields.forEach((k, v) => req.fields[k] = v is List ? v.join(',') : '$v');
       for (var i = 0; i < photos.length; i++) {
-        req.files.add(http.MultipartFile.fromBytes('file', photos[i],
-            filename: 'photo_${i + 1}.jpg'));
+        req.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            photos[i],
+            filename: 'photo_${i + 1}.jpg',
+          ),
+        );
       }
       res = await http.Response.fromStream(
-          await req.send().timeout(_uploadTimeout));
+        await req.send().timeout(_uploadTimeout),
+      );
     }
     if (res.statusCode != 201) {
       throw http.ClientException(_reason(res));
@@ -571,34 +672,32 @@ class Api {
   }
 
   Product _product(Map<String, dynamic> r) => Product(
-        id: r['id'] as String,
-        name: r['name'] as String,
-        category: r['category'] as String? ?? '',
-        tab: r['tab'] as String? ?? 'All',
-        price: (r['price'] as num).toDouble(),
-        imageUrl: r['imageUrl'] as String? ?? '',
-        store: r['store'] as String? ?? '',
-        description: r['description'] as String? ?? '',
-        // Photos past the cover. The gallery shows every one; before this they
-        // were parsed away, so a two-photo listing looked like a one-photo one.
-        extraImages: ((r['imageUrls'] as List<dynamic>? ?? const [])
-                .cast<String>()
-                .toList()
+    id: r['id'] as String,
+    name: r['name'] as String,
+    category: r['category'] as String? ?? '',
+    tab: r['tab'] as String? ?? 'All',
+    price: (r['price'] as num).toDouble(),
+    imageUrl: r['imageUrl'] as String? ?? '',
+    store: r['store'] as String? ?? '',
+    description: r['description'] as String? ?? '',
+    // Photos past the cover. The gallery shows every one; before this they
+    // were parsed away, so a two-photo listing looked like a one-photo one.
+    extraImages:
+        ((r['imageUrls'] as List<dynamic>? ?? const []).cast<String>().toList()
               ..remove(r['imageUrl'] as String? ?? ''))
             .where((u) => u.isNotEmpty)
             .toList(),
-        offers: [
-          for (final o in (r['offers'] as List<dynamic>? ?? const []))
-            ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),
-        ],
-      );
+    offers: [
+      for (final o in (r['offers'] as List<dynamic>? ?? const []))
+        ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),
+    ],
+  );
 }
 
 /// Logs why a call fell back, so a silent offline mode is never a mystery.
 void logApiFailure(String what, Object error) {
   debugPrint('API $what failed, using bundled data: $error');
 }
-
 
 /// This account has no store yet — a normal state, not a failure.
 class NoStoreYet implements Exception {

@@ -17,6 +17,19 @@ func addRider(t *testing.T, h http.Handler, admin, phone string) string {
 	return body["pin"].(string)
 }
 
+// buyerCode is the four digits the buyer was told, which is the only way an
+// order can be closed.
+func buyerCode(t *testing.T, h http.Handler, id string) string {
+	t.Helper()
+	for _, o := range callAs2(t, h, testToken, "/api/orders")["orders"].([]any) {
+		if row := o.(map[string]any); row["id"] == id {
+			return row["deliveryCode"].(string)
+		}
+	}
+	t.Fatalf("no order %s in the buyer's list", id)
+	return ""
+}
+
 // Nothing behind /api/admin or /api/delivery opens without the right kind of
 // token — and an admin's token is the wrong kind for the delivery panel.
 func TestStaffPanelsAreClosedWithoutTheRightToken(t *testing.T) {
@@ -206,6 +219,85 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 	panel := callAs2(t, h, riderToken, "/api/delivery/orders")
 	if got := panel["rider"].(map[string]any)["delivered"].(float64); got != 1 {
 		t.Fatalf("the rider's delivered count should be 1, got %v", got)
+	}
+}
+
+// Off is not gone: a switched-off rider comes back with the same PIN.
+// Removing them for good is a different button, and it will not leave an
+// order in nobody's hands.
+func TestARiderCanBeSwitchedOffAndBackOnOrRemoved(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{
+		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
+		"categories": []string{"Food"},
+	})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items",
+		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 10})
+
+	admin := adminSignIn(t, h)
+	pin := addRider(t, h, admin, "9111111111")
+
+	// Off: signed out, and no longer handed anything.
+	callAs(t, h, admin, http.MethodDelete, "/api/admin/riders/9111111111", nil)
+	// 403 rather than 401: the number and PIN are right, the shift is not.
+	if code, _ := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": pin}); code != http.StatusForbidden {
+		t.Fatalf("a switched-off rider should not sign in, got %d", code)
+	}
+	_, order := call(t, h, http.MethodPost, "/api/orders",
+		map[string]any{"itemId": item["id"], "units": 1})
+	id := order["id"].(string)
+	_, accepted := call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
+	if accepted["assignedTo"] != nil {
+		t.Fatalf("a switched-off rider should not be handed work: %v", accepted["assignedTo"])
+	}
+
+	// On again, with the PIN they already have.
+	if code, _ := callAs(t, h, admin, http.MethodPost,
+		"/api/admin/riders/9111111111/on", nil); code != http.StatusOK {
+		t.Fatalf("switch on: want 200, got %d", code)
+	}
+	_, back := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": pin})
+	token, ok := back["token"].(string)
+	if !ok {
+		t.Fatalf("the same PIN should still work: %v", back["error"])
+	}
+
+	// Carrying something is the one thing that blocks a permanent removal.
+	callAs(t, h, admin, http.MethodPost, "/api/admin/orders/"+id+"/assign",
+		map[string]string{"phone": "9111111111"})
+	callAs(t, h, token, http.MethodPost, "/api/delivery/orders/"+id+"/pick", nil)
+	if code, body := callAs(t, h, admin, http.MethodDelete,
+		"/api/admin/riders/9111111111?forever=true", nil); code != http.StatusConflict {
+		t.Fatalf("removing a rider mid-delivery: want 409, got %d (%v)", code, body["error"])
+	}
+
+	// Hands empty, and an order merely assigned goes back to the pool.
+	_, second := call(t, h, http.MethodPost, "/api/orders",
+		map[string]any{"itemId": item["id"], "units": 1})
+	secondID := second["id"].(string)
+	call(t, h, http.MethodPost, "/api/seller/orders/"+secondID+"/accept", nil)
+	callAs(t, h, token, http.MethodPost, "/api/delivery/orders/"+id+"/deliver",
+		map[string]string{"code": buyerCode(t, h, id)})
+
+	if code, body := callAs(t, h, admin, http.MethodDelete,
+		"/api/admin/riders/9111111111?forever=true", nil); code != http.StatusNoContent {
+		t.Fatalf("remove for good: want 204, got %d (%v)", code, body["error"])
+	}
+	if got := callListAs(t, h, admin, "/api/admin/riders"); len(got) != 0 {
+		t.Fatalf("the rider should be gone, got %d", len(got))
+	}
+	for _, o := range callListAs(t, h, admin, "/api/admin/orders") {
+		if o.(map[string]any)["id"] == secondID &&
+			o.(map[string]any)["assignedTo"] != nil {
+			t.Fatal("an order they had not collected should go back to the pool")
+		}
+	}
+	if code, _ := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
+		map[string]string{"phone": "9111111111", "pin": pin}); code != http.StatusUnauthorized {
+		t.Fatalf("a removed rider should not sign in, got %d", code)
 	}
 }
 

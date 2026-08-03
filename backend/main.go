@@ -143,6 +143,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/riders", s.handleAddRider)
 	mux.HandleFunc("POST /api/admin/riders/{phone}/pin", s.handleResetRiderPIN)
 	mux.HandleFunc("POST /api/admin/riders/{phone}/number", s.handleChangeRiderNumber)
+	mux.HandleFunc("POST /api/admin/riders/{phone}/on", s.handleRestoreRider)
 	mux.HandleFunc("DELETE /api/admin/riders/{phone}", s.handleRemoveRider)
 
 	// Delivery panel.

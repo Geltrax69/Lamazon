@@ -361,6 +361,51 @@ class _AdminHomeState extends State<_AdminHome> {
     await _load();
   }
 
+  /// Off is a pause, not an ending: no new orders, signed out, everything
+  /// they have done still theirs. On again needs no new PIN.
+  Future<void> _switchRider(Map<String, dynamic> rider) async {
+    final phone = rider['phone'] as String;
+    final on = rider['active'] == true;
+    if (on &&
+        !await _confirm(
+          'Switch off $phone?',
+          'They stop being handed orders and are signed out of the delivery '
+              'panel. Their deliveries stay on their name, and you can switch '
+              'them back on with the same PIN.',
+          'Switch off',
+        )) {
+      return;
+    }
+    try {
+      on
+          ? await Api.instance.removeRider(phone)
+          : await Api.instance.restoreRider(phone);
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+    await _load();
+  }
+
+  Future<void> _deleteRider(Map<String, dynamic> rider) async {
+    final phone = rider['phone'] as String;
+    if (!await _confirm(
+      'Remove $phone for good?',
+      'The rider is deleted. Anything they were assigned but had not '
+          'collected goes back to the other riders. This cannot be undone — '
+          'switch them off instead if they might come back.',
+      'Remove',
+    )) {
+      return;
+    }
+    try {
+      await Api.instance.deleteRider(phone);
+    } catch (e) {
+      // The server refuses while a bag is in their hand, and says so.
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+    await _load();
+  }
+
   Future<bool> _confirm(String title, String body, String action) async =>
       await showDialog<bool>(
         context: context,
@@ -673,18 +718,8 @@ class _AdminHomeState extends State<_AdminHome> {
                 rider: r,
                 onResetPin: () => _resetPin(r),
                 onChangeNumber: () => _changeNumber(r),
-                onRemove: () async {
-                  if (!await _confirm(
-                    'Switch off ${r['phone']}?',
-                    'They stop getting new orders and are signed out. What '
-                        'they have already delivered stays on their name.',
-                    'Switch off',
-                  )) {
-                    return;
-                  }
-                  await Api.instance.removeRider(r['phone'] as String);
-                  await _load();
-                },
+                onSwitch: () => _switchRider(r),
+                onDelete: () => _deleteRider(r),
               ),
         ];
 
@@ -970,12 +1005,14 @@ class _RiderRow extends StatelessWidget {
   final Map<String, dynamic> rider;
   final VoidCallback onResetPin;
   final VoidCallback onChangeNumber;
-  final VoidCallback onRemove;
+  final VoidCallback onSwitch;
+  final VoidCallback onDelete;
   const _RiderRow({
     required this.rider,
     required this.onResetPin,
     required this.onChangeNumber,
-    required this.onRemove,
+    required this.onSwitch,
+    required this.onDelete,
   });
 
   @override
@@ -1002,10 +1039,16 @@ class _RiderRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${rider['delivered']} delivered · ${rider['carrying']} carrying'
-                  '${active ? '' : ' · switched off'}',
+                  '${rider['delivered']} delivered · ${rider['carrying']} carrying',
                   style: const TextStyle(fontSize: 12, color: _muted),
                 ),
+                // What "off" means, where it is read, rather than one word
+                // that could mean anything.
+                if (!active)
+                  const Text(
+                    'Switched off — not signed in, and not being handed orders',
+                    style: TextStyle(fontSize: 11.5, color: _amber),
+                  ),
               ],
             ),
           ),
@@ -1014,7 +1057,8 @@ class _RiderRow extends StatelessWidget {
             onSelected: (choice) => switch (choice) {
               'pin' => onResetPin(),
               'number' => onChangeNumber(),
-              _ => onRemove(),
+              'switch' => onSwitch(),
+              _ => onDelete(),
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'pin', child: Text('New PIN')),
@@ -1022,11 +1066,14 @@ class _RiderRow extends StatelessWidget {
                 value: 'number',
                 child: Text('Change number'),
               ),
-              if (active)
-                const PopupMenuItem(
-                  value: 'off',
-                  child: Text('Switch off', style: TextStyle(color: _red)),
-                ),
+              PopupMenuItem(
+                value: 'switch',
+                child: Text(active ? 'Switch off' : 'Switch back on'),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Remove for good', style: TextStyle(color: _red)),
+              ),
             ],
           ),
         ],

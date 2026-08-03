@@ -571,10 +571,19 @@ func newPIN() (pin, hash string, err error) {
 	return pin, hash, err
 }
 
-// DELETE /api/admin/riders/{phone} — switched off rather than deleted, so the
-// orders they already delivered keep pointing at someone.
+// DELETE /api/admin/riders/{phone} — off, not gone. They stop being handed
+// orders and are signed out, but the row stays, so the deliveries behind them
+// still point at somebody. Switching them back on is one call.
+//
+// DELETE /api/admin/riders/{phone}?forever=true removes the row instead. That
+// is refused while they are actually carrying something: an order with nobody
+// on it is worse than a rider who is switched off.
 func (a *API) handleRemoveRider(w http.ResponseWriter, r *http.Request) {
 	phone := normalisePhone(r.PathValue("phone"))
+	if r.URL.Query().Get("forever") == "true" {
+		a.deleteRider(w, r, phone)
+		return
+	}
 	res, err := a.db.sql.ExecContext(r.Context(),
 		`UPDATE riders SET active = false WHERE phone = $1`, phone)
 	if err != nil {
@@ -588,6 +597,79 @@ func (a *API) handleRemoveRider(w http.ResponseWriter, r *http.Request) {
 	// Their sessions go with them; an off rider must not keep a live panel.
 	a.db.sql.ExecContext(r.Context(),
 		`DELETE FROM staff_sessions WHERE role = 'rider' AND subject = $1`, phone)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /api/admin/riders/{phone}/on — back on shift. They sign in with the
+// same PIN as before; nothing about them was thrown away.
+func (a *API) handleRestoreRider(w http.ResponseWriter, r *http.Request) {
+	phone := normalisePhone(r.PathValue("phone"))
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE riders SET active = true WHERE phone = $1`, phone)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no rider on "+phone)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"phone": phone, "active": true})
+}
+
+// deleteRider removes the row for good.
+//
+// Orders they were only assigned go back to the open pool rather than
+// disappearing with them — somebody else can take those. An order they have
+// already collected cannot be handled that way, because the bag is in their
+// hand, so the delete is refused until it is delivered.
+func (a *API) deleteRider(w http.ResponseWriter, r *http.Request, phone string) {
+	var carrying int
+	if err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT count(*) FROM orders WHERE rider_phone = $1 AND stage = 'picked'`,
+		phone).Scan(&carrying); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if carrying > 0 {
+		writeError(w, http.StatusConflict, fmt.Sprintf(
+			"they are still carrying %d order(s) — switch them off instead, or "+
+				"wait until those are delivered", carrying))
+		return
+	}
+
+	tx, err := a.db.sql.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	if _, err := tx.ExecContext(r.Context(),
+		`UPDATE orders SET assigned_to = '' WHERE assigned_to = $1
+		 AND stage IN ('received', 'accepted')`, phone); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	res, err := tx.ExecContext(r.Context(), `DELETE FROM riders WHERE phone = $1`, phone)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no rider on "+phone)
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(),
+		`DELETE FROM staff_sessions WHERE role = 'rider' AND subject = $1`,
+		phone); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
