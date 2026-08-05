@@ -127,8 +127,15 @@ else
   echo "==> local dev: the app will call $LOCAL_API"
 fi
 
-products=$(curl -sf "$API/api/products" | grep -o '"id"' | wc -l | tr -d ' ')
-echo "==> API healthy, catalog has $products products"
+# An empty catalogue is a legitimate state — the database can be deliberately
+# bare — but grep exits 1 when it matches nothing, and under `set -e` that
+# killed the script here rather than starting the app. `|| true` keeps a count
+# of zero a count.
+products=$(curl -sf "$API/api/products" | grep -o '"id"' | wc -l | tr -d ' ' || true)
+echo "==> API healthy, catalog has ${products:-0} products"
+if [ "${products:-0}" = "0" ]; then
+  echo "   (nothing to shop yet — open a store, or unset SKIP_SEED above)"
+fi
 
 cat > frontend/web/firebase-env.js <<EOF
 globalThis.lamazonFirebaseConfig = {
