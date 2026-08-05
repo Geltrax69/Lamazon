@@ -196,10 +196,11 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	// The id comes from the sequence, so concurrent adds cannot collide.
 	err = a.db.sql.QueryRowContext(r.Context(), `
 		INSERT INTO inventory_items
-			(owner, title, description, category, price, mrp, stock, image_urls)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id`,
+			(owner, title, description, category, price, mrp, options, stock,
+			 image_urls)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::text[]) RETURNING id`,
 		a.owner(r), in.Title, in.Description, in.Category, in.Price, in.MRP,
-		in.Stock, in.ImageURLs).
+		optionsJSON(in.Options), in.Stock, in.ImageURLs).
 		Scan(&in.ID)
 	// The foreign key is what enforces "no stock without a store".
 	var pgErr *pgconn.PgError
@@ -237,14 +238,14 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	case in.Stock != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
 		         WHERE id = $1 AND owner = $3
-		         RETURNING id, title, description, category, price, mrp, stock,
-		         array_to_string(image_urls, E'\n')`
+		         RETURNING id, title, description, category, price, mrp,
+		         options, stock, array_to_string(image_urls, E'\n')`
 		arg = *in.Stock
 	case in.Delta != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
 		         WHERE id = $1 AND owner = $3
-		         RETURNING id, title, description, category, price, mrp, stock,
-		         array_to_string(image_urls, E'\n')`
+		         RETURNING id, title, description, category, price, mrp,
+		         options, stock, array_to_string(image_urls, E'\n')`
 		arg = *in.Delta
 	default:
 		writeError(w, http.StatusBadRequest, "send delta or stock")
@@ -253,14 +254,19 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 
 	var it InventoryItem
 	var urls string
+	var options []byte
 	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg, a.owner(r)).Scan(
 		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.MRP,
-		&it.Stock, &urls)
+		&options, &it.Stock, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
 		return
 	}
 	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := json.Unmarshal(options, &it.Options); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -300,19 +306,20 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 
 	var it InventoryItem
 	var urls string
+	var options []byte
 	// The owner is in the WHERE clause, not just the read: without it a seller
 	// could reprice somebody else's stock by guessing an id.
 	err := a.db.sql.QueryRowContext(r.Context(), `
 		UPDATE inventory_items
 		SET title = $2, description = $3, category = $4, price = $5,
-		    mrp = $6, stock = $7
-		WHERE id = $1 AND owner = $8
-		RETURNING id, title, description, category, price, mrp, stock,
+		    mrp = $6, options = $7, stock = $8
+		WHERE id = $1 AND owner = $9
+		RETURNING id, title, description, category, price, mrp, options, stock,
 		          array_to_string(image_urls, E'\n')`,
 		r.PathValue("id"), in.Title, in.Description, in.Category, in.Price,
-		in.MRP, in.Stock, a.owner(r)).
+		in.MRP, optionsJSON(in.Options), in.Stock, a.owner(r)).
 		Scan(&it.ID, &it.Title, &it.Description, &it.Category, &it.Price,
-			&it.MRP, &it.Stock, &urls)
+			&it.MRP, &options, &it.Stock, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+r.PathValue("id"))
 		return
@@ -321,9 +328,27 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if err := json.Unmarshal(options, &it.Options); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	it.Status = stockStatus(it.Stock)
 	it.ImageURLs = splitURLs(urls)
 	writeJSON(w, http.StatusOK, it)
+}
+
+// optionsJSON is what goes into the jsonb column. A nil slice must land as an
+// empty array, not as SQL NULL: the column is NOT NULL, and every reader
+// unmarshals it without a nil check.
+func optionsJSON(in []ItemOption) []byte {
+	if in == nil {
+		in = []ItemOption{}
+	}
+	out, err := json.Marshal(in)
+	if err != nil {
+		return []byte("[]")
+	}
+	return out
 }
 
 // DELETE /api/seller/items/{id}

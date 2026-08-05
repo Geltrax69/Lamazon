@@ -12,6 +12,8 @@ class Product {
   final List<String> sizes;
   final List<String> extraImages;
   final List<ShopOffer> offers; // same product priced at other shops
+  /// What the shop asks the buyer to choose. Empty for most things.
+  final List<ItemOption> options;
 
   const Product({
     required this.id,
@@ -26,6 +28,7 @@ class Product {
     this.sizes = const [],
     this.extraImages = const [],
     this.offers = const [],
+    this.options = const [],
   });
 
   /// True only when there is a real saving to show. An MRP equal to the price
@@ -36,6 +39,42 @@ class Product {
   /// "20% off", not "20.08%".
   int get discountPercent =>
       discounted ? (((mrp - price) / mrp) * 100).round() : 0;
+
+  /// What the shopper picks. The bundled catalogue predates option groups and
+  /// carries a plain [sizes] list; rather than leave that data stranded, it
+  /// becomes a Size group so both kinds of product render through one path.
+  List<ItemOption> get choices => options.isNotEmpty
+      ? options
+      : sizes.isEmpty
+      ? const []
+      : [ItemOption(name: 'Size', values: sizes)];
+}
+
+/// One thing a buyer picks before ordering, and the choices the shop offers.
+/// [kind] is 'colour' when the values are hex and should draw as swatches.
+class ItemOption {
+  final String name;
+  final String kind;
+  final List<String> values;
+  const ItemOption({
+    required this.name,
+    this.kind = 'text',
+    this.values = const [],
+  });
+
+  bool get isColour => kind == 'colour';
+
+  factory ItemOption.fromJson(Map<String, dynamic> r) => ItemOption(
+    name: r['name'] as String? ?? '',
+    kind: r['kind'] as String? ?? 'text',
+    values: (r['values'] as List<dynamic>? ?? const []).cast<String>(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'kind': kind,
+    'values': values,
+  };
 }
 
 class ShopOffer {

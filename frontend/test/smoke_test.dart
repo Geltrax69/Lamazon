@@ -67,7 +67,9 @@ void main() {
       expect(find.text(products.first.name), findsOneWidget);
       expect(find.text('Add to Cart'), findsOneWidget);
       expect(find.text('Buy Now'), findsOneWidget);
-      expect(find.text('Select Size'), findsOneWidget);
+      // The heading is the option group's own name now, and the shop chooses
+      // it — the bundled products carry a Size list, which renders as one.
+      expect(find.text('Size'), findsOneWidget);
     });
   });
 

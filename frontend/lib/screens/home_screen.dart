@@ -11,7 +11,6 @@ import '../widgets/notify_banner.dart';
 import '../data/seller.dart';
 import '../models/product.dart';
 import '../widgets/app_shell.dart';
-import '../widgets/image_marquee.dart';
 import '../widgets/location_prompt.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
@@ -28,6 +27,9 @@ import 'wishlist_screen.dart';
 const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
 const kBg = Color(0xFFF1F1EF);
+
+/// Tiles built per page of the product grid.
+const _productPage = 12;
 
 
 class HomeScreen extends StatefulWidget {
@@ -46,6 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Kept aside so the drawer can list every category without waiting on a
   /// second load. Assigned before the FutureBuilder rebuilds, so no setState.
   List<Product> _all = const [];
+
+  /// How much of the grid is built. Reset whenever the tab changes, so
+  /// switching department does not carry ten pages of the last one.
+  int _shownCount = _productPage;
 
   Future<(List<Product>, List<Shop>)> _load() async {
     // The navigation comes down with the catalogue: the tabs are the admin's
@@ -136,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final shownProducts = items
         .where((p) => _tab == 0 || p.tab == tabName)
         .toList();
+    final shown = shownProducts.take(_shownCount).toList();
     final wide = isWide(context);
     return ListView(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 20, 8, wide ? 32 : 20, 110),
@@ -147,7 +154,13 @@ class _HomeScreenState extends State<HomeScreen> {
         if (Session.instance.loggedIn) const NotifyBanner(),
         _SearchBar(tab: tabName),
         const SizedBox(height: 12),
-        _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
+        _TabBar(
+          active: _tab,
+          onTap: (i) => setState(() {
+            _tab = i;
+            _shownCount = _productPage;
+          }),
+        ),
         const SizedBox(height: 12),
         // Shops first: who is open near you is the thing a shopper is
         // deciding on this screen, and the categories are how they narrow it
@@ -185,23 +198,64 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisSpacing: 16,
             childAspectRatio: 0.68,
           ),
-          itemCount: shownProducts.length,
+          // A page at a time. The Food tab alone is 200-odd products, and
+          // building every tile up front is what made the first scroll stutter
+          // on a phone.
+          itemCount: shown.length,
           itemBuilder: (_, i) => ProductCard(
-            product: shownProducts[i],
+            product: shown[i],
             showAddToCart:
-                shownProducts[i].tab == 'Food' ||
-                shownProducts[i].tab == 'Grocery',
+                shown[i].tab == 'Food' || shown[i].tab == 'Grocery',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => DetailsScreen(product: shownProducts[i]),
+                builder: (_) => DetailsScreen(product: shown[i]),
               ),
             ),
           ),
         ),
+        if (shownProducts.length > shown.length) ...[
+          const SizedBox(height: 16),
+          _ShowMore(
+            left: shownProducts.length - shown.length,
+            onTap: () => setState(() => _shownCount += _productPage),
+          ),
+        ],
         const SizedBox(height: 16),
         const Center(child: _VersionBadge()),
       ],
+    );
+  }
+}
+
+/// The next page of the grid. Says how many are left, so the shopper knows
+/// whether they are near the end of the aisle or the start of it.
+class _ShowMore extends StatelessWidget {
+  final int left;
+  final VoidCallback onTap;
+  const _ShowMore({required this.left, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+        ),
+        child: Text(
+          'Show more  ·  $left left',
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: kInk,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -668,18 +722,24 @@ class _ShopAds extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (shops.isEmpty) return const SizedBox.shrink();
+    // A PageView, not the drifting marquee it used to be: a shop that slides
+    // away on its own is one you cannot read, and cannot tap without chasing.
+    // Swiping is the shopper's now, and each card snaps into place.
+    final wide = isWide(context);
     return SizedBox(
       height: 96,
-      child: MarqueeStrip(
-        itemWidth: 246 + 14,
-        period: Duration(seconds: 6 * shops.length),
-        children: [
-          for (final shop in shops)
-            Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: _ShopAd(shop: shop),
-            ),
-        ],
+      child: PageView.builder(
+        controller: PageController(
+          // Less than one, so the next card peeks in and the row reads as
+          // something that continues rather than as one lonely tile.
+          viewportFraction: wide ? 0.42 : 0.86,
+        ),
+        padEnds: false,
+        itemCount: shops.length,
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.only(right: 14),
+          child: _ShopAd(shop: shops[i]),
+        ),
       ),
     );
   }

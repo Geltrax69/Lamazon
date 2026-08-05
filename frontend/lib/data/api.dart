@@ -315,6 +315,7 @@ class Api {
     required double price,
     required double mrp,
     required int stock,
+    List<ItemOption> options = const [],
   }) async {
     final res = await http
         .patch(
@@ -326,6 +327,7 @@ class Api {
             'category': category,
             'price': price,
             'mrp': mrp,
+            'options': [for (final o in options) o.toJson()],
             'stock': stock,
           }),
         )
@@ -630,6 +632,7 @@ class Api {
           category: r['category'] as String? ?? '',
           price: (r['price'] as num?)?.toDouble() ?? 0,
           mrp: (r['mrp'] as num?)?.toDouble() ?? 0,
+          options: _options(r),
           stock: (r['stock'] as num?)?.toInt() ?? 0,
         )
         ..serverId = r['id'] as String
@@ -664,6 +667,7 @@ class Api {
     required double price,
     required int stock,
     double mrp = 0,
+    List<ItemOption> options = const [],
     List<Uint8List> photos = const [],
   }) async {
     final body = await _send('/api/seller/items', {
@@ -672,6 +676,9 @@ class Api {
       'category': category,
       'price': price,
       'mrp': mrp,
+      // Encoded here rather than passed through: multipart fields are flat
+      // strings, and the backend expects one JSON blob either way.
+      'options': jsonEncode([for (final o in options) o.toJson()]),
       'stock': stock,
     }, photos);
     return (
@@ -758,7 +765,13 @@ class Api {
       for (final o in (r['offers'] as List<dynamic>? ?? const []))
         ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),
     ],
+    options: _options(r),
   );
+
+  List<ItemOption> _options(Map<String, dynamic> r) => [
+    for (final o in (r['options'] as List<dynamic>? ?? const []))
+      ItemOption.fromJson(o as Map<String, dynamic>),
+  ];
 }
 
 /// Logs why a call fell back, so a silent offline mode is never a mystery.

@@ -294,3 +294,14 @@ WHERE NOT EXISTS (SELECT 1 FROM catalog_categories);
 
 CREATE INDEX IF NOT EXISTS idx_categories_parent
     ON catalog_categories (parent, position);
+
+-- What a shopper picks before buying: size, colour, flavour, whatever the shop
+-- sells by. JSONB rather than option and value tables, because nothing queries
+-- across them — an item's options are read with the item and written with it,
+-- and two more tables would buy joins we would never use.
+--
+-- Shape: [{"name":"Size","kind":"text","values":["S","M","L"]}]
+-- kind is "text" or "colour"; a colour's values are hex, so the app can draw
+-- swatches instead of spelling "Maroon".
+ALTER TABLE inventory_items
+    ADD COLUMN IF NOT EXISTS options JSONB NOT NULL DEFAULT '[]'::jsonb;

@@ -24,7 +24,23 @@ class SellerDashboardScreen extends StatefulWidget {
   State<SellerDashboardScreen> createState() => _SellerDashboardScreenState();
 }
 
+/// How many rows a page shows before "show more". Enough to fill a screen
+/// without making the shop wait on a hundred widgets it will not look at.
+const _pageSize = 8;
+
+enum _Pane { orders, inventory }
+
 class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
+  /// Null until the seller picks a side, so the first view can follow the
+  /// shop's own state: a store with no orders yet opens on its stock rather
+  /// than on an empty list.
+  _Pane? _chosen;
+  _Pane get _pane =>
+      _chosen ??
+      (Seller.instance.orders.isEmpty ? _Pane.inventory : _Pane.orders);
+  int _shownOrders = _pageSize;
+  int _shownItems = _pageSize;
+
   @override
   void initState() {
     super.initState();
@@ -181,96 +197,121 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 22),
-                        const Text(
-                          'Orders',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        // Orders and inventory used to run one after the
+                        // other, so a shop with a day's orders had to scroll
+                        // past all of them to change a price. Two panes, one
+                        // tap apart, and neither can bury the other.
+                        _PaneToggle(
+                          pane: _pane,
+                          orders: Seller.instance.orders.length,
+                          items: items.length,
+                          onTap: (p) => setState(() => _chosen = p),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _Stat(
-                              label: 'Received',
-                              value:
-                                  '${Seller.instance.countAt(OrderStage.received)}',
-                              color:
-                                  Seller.instance.countAt(OrderStage.received) >
-                                      0
-                                  ? _amber
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            _Stat(
-                              label: 'Accepted',
-                              value:
-                                  '${Seller.instance.countAt(OrderStage.accepted)}',
-                            ),
-                            const SizedBox(width: 10),
-                            _Stat(
-                              label: 'Delivered',
-                              value:
-                                  '${Seller.instance.countAt(OrderStage.delivered)}',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (Seller.instance.orders.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 18),
-                            child: Center(
-                              child: Text(
-                                'No orders yet',
-                                style: TextStyle(fontSize: 13.5, color: _muted),
+                        const SizedBox(height: 14),
+                        if (_pane == _Pane.orders) ...[
+                          Row(
+                            children: [
+                              _Stat(
+                                label: 'Received',
+                                value:
+                                    '${Seller.instance.countAt(OrderStage.received)}',
+                                color:
+                                    Seller.instance.countAt(OrderStage.received) >
+                                        0
+                                    ? _amber
+                                    : null,
                               ),
-                            ),
-                          )
-                        else
-                          for (final order in Seller.instance.orders) ...[
-                            _OrderRow(order: order),
-                            const SizedBox(height: 10),
-                          ],
-                        const SizedBox(height: 22),
-                        Text(
-                          'Inventory (${items.length})',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                              const SizedBox(width: 10),
+                              _Stat(
+                                label: 'Accepted',
+                                value:
+                                    '${Seller.instance.countAt(OrderStage.accepted)}',
+                              ),
+                              const SizedBox(width: 10),
+                              _Stat(
+                                label: 'Delivered',
+                                value:
+                                    '${Seller.instance.countAt(OrderStage.delivered)}',
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (items.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 30),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  LucideIcons.packageOpen,
-                                  size: 44,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(height: 12),
-                                Text(
-                                  'No products yet',
-                                  style: TextStyle(fontSize: 15, color: _muted),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Add your first one to start selling',
+                          const SizedBox(height: 12),
+                          if (Seller.instance.orders.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 18),
+                              child: Center(
+                                child: Text(
+                                  'No orders yet',
                                   style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFF9A9A9A),
+                                    fontSize: 13.5,
+                                    color: _muted,
                                   ),
                                 ),
-                              ],
-                            ),
-                          )
-                        else
-                          for (final item in items) ...[
-                            _ItemRow(item: item),
-                            const SizedBox(height: 10),
+                              ),
+                            )
+                          else ...[
+                            // A page at a time, newest first. The ones that
+                            // need answering are at the top; the rest is a
+                            // record, and a record does not need to be
+                            // rendered all at once.
+                            for (final order
+                                in Seller.instance.orders.take(_shownOrders)) ...[
+                              _OrderRow(order: order),
+                              const SizedBox(height: 10),
+                            ],
+                            if (Seller.instance.orders.length > _shownOrders)
+                              _MoreButton(
+                                left:
+                                    Seller.instance.orders.length - _shownOrders,
+                                noun: 'orders',
+                                onTap: () =>
+                                    setState(() => _shownOrders += _pageSize),
+                              ),
                           ],
+                        ] else ...[
+                          if (items.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 30),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    LucideIcons.packageOpen,
+                                    size: 44,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'No products yet',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: _muted,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Add your first one to start selling',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: Color(0xFF9A9A9A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            for (final item in items.take(_shownItems)) ...[
+                              _ItemRow(item: item),
+                              const SizedBox(height: 10),
+                            ],
+                            if (items.length > _shownItems)
+                              _MoreButton(
+                                left: items.length - _shownItems,
+                                noun: 'products',
+                                onTap: () =>
+                                    setState(() => _shownItems += _pageSize),
+                              ),
+                          ],
+                        ],
                       ],
                     ),
                   ),
@@ -291,10 +332,15 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
           return FloatingActionButton.extended(
             backgroundColor: _green,
             foregroundColor: Colors.white,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SellerProductScreen()),
-            ),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SellerProductScreen()),
+              );
+              // Land on what you just added. Coming back to the orders pane
+              // after adding a product looks like the add did nothing.
+              if (mounted) setState(() => _chosen = _Pane.inventory);
+            },
             icon: const Icon(LucideIcons.plus, size: 18),
             label: const Text(
               'Add product',
@@ -308,6 +354,98 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 }
 
 /// One incoming order, with the single action it is waiting on.
+/// Orders or inventory, with the counts on the buttons so the shop can see
+/// there is something waiting without opening the other side.
+class _PaneToggle extends StatelessWidget {
+  final _Pane pane;
+  final int orders;
+  final int items;
+  final ValueChanged<_Pane> onTap;
+  const _PaneToggle({
+    required this.pane,
+    required this.orders,
+    required this.items,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Row(
+        children: [
+          _half('Orders ($orders)', _Pane.orders),
+          _half('Inventory ($items)', _Pane.inventory),
+        ],
+      ),
+    );
+  }
+
+  Widget _half(String label, _Pane which) => Expanded(
+    child: GestureDetector(
+      onTap: () => onTap(which),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: pane == which ? _ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: pane == which ? Colors.white : _muted,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// The rest of a long list, on request. Says how many are left rather than
+/// "Show more", so the shop knows whether it is one tap or ten.
+class _MoreButton extends StatelessWidget {
+  final int left;
+  final String noun;
+  final VoidCallback onTap;
+  const _MoreButton({
+    required this.left,
+    required this.noun,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Text(
+          'Show $left more $noun',
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: _ink,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OrderRow extends StatelessWidget {
   final SellerOrder order;
   const _OrderRow({required this.order});

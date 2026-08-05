@@ -12,8 +12,11 @@ type Product struct {
 	// What it cost before the discount. Zero means there is no discount to
 	// show — not a free item — so the badge and the struck-through line are
 	// both driven off "is this above price", never off "is this set".
-	MRP      float64 `json:"mrp,omitempty"`
-	ImageURL string  `json:"imageUrl"`
+	MRP float64 `json:"mrp,omitempty"`
+	// What the shopper picks before buying — size, colour, whatever this shop
+	// sells by. Empty for the seeded catalogue and for anything sold one way.
+	Options  []ItemOption `json:"options,omitempty"`
+	ImageURL string       `json:"imageUrl"`
 	// Every photo, in upload order. A seller's item can carry several; the
 	// seeded rows have one. imageUrl stays the cover so old callers still work.
 	ImageURLs   []string `json:"imageUrls"`
@@ -50,15 +53,27 @@ type SellerStore struct {
 
 // InventoryItem is one line of a seller's stock.
 type InventoryItem struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Category    string   `json:"category"`
-	Price       float64  `json:"price"`
-	MRP         float64  `json:"mrp"` // 0 when the seller is not running a discount
-	Stock       int      `json:"stock"`
-	Status      string   `json:"status"`    // derived from stock, never stored
-	ImageURLs   []string `json:"imageUrls"` // Cloudinary, in upload order
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Category    string  `json:"category"`
+	Price       float64 `json:"price"`
+	MRP         float64 `json:"mrp"` // 0 when the seller is not running a discount
+	// What the buyer chooses before ordering. Empty for most things — a
+	// samosa has no size — so it stays out of the JSON when there is none.
+	Options   []ItemOption `json:"options,omitempty"`
+	Stock     int          `json:"stock"`
+	Status    string       `json:"status"`    // derived from stock, never stored
+	ImageURLs []string     `json:"imageUrls"` // Cloudinary, in upload order
+}
+
+// ItemOption is one thing a buyer picks, with the choices the shop offers.
+// Kind decides how it draws: "colour" values are hex and become swatches,
+// anything else is a row of labels.
+type ItemOption struct {
+	Name   string   `json:"name"`
+	Kind   string   `json:"kind"`
+	Values []string `json:"values"`
 }
 
 // LowStockAt is the threshold below which an item is flagged for restocking.

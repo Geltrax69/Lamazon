@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/product.dart';
 import 'api.dart';
 
 // What a seller can list under now comes from the admin's categories — see
@@ -62,6 +63,8 @@ class InventoryItem {
   /// Price before the discount, 0 when the seller is not running one. Never
   /// below price — the server rejects that, and so does the form.
   double mrp;
+  /// What the buyer picks: size, colour, whatever this shop sells by.
+  List<ItemOption> options;
   int stock;
   List<Uint8List> photos; // first one is the cover
 
@@ -77,6 +80,7 @@ class InventoryItem {
     required this.category,
     required this.price,
     this.mrp = 0,
+    this.options = const [],
     required this.stock,
     this.photos = const [],
   });
@@ -260,6 +264,7 @@ class Seller extends ChangeNotifier {
         category: item.category,
         price: item.price,
         mrp: item.mrp,
+        options: item.options,
         stock: item.stock,
         photos: item.photos,
       );
@@ -323,6 +328,7 @@ class Seller extends ChangeNotifier {
         category: item.category,
         price: item.price,
         mrp: item.mrp,
+        options: item.options,
         stock: item.stock,
       );
       item.imageUrls = saved.imageUrls;

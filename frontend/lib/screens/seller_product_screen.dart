@@ -6,6 +6,7 @@ import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/categories.dart';
+import '../models/product.dart';
 import '../data/seller.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
@@ -41,9 +42,10 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     text: widget.existing?.stock.toString(),
   );
   late List<Uint8List> _photos = [...?widget.existing?.photos];
+  late final List<ItemOption> _options = [...?widget.existing?.options];
   late String _category =
       widget.existing?.category ??
-      (Seller.instance.store?.categories.first ?? _options.first);
+      (Seller.instance.store?.categories.first ?? _categoryOptions.first);
 
   @override
   void dispose() {
@@ -58,11 +60,16 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   /// What this seller may file an item under: the admin's categories inside
   /// the departments this store signed up for. A department with no
   /// categories yet offers itself, so a new one is never unsellable in.
-  List<String> get _options {
+  List<String> get _categoryOptions {
     final mine = Seller.instance.store?.categories ?? const <String>[];
     final out = [for (final d in mine) ...sellableCategories(d)];
     return out.isEmpty ? sellableCategories() : out;
   }
+
+  /// A group with no values is one the seller started and abandoned; saving it
+  /// would show the buyer a heading with nothing to pick under it.
+  List<ItemOption> get _liveOptions =>
+      [for (final o in _options) if (o.values.isNotEmpty) o];
 
   double? get _priceValue => double.tryParse(_price.text.trim());
   int? get _stockValue => int.tryParse(_stock.text.trim());
@@ -150,6 +157,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           category: _category,
           price: _priceValue!,
           mrp: _mrpValue!,
+          options: _liveOptions,
           stock: _stockValue!,
           photos: _photos,
         ),
@@ -161,6 +169,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         ..category = _category
         ..price = _priceValue!
         ..mrp = _mrpValue!
+        ..options = _liveOptions
         ..stock = _stockValue!
         ..photos = _photos;
       Seller.instance.itemChanged(item);
@@ -171,7 +180,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
-    final categories = _options;
+    final categories = _categoryOptions;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
@@ -309,6 +318,17 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                         ],
                       ),
                     ],
+                    const SizedBox(height: 22),
+                    SellerSection(
+                      title: 'Options',
+                      hint: _options.isEmpty
+                          ? 'Only if buyers have to choose — size, colour…'
+                          : 'Buyers pick one of each before ordering',
+                    ),
+                    _OptionsEditor(
+                      options: _options,
+                      onChanged: () => setState(() {}),
+                    ),
                     if (categories.length > 1) ...[
                       const SizedBox(height: 22),
                       const SellerSection(title: 'Category'),
@@ -335,6 +355,368 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Presets, so the common cases are one tap and not a form. A clothes shop
+/// wants Size with S–XL; making them type five boxes to get there is what
+/// makes a seller decide options are not worth it.
+const _presets = <String, ItemOption>{
+  'Size': ItemOption(
+    name: 'Size',
+    values: ['S', 'M', 'L', 'XL'],
+  ),
+  'Colour': ItemOption(
+    name: 'Colour',
+    kind: 'colour',
+    values: ['#1A1A1A', '#FFFFFF', '#D32F2F', '#2F6FED'],
+  ),
+  'Weight': ItemOption(
+    name: 'Weight',
+    values: ['250g', '500g', '1kg'],
+  ),
+  'Spice': ItemOption(
+    name: 'Spice',
+    values: ['Mild', 'Medium', 'Hot'],
+  ),
+};
+
+/// Colours a swatch can be. A named row rather than a colour wheel: a shop is
+/// picking "the red one", not #B71C1C exactly, and a wheel is a decision they
+/// did not ask to make.
+const _swatches = <String, String>{
+  'Black': '#1A1A1A',
+  'White': '#FFFFFF',
+  'Grey': '#9E9E9E',
+  'Red': '#D32F2F',
+  'Pink': '#F06292',
+  'Orange': '#FF8A3D',
+  'Yellow': '#FBC02D',
+  'Green': '#43A047',
+  'Blue': '#2F6FED',
+  'Navy': '#1A237E',
+  'Purple': '#9C6ADE',
+  'Brown': '#6D4C41',
+  'Beige': '#D7CCC8',
+  'Gold': '#C9A227',
+};
+
+Color _hexColour(String hex) => Color(
+  0xFF000000 |
+      (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0),
+);
+
+/// The option groups on a listing, and the two taps that add one. Mutates the
+/// list it is given — the screen owns it and saves it, this only edits.
+class _OptionsEditor extends StatelessWidget {
+  final List<ItemOption> options;
+  final VoidCallback onChanged;
+  const _OptionsEditor({required this.options, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final unused = _presets.keys
+        .where((k) => !options.any((o) => o.name == k))
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (i, option) in options.indexed) ...[
+          _OptionGroup(
+            option: option,
+            onRemove: () {
+              options.removeAt(i);
+              onChanged();
+            },
+            onValues: (values) {
+              options[i] = ItemOption(
+                name: option.name,
+                kind: option.kind,
+                values: values,
+              );
+              onChanged();
+            },
+          ),
+          const SizedBox(height: 10),
+        ],
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            // Named presets come filled in; the shop deletes what it does not
+            // sell rather than typing what it does.
+            for (final name in unused)
+              _AddChip(
+                label: '+ $name',
+                onTap: () {
+                  options.add(_presets[name]!);
+                  onChanged();
+                },
+              ),
+            _AddChip(
+              label: '+ Something else',
+              onTap: () async {
+                final name = await _askName(context);
+                if (name == null || name.isEmpty) return;
+                options.add(ItemOption(name: name));
+                onChanged();
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<String?> _askName(BuildContext context) {
+    final field = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('What do buyers choose?'),
+        content: TextField(
+          controller: field,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'e.g. Flavour, Length, Material',
+          ),
+          onSubmitted: (v) => Navigator.pop(dialog, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, field.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One group: its name, its values as removable chips, and one field to add
+/// another. Colour groups swap the field for swatches.
+class _OptionGroup extends StatefulWidget {
+  final ItemOption option;
+  final VoidCallback onRemove;
+  final ValueChanged<List<String>> onValues;
+  const _OptionGroup({
+    required this.option,
+    required this.onRemove,
+    required this.onValues,
+  });
+
+  @override
+  State<_OptionGroup> createState() => _OptionGroupState();
+}
+
+class _OptionGroupState extends State<_OptionGroup> {
+  final _entry = TextEditingController();
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
+
+  void _add(String value) {
+    value = value.trim();
+    // Duplicates would render as two identical chips the buyer cannot tell
+    // apart, so silently ignore rather than warn about it.
+    if (value.isEmpty || widget.option.values.contains(value)) return;
+    widget.onValues([...widget.option.values, value]);
+    _entry.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final option = widget.option;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  option.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove ${option.name}',
+                onPressed: widget.onRemove,
+                icon: const Icon(LucideIcons.trash2, size: 15, color: _amber),
+              ),
+            ],
+          ),
+          if (option.values.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Add at least one choice, or this group is dropped.',
+                style: TextStyle(fontSize: 12, color: _muted),
+              ),
+            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final value in option.values)
+                _ValueChip(
+                  label: option.isColour ? _nameOf(value) : value,
+                  swatch: option.isColour ? _hexColour(value) : null,
+                  onRemove: () => widget.onValues(
+                    [...option.values]..remove(value),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (option.isColour)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final entry in _swatches.entries)
+                  if (!option.values.contains(entry.value))
+                    GestureDetector(
+                      onTap: () => _add(entry.value),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: _hexColour(entry.value),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black12),
+                        ),
+                      ),
+                    ),
+              ],
+            )
+          else
+            SizedBox(
+              height: 42,
+              child: TextField(
+                controller: _entry,
+                textInputAction: TextInputAction.done,
+                onSubmitted: _add,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Add a choice, then Enter',
+                  hintStyle: const TextStyle(fontSize: 13, color: _muted),
+                  filled: true,
+                  fillColor: const Color(0xFFF4F4F2),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: IconButton(
+                    onPressed: () => _add(_entry.text),
+                    icon: const Icon(LucideIcons.plus, size: 16),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The nearest name we have for a hex value, so a chip reads "Red" rather
+  /// than "#D32F2F". Unknown values keep their hex — it is still true.
+  String _nameOf(String hex) {
+    for (final entry in _swatches.entries) {
+      if (entry.value.toLowerCase() == hex.toLowerCase()) return entry.key;
+    }
+    return hex;
+  }
+}
+
+class _ValueChip extends StatelessWidget {
+  final String label;
+  final Color? swatch;
+  final VoidCallback onRemove;
+  const _ValueChip({
+    required this.label,
+    required this.swatch,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1EF),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (swatch != null) ...[
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: swatch,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black12),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Text(label, style: const TextStyle(fontSize: 12.5)),
+          const SizedBox(width: 2),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(LucideIcons.x, size: 12, color: _muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _AddChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFDDDDD8)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
         ),
       ),
     );

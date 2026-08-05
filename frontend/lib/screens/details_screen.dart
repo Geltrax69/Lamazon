@@ -23,15 +23,11 @@ class DetailsScreen extends StatefulWidget {
 
 class _DetailsScreenState extends State<DetailsScreen> {
   int _qty = 1;
-  int _size = 0;
-  int _color = 0;
 
-  static const _colors = [
-    _hero,
-    Color(0xFF1A1A1A),
-    Color(0xFF8FB8D8),
-    Color(0xFFC9D4DC),
-  ];
+  /// What the shopper has picked per option group, keyed by its name. Empty
+  /// until they choose — nothing is preselected, because a default here is a
+  /// choice the shop did not make on their behalf.
+  final Map<String, String> _picked = {};
 
   void _addToCart() {
     Cart.instance.add(widget.product, _qty);
@@ -143,65 +139,18 @@ class _DetailsScreenState extends State<DetailsScreen> {
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      for (var i = 0; i < _colors.length; i++)
-                        GestureDetector(
-                          onTap: () => setState(() => _color = i),
-                          child: Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              color: _colors[i],
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _color == i ? _ink : Colors.transparent,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
-                  if (p.sizes.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Select Size',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  // Whatever this shop sells by, in the order it listed them.
+                  // The size row used to be hardcoded and the colour dots were
+                  // decoration — four swatches every product had, none of
+                  // which any shop had chosen.
+                  for (final option in p.choices)
+                    _OptionPicker(
+                      option: option,
+                      selected: _picked[option.name],
+                      onPick: (v) => setState(() => _picked[option.name] = v),
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 44,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: p.sizes.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 10),
-                        itemBuilder: (_, i) => GestureDetector(
-                          onTap: () => setState(() => _size = i),
-                          child: Container(
-                            width: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _size == i ? _hero : Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              p.sizes[i],
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: _size == i
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 18),
                   const Text(
                     'Description',
@@ -575,3 +524,103 @@ class _PillButton extends StatelessWidget {
     );
   }
 }
+
+/// One option group as the shopper sees it. Colour values draw as swatches,
+/// everything else as labels — the shop said which when it created the group.
+class _OptionPicker extends StatelessWidget {
+  final ItemOption option;
+  final String? selected;
+  final ValueChanged<String> onPick;
+  const _OptionPicker({
+    required this.option,
+    required this.selected,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (option.values.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                option.name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (selected != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  option.isColour ? '' : selected!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B6B6B),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final value in option.values)
+                if (option.isColour)
+                  GestureDetector(
+                    onTap: () => onPick(value),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: _swatchColour(value),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected == value
+                              ? _ink
+                              : Colors.black12,
+                          width: selected == value ? 2.5 : 1,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => onPick(value),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected == value ? _hero : Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: selected == value
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Color _swatchColour(String hex) => Color(
+  0xFF000000 | (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0),
+);

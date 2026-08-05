@@ -67,6 +67,14 @@ func decodeItem(r *http.Request) (InventoryItem, [][]byte, error) {
 		}
 		in.MRP = mrp
 	}
+	// A multipart form carries the option groups as one JSON field — they are
+	// a nested shape, and flattening them into repeated keys would need a
+	// parser on both sides to say the same thing.
+	if s := strings.TrimSpace(r.FormValue("options")); s != "" {
+		if err := json.Unmarshal([]byte(s), &in.Options); err != nil {
+			return in, nil, errors.New("options must be valid JSON")
+		}
+	}
 	if s := strings.TrimSpace(r.FormValue("stock")); s != "" {
 		stock, err := strconv.Atoi(s)
 		if err != nil {
