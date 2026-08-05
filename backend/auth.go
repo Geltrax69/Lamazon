@@ -128,6 +128,16 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Development shortcut: hand back a session on the spot, no code and no
+	// email. Off unless SKIP_LOGIN_CODE is set, and it must stay off anywhere
+	// reachable from outside — with it on, anyone who can POST here can sign
+	// in as anybody. dev.sh sets it; nothing else does.
+	if skipLoginCode() {
+		log.Printf("SKIP_LOGIN_CODE: signing %s in without a code", email)
+		a.issueSession(w, r, email)
+		return
+	}
+
 	code, err := sixDigits()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -212,8 +222,21 @@ func (a *API) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// First verified code is where a person becomes a row, and where their
-	// public id is minted. Everything else joins on the email.
+	a.issueSession(w, r, email)
+}
+
+// skipLoginCode reports whether the sign-in code is bypassed. Anything but
+// unset or "0"/"false" turns it on, because a flag you have to spell exactly
+// right is a flag that silently stays off.
+func skipLoginCode() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("SKIP_LOGIN_CODE")))
+	return v != "" && v != "0" && v != "false"
+}
+
+// issueSession mints the tokens and the user row behind them. Signing in is
+// the first time a person becomes a row, and where their public id comes
+// from; everything else joins on the email.
+func (a *API) issueSession(w http.ResponseWriter, r *http.Request, email string) {
 	user, err := a.db.upsertUser(r.Context(), email)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

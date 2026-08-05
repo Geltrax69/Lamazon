@@ -159,7 +159,12 @@ class Api {
 
   /// Asks the backend to email a six-digit code. Throws with the server's
   /// reason (bad address, or a resend too soon after the last one).
-  Future<void> requestLoginCode(String email) async {
+  ///
+  /// Returns tokens instead of null when the server is running with the
+  /// sign-in code switched off — a development setup signs straight in, and
+  /// the caller skips the second step rather than asking for a code that was
+  /// never sent.
+  Future<AuthTokens?> requestLoginCode(String email) async {
     final res = await http
         .post(
           _url('/api/login'),
@@ -168,6 +173,8 @@ class Api {
         )
         .timeout(_authTimeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body.containsKey('token') ? AuthTokens.fromJson(body) : null;
   }
 
   /// Trades the code for a token pair.

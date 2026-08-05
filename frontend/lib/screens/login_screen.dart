@@ -50,7 +50,17 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await Api.instance.requestLoginCode(_email.text.trim());
+      final straightIn = await Api.instance.requestLoginCode(
+        _email.text.trim(),
+      );
+      // The server can sign someone in on the spot when it is running with
+      // the code switched off; asking for one that was never sent would be a
+      // dead end.
+      if (straightIn != null) {
+        await Session.instance.signIn(straightIn);
+        _go();
+        return;
+      }
       setState(() => _codeSent = true);
     } on http.ClientException catch (e) {
       setState(() => _error = e.message);

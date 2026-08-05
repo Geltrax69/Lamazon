@@ -80,8 +80,15 @@ echo "==> building API"
 BIN=$(mktemp -t lamazon-api)
 go build -C backend -o "$BIN" .
 
+# Local sign-in skips the emailed code: type an address, press the button, you
+# are in. Set here and nowhere else — with this on, anyone who can reach the
+# API can sign in as anybody, so it must never be set on a deployed one.
+# Comment the line out to get the real code flow back.
+SKIP_LOGIN_CODE="${SKIP_LOGIN_CODE:-1}"
+
 echo "==> starting API on $PORT"
-DATABASE_URL="$DB_URL" PORT="$PORT" "$BIN" &
+[ "$SKIP_LOGIN_CODE" = "1" ] && echo "==> sign-in code is OFF (local only)"
+DATABASE_URL="$DB_URL" PORT="$PORT" SKIP_LOGIN_CODE="$SKIP_LOGIN_CODE" "$BIN" &
 API_PID=$!
 # INT and TERM as well as EXIT: Ctrl-C is how this normally ends, and bash does
 # not always reach the EXIT trap on an untrapped signal.
