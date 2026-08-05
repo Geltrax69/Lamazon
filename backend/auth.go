@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -129,10 +130,13 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Development shortcut: hand back a session on the spot, no code and no
-	// email. Off unless SKIP_LOGIN_CODE is set, and it must stay off anywhere
-	// reachable from outside — with it on, anyone who can POST here can sign
-	// in as anybody. dev.sh sets it; nothing else does.
-	if skipLoginCode() {
+	// email. Needs the flag *and* a request that came from this machine.
+	//
+	// The flag alone is not enough. The Cloudflare tunnel forwards to the very
+	// port dev.sh runs on, so "only dev.sh sets it" and "only reachable
+	// locally" are not the same sentence — with the tunnel up, a flag meant
+	// for a laptop was letting anyone on the internet sign in as anybody.
+	if skipLoginCode() && isLoopback(r) {
 		log.Printf("SKIP_LOGIN_CODE: signing %s in without a code", email)
 		a.issueSession(w, r, email)
 		return
@@ -223,6 +227,26 @@ func (a *API) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.issueSession(w, r, email)
+}
+
+// isLoopback reports whether the request came from this machine and was not
+// relayed. Any forwarding header means a proxy is in front — the tunnel sets
+// them, and a real local browser does not — so their presence alone disproves
+// it, whatever the socket says.
+func isLoopback(r *http.Request) bool {
+	for _, h := range []string{
+		"X-Forwarded-For", "CF-Connecting-IP", "X-Real-IP", "Forwarded",
+	} {
+		if r.Header.Get(h) != "" {
+			return false
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // skipLoginCode reports whether the sign-in code is bypassed. Anything but
