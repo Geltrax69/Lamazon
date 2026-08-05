@@ -42,9 +42,22 @@ class ScreenHeader extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          // Flexible, so a long title or a wide action shortens the title
+          // rather than running off the edge of a narrow phone.
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
           SizedBox(width: 46, child: action),
         ],

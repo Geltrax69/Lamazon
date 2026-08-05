@@ -40,7 +40,7 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
       _fix = fix;
       _error = fix == null
           ? 'Could not get your location. Allow it in your browser, or enter '
-              'your address instead.'
+                'your address instead.'
           : null;
     });
   }
@@ -82,7 +82,9 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                here ? 'You look like you are here' : 'You are outside our area',
+                here
+                    ? 'You look like you are here'
+                    : 'You are outside our area',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 18,
@@ -97,9 +99,9 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
               child: Text(
                 here
                     ? '${serviceableCities.first}\n'
-                        '${fix.distanceLabel} from the centre of campus'
+                          '${fix.distanceLabel} from the centre of campus'
                     : 'We only deliver around ${serviceableCities.first}, '
-                        'and you are ${fix.distanceLabel}.',
+                          'and you are ${fix.distanceLabel}.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13.5,
@@ -196,8 +198,8 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
               label: _locating
                   ? 'Finding you…'
                   : Geo.instance.supported
-                      ? 'Use my current location'
-                      : 'Enable device location',
+                  ? 'Use my current location'
+                  : 'Enable device location',
               color: _green,
               onTap: () {
                 if (_locating) return;
@@ -211,7 +213,9 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
                     const SnackBar(
-                      content: Text('Location on — add an address to start ordering'),
+                      content: Text(
+                        'Location on — add an address to start ordering',
+                      ),
                       behavior: SnackBarBehavior.floating,
                       duration: Duration(seconds: 2),
                     ),

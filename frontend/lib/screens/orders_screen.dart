@@ -93,7 +93,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ],
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                4,
+                                20,
+                                100,
+                              ),
                               itemCount: orders.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: 12),

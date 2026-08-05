@@ -67,4 +67,32 @@ void main() {
       expect(find.text('Keep this for later?'), findsNothing);
     });
   });
+
+  testWidgets('editing starts from the store, and keeps no draft',
+      (tester) async {
+    await mockNetworkImagesFor(() async {
+      final store = SellerStore(
+        name: 'Lalit Computer Tech.',
+        photo: null,
+        location: 'UNi Mal, 3rd Floor',
+        city: 'Lovely Professional University',
+        categories: const ['Electronics'],
+        status: 'approved',
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: SellerOnboardingScreen(existing: store)),
+      );
+      await tester.pump();
+
+      expect(find.text('Edit store'), findsOneWidget);
+      expect(find.text('Save changes'), findsOneWidget);
+      expect(find.text('Lalit Computer Tech.'), findsWidgets);
+
+      // Backing out of an edit must not leave a draft behind: the next person
+      // to open a new store would find someone else's shop in the form.
+      await tester.tap(find.byIcon(LucideIcons.arrowLeft));
+      await tester.pumpAndSettle();
+      expect(StoreDraft.isEmpty, isTrue);
+    });
+  });
 }

@@ -17,23 +17,42 @@ const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
 const _green = Color(0xFF2E7D32);
 
-/// Opens a seller's store: business name, photo, location, what they sell.
+/// Opens a seller's store, or edits the one they have: business name, photo,
+/// location, what they sell.
+///
+/// One screen for both, because they ask for exactly the same things and the
+/// server upserts on the owner — a separate edit form would be the same
+/// fields with a different set of bugs.
 class SellerOnboardingScreen extends StatefulWidget {
-  const SellerOnboardingScreen({super.key});
+  /// The store being changed, or null when opening the first one.
+  final SellerStore? existing;
+  const SellerOnboardingScreen({super.key, this.existing});
 
   @override
   State<SellerOnboardingScreen> createState() => _SellerOnboardingScreenState();
 }
 
 class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
-  // Whatever was left behind last time, so coming back lands where you left.
-  late final _name = TextEditingController(text: StoreDraft.name);
-  late final _location = TextEditingController(text: StoreDraft.location);
-  late final _city = TextEditingController(
-    text: StoreDraft.city.isEmpty ? serviceableCities.first : StoreDraft.city,
+  // Editing starts from the store. Opening starts from whatever was left
+  // behind last time, so coming back lands where you left.
+  bool get _editing => widget.existing != null;
+
+  late final _name = TextEditingController(
+    text: widget.existing?.name ?? StoreDraft.name,
   );
-  late final _picked = <String>{...StoreDraft.categories};
-  late Uint8List? _photo = StoreDraft.photo;
+  late final _location = TextEditingController(
+    text: widget.existing?.location ?? StoreDraft.location,
+  );
+  late final _city = TextEditingController(
+    text:
+        widget.existing?.city ??
+        (StoreDraft.city.isEmpty ? serviceableCities.first : StoreDraft.city),
+  );
+  late final _picked = <String>{
+    ...?widget.existing?.categories,
+    if (!_editing) ...StoreDraft.categories,
+  };
+  late Uint8List? _photo = widget.existing?.photo ?? StoreDraft.photo;
 
   /// A store signs up to departments, not to the categories inside them —
   /// this is what decides which tab the shop appears under.
@@ -63,6 +82,10 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
   }
 
   void _saveDraft() {
+    // A draft is for a store that does not exist yet. Editing one that does
+    // has somewhere to put changes already, and stashing them here would
+    // reappear as a phantom draft next time somebody opens a new store.
+    if (_editing) return;
     StoreDraft.photo = _photo;
     StoreDraft.name = _name.text;
     StoreDraft.location = _location.text;
@@ -115,8 +138,18 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
         location: _location.text.trim(),
         city: _city.text.trim(),
         categories: _picked.toList(),
+        // Editing keeps the standing it already has. The server decides
+        // anyway — it only sends a store back for review when it had been
+        // rejected — but saying so here stops the screen flashing "pending"
+        // at an approved shop in the meantime.
+        status: widget.existing?.status ?? 'pending',
+        rejectReason: widget.existing?.rejectReason ?? '',
       ),
     );
+    if (_editing) {
+      Navigator.pop(context);
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const SellerDashboardScreen()),
@@ -141,14 +174,20 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
           child: SafeArea(
             child: Column(
               children: [
-                ScreenHeader(title: 'Open your store', onBack: _confirmLeave),
+                ScreenHeader(
+                  title: _editing ? 'Edit store' : 'Open your store',
+                  onBack: _confirmLeave,
+                ),
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                     children: [
-                      const Text(
-                        'Sell to everyone ordering on campus. Takes a minute.',
-                        style: TextStyle(fontSize: 13.5, color: _muted),
+                      Text(
+                        _editing
+                            ? 'Changes show on your store page and to shoppers.'
+                            : 'Sell to everyone ordering on campus. Takes a '
+                                  'minute.',
+                        style: const TextStyle(fontSize: 13.5, color: _muted),
                       ),
                       const SizedBox(height: 20),
                       const SellerSection(
@@ -158,7 +197,10 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                       PhotoTile(
                         photo: _photo,
                         emptyLabel: 'Upload store photo',
-                        emptyHint: 'Tap to choose from your device',
+                        emptyHint: 'Tap to choose, then frame it',
+                        // The shape the dashboard and the store card show it
+                        // in, so the crop is the picture shoppers get.
+                        aspect: 16 / 9,
                         onChanged: (p) => setState(() => _photo = p),
                       ),
                       const SizedBox(height: 22),
@@ -223,7 +265,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                   ),
                 ),
                 SellerSubmitBar(
-                  label: 'Create store',
+                  label: _editing ? 'Save changes' : 'Create store',
                   blocker: blocker,
                   onSubmit: _create,
                 ),

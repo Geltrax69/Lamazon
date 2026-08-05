@@ -56,7 +56,7 @@ class _NotifyBannerState extends State<NotifyBanner> {
         _step = _NotifyStep.failed;
         _error = Push.instance.denied
             ? 'Your browser is blocking notifications. Allow them for this '
-                'site in its settings, then try again.'
+                  'site in its settings, then try again.'
             : 'Could not turn notifications on. You will still get emails.';
       });
       return;
@@ -65,7 +65,8 @@ class _NotifyBannerState extends State<NotifyBanner> {
     if (!await Push.instance.sendTest()) {
       setState(() {
         _step = _NotifyStep.failed;
-        _error = 'Notifications are on, but the test one did not send. '
+        _error =
+            'Notifications are on, but the test one did not send. '
             'Emails are unaffected.';
       });
       return;
@@ -83,8 +84,8 @@ class _NotifyBannerState extends State<NotifyBanner> {
         _error = _delivered
             ? null
             : 'FCM accepted it but no notification appeared. Check that '
-                'Chrome is allowed to notify you in macOS System Settings, '
-                'then try again.';
+                  'Chrome is allowed to notify you in macOS System Settings, '
+                  'then try again.';
       });
     });
   }
@@ -126,7 +127,8 @@ class _NotifyBannerState extends State<NotifyBanner> {
     final done = _step == _NotifyStep.confirmed;
     if (_hidden || !push.supported) return const SizedBox.shrink();
     // Already granted and nothing to prove: stay out of the way.
-    if (push.granted && _step == _NotifyStep.ask) return const SizedBox.shrink();
+    if (push.granted && _step == _NotifyStep.ask)
+      return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -143,7 +145,12 @@ class _NotifyBannerState extends State<NotifyBanner> {
             color: done ? const Color(0xFF1D4A3C) : null,
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(_message(), style: const TextStyle(fontSize: 12.5, height: 1.35))),
+          Expanded(
+            child: Text(
+              _message(),
+              style: const TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+          ),
           _action(),
           IconButton(
             icon: const Icon(LucideIcons.x, size: 15),
@@ -155,33 +162,33 @@ class _NotifyBannerState extends State<NotifyBanner> {
   }
 
   String _message() => switch (_step) {
-        _NotifyStep.ask =>
-          'Get notified the moment an order arrives.\nWe email you either way.',
-        _NotifyStep.sending => 'Setting notifications up…',
-        _NotifyStep.waiting =>
-          'Sent you a test notification. Tap “Yes, got it” on it to finish.',
-        _NotifyStep.confirmed =>
-          'Notifications are working. You will hear about new orders here.',
-        _NotifyStep.failed => _error ?? 'Something went wrong.',
-      };
+    _NotifyStep.ask =>
+      'Get notified the moment an order arrives.\nWe email you either way.',
+    _NotifyStep.sending => 'Setting notifications up…',
+    _NotifyStep.waiting =>
+      'Sent you a test notification. Tap “Yes, got it” on it to finish.',
+    _NotifyStep.confirmed =>
+      'Notifications are working. You will hear about new orders here.',
+    _NotifyStep.failed => _error ?? 'Something went wrong.',
+  };
 
   Widget _action() => switch (_step) {
-        _NotifyStep.ask => TextButton(
-            onPressed: _openDialog,
-            child: const Text('Turn on'),
-          ),
-        _NotifyStep.sending || _NotifyStep.waiting => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: SizedBox(
-              width: 15,
-              height: 15,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        _NotifyStep.confirmed => const SizedBox(width: 8),
-        _NotifyStep.failed => TextButton(
-            onPressed: _turnOn,
-            child: const Text('Retry'),
-          ),
-      };
+    _NotifyStep.ask => TextButton(
+      onPressed: _openDialog,
+      child: const Text('Turn on'),
+    ),
+    _NotifyStep.sending || _NotifyStep.waiting => const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12),
+      child: SizedBox(
+        width: 15,
+        height: 15,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    ),
+    _NotifyStep.confirmed => const SizedBox(width: 8),
+    _NotifyStep.failed => TextButton(
+      onPressed: _turnOn,
+      child: const Text('Retry'),
+    ),
+  };
 }

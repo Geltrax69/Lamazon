@@ -88,7 +88,30 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
               final items = Seller.instance.items;
               return Column(
                 children: [
-                  const ScreenHeader(title: 'Your store'),
+                  ScreenHeader(
+                    title: 'Your store',
+                    // A shop moves, renames itself, and takes a better photo
+                    // of the counter. None of that was reachable once the
+                    // store existed.
+                    action: IconButton(
+                      tooltip: 'Edit store',
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                SellerOnboardingScreen(existing: store),
+                          ),
+                        );
+                        if (context.mounted) Seller.instance.load();
+                      },
+                      icon: const Icon(
+                        LucideIcons.pencil,
+                        size: 17,
+                        color: _ink,
+                      ),
+                    ),
+                  ),
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),

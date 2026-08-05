@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'photo_cropper.dart';
+
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
 
@@ -32,6 +34,11 @@ class PhotoTile extends StatelessWidget {
   final double height;
   final ValueChanged<Uint8List?> onChanged;
 
+  /// The shape the photo will be shown in. Cropping to it here means the
+  /// person decides what gets cut off, rather than BoxFit.cover deciding for
+  /// them at the moment a shopper looks at the card.
+  final double aspect;
+
   const PhotoTile({
     super.key,
     required this.photo,
@@ -39,11 +46,21 @@ class PhotoTile extends StatelessWidget {
     this.emptyLabel = 'Add a photo',
     this.emptyHint = 'JPG or PNG from your device',
     this.height = 150,
+    this.aspect = 16 / 9,
   });
 
-  Future<void> _pick() async {
+  Future<void> _pick(BuildContext context) async {
     final picked = await pickPhotos(multiple: false);
-    if (picked.isNotEmpty) onChanged(picked.first);
+    if (picked.isEmpty || !context.mounted) return;
+    // Straight into the cropper: framing it is part of choosing it, and a
+    // separate "now adjust it" step is one most people would skip.
+    final cropped = await cropPhoto(context, picked.first, aspect: aspect);
+    onChanged(cropped ?? picked.first);
+  }
+
+  Future<void> _adjust(BuildContext context) async {
+    final cropped = await cropPhoto(context, photo!, aspect: aspect);
+    if (cropped != null) onChanged(cropped);
   }
 
   @override
@@ -51,7 +68,7 @@ class PhotoTile extends StatelessWidget {
     if (photo == null) {
       return _DashedBox(
         height: height,
-        onTap: _pick,
+        onTap: () => _pick(context),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -89,9 +106,14 @@ class PhotoTile extends StatelessWidget {
               child: Row(
                 children: [
                   _OverlayButton(
+                    icon: LucideIcons.crop,
+                    label: 'Adjust',
+                    onTap: () => _adjust(context),
+                  ),
+                  const SizedBox(width: 8),
+                  _OverlayButton(
                     icon: LucideIcons.repeat2,
-                    label: 'Replace',
-                    onTap: _pick,
+                    onTap: () => _pick(context),
                   ),
                   const SizedBox(width: 8),
                   _OverlayButton(
