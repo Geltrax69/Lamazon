@@ -311,9 +311,8 @@ class _AdminHomeState extends State<_AdminHome> {
                       ),
                     ),
                   TextButton.icon(
-                    onPressed: () => setDialog(
-                      () => fields.add(const GroupAttribute('')),
-                    ),
+                    onPressed: () =>
+                        setDialog(() => fields.add(const GroupAttribute(''))),
                     icon: const Icon(LucideIcons.plus, size: 15),
                     label: const Text('Add a field'),
                   ),
@@ -361,7 +360,10 @@ class _AdminHomeState extends State<_AdminHome> {
     final picked = <String>[
       ...(store['categories'] as List<dynamic>? ?? const []).cast<String>(),
     ];
-    final all = [for (final d in departments) if (d.name != 'All') d.name];
+    final all = [
+      for (final d in departments)
+        if (d.name != 'All') d.name,
+    ];
 
     final ok = await showDialog<bool>(
       context: context,
@@ -429,10 +431,7 @@ class _AdminHomeState extends State<_AdminHome> {
     );
     if (ok != true) return;
     try {
-      await Api.instance.setStoreCategories(
-        store['owner'] as String,
-        picked,
-      );
+      await Api.instance.setStoreCategories(store['owner'] as String, picked);
       await _load();
     } catch (e) {
       _say(e.toString().replaceFirst('ClientException: ', ''));
@@ -468,8 +467,10 @@ class _AdminHomeState extends State<_AdminHome> {
                 ),
                 if (parent.isEmpty) ...[
                   const SizedBox(height: 18),
-                  const Text('Icon', style: TextStyle(fontSize: 12.5,
-                      color: _muted)),
+                  const Text(
+                    'Icon',
+                    style: TextStyle(fontSize: 12.5, color: _muted),
+                  ),
                   const SizedBox(height: 8),
                   // A fixed set, not a text field: Flutter drops any icon it
                   // cannot see referenced in the code, so a name typed here
@@ -501,8 +502,10 @@ class _AdminHomeState extends State<_AdminHome> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  const Text('Colour', style: TextStyle(fontSize: 12.5,
-                      color: _muted)),
+                  const Text(
+                    'Colour',
+                    style: TextStyle(fontSize: 12.5, color: _muted),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -992,8 +995,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.approved: _storesWith('approved').length,
     _Tab.rejected: _storesWith('rejected').length,
     _Tab.orders: _orders.length,
-    _Tab.insights:
-        (_insights?['topStores'] as List?)?.length ?? 0,
+    _Tab.insights: (_insights?['topStores'] as List?)?.length ?? 0,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
     _Tab.compare: _groups.length,
     _Tab.delivery: _riders.length,
@@ -1088,10 +1090,7 @@ class _AdminHomeState extends State<_AdminHome> {
           ),
           Row(
             children: [
-              _Stat(
-                label: 'Orders placed',
-                value: '${totals['placed'] ?? 0}',
-              ),
+              _Stat(label: 'Orders placed', value: '${totals['placed'] ?? 0}'),
               const SizedBox(width: 10),
               _Stat(
                 label: 'Delivered',
@@ -1101,7 +1100,8 @@ class _AdminHomeState extends State<_AdminHome> {
               const SizedBox(width: 10),
               _Stat(
                 label: 'Revenue',
-                value: '₹${((totals['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                value:
+                    '₹${((totals['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
               ),
             ],
           ),
@@ -1114,8 +1114,7 @@ class _AdminHomeState extends State<_AdminHome> {
               _RankRow(
                 rank: i + 1,
                 title: s['name'] as String? ?? '',
-                subtitle:
-                    '${s['units']} units · ${s['delivered']} delivered',
+                subtitle: '${s['units']} units · ${s['delivered']} delivered',
                 trailing: '${s['orders']} orders',
                 note: '₹${((s['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
                 // The bar is read against the top row, not against a total:
@@ -1132,8 +1131,7 @@ class _AdminHomeState extends State<_AdminHome> {
               _RankRow(
                 rank: i + 1,
                 title: it['title'] as String? ?? '',
-                subtitle:
-                    '${it['store']} · ${it['orders']} orders',
+                subtitle: '${it['store']} · ${it['orders']} orders',
                 trailing: '${it['units']} units',
                 note: '₹${((it['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
                 fraction: _share(it['units'], items.first['units']),
@@ -1423,9 +1421,7 @@ class _PickChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: on ? _ink : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: on ? _ink : const Color(0xFFDDDDD8),
-          ),
+          border: Border.all(color: on ? _ink : const Color(0xFFDDDDD8)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1479,8 +1475,9 @@ const _palette = [
   '#546E7A',
 ];
 
-Color _hex(String value) =>
-    Color(0xFF000000 | (int.tryParse(value.replaceFirst('#', ''), radix: 16) ?? 0));
+Color _hex(String value) => Color(
+  0xFF000000 | (int.tryParse(value.replaceFirst('#', ''), radix: 16) ?? 0),
+);
 
 /// Everything under a department, at every level.
 int _countAll(List<CategoryNode> nodes) =>
@@ -1558,11 +1555,7 @@ class _DepartmentTile extends StatelessWidget {
                   onPressed: onDelete,
                   icon: const Icon(LucideIcons.trash2, size: 15, color: _red),
                 ),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  size: 16,
-                  color: _muted,
-                ),
+                const Icon(LucideIcons.chevronRight, size: 16, color: _muted),
               ],
             ),
             if (department.categories.isNotEmpty) ...[
@@ -1666,9 +1659,7 @@ class _SectionCardState extends State<_SectionCard> {
                   ),
                   if (node.children.isNotEmpty)
                     Icon(
-                      _open
-                          ? LucideIcons.chevronUp
-                          : LucideIcons.chevronDown,
+                      _open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                       size: 15,
                       color: _muted,
                     ),
@@ -1823,9 +1814,7 @@ class _RankRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   // The top three are the answer to "who is winning"; the
                   // rest are context.
-                  color: rank <= 3
-                      ? _ink
-                      : const Color(0xFFE8E8E4),
+                  color: rank <= 3 ? _ink : const Color(0xFFE8E8E4),
                   shape: BoxShape.circle,
                 ),
                 child: Text(

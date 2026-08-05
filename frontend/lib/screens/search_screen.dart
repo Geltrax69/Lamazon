@@ -272,10 +272,7 @@ class _SearchHint extends StatelessWidget {
             children: [
               for (final d in departments)
                 if (d.name != 'All')
-                  _DepartmentTile(
-                    department: d,
-                    onTap: () => onPick(d.name),
-                  ),
+                  _DepartmentTile(department: d, onTap: () => onPick(d.name)),
             ],
           ),
           const SizedBox(height: 24),

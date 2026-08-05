@@ -61,23 +61,25 @@ List<Product> productsAtShop(String shopName) {
     }
     for (final o in p.offers) {
       if (o.store != shopName) continue;
-      out.add(Product(
-        id: '${p.id}@$shopName',
-        name: p.name,
-        category: p.category,
-        tab: p.tab,
-        price: o.price,
-        imageUrl: p.imageUrl,
-        store: shopName,
-        description: p.description,
-        sizes: p.sizes,
-        extraImages: p.extraImages,
-        // Compare against the original listing and the other vendors.
-        offers: [
-          ShopOffer(p.store, p.price),
-          ...p.offers.where((x) => x.store != shopName),
-        ],
-      ));
+      out.add(
+        Product(
+          id: '${p.id}@$shopName',
+          name: p.name,
+          category: p.category,
+          tab: p.tab,
+          price: o.price,
+          imageUrl: p.imageUrl,
+          store: shopName,
+          description: p.description,
+          sizes: p.sizes,
+          extraImages: p.extraImages,
+          // Compare against the original listing and the other vendors.
+          offers: [
+            ShopOffer(p.store, p.price),
+            ...p.offers.where((x) => x.store != shopName),
+          ],
+        ),
+      );
       break;
     }
   }
@@ -115,8 +117,7 @@ const shops = [
   Shop(
     name: 'FreshMart',
     tagline: 'Farm-fresh groceries daily',
-    imageUrl:
-        'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
     tab: 'Grocery',
   ),
   Shop(
@@ -163,8 +164,7 @@ const shops = [
   Shop(
     name: 'Sweet Tooth',
     tagline: 'Cakes, desserts & bakes',
-    imageUrl:
-        'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400',
     tab: 'Food',
   ),
   Shop(
@@ -205,8 +205,7 @@ const shops = [
   Shop(
     name: 'ToyVerse',
     tagline: 'Figures, toys & collectibles',
-    imageUrl:
-        'https://images.unsplash.com/photo-1558679908-541bcf1249ff?w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1558679908-541bcf1249ff?w=400',
     tab: 'Gifts',
   ),
 ];
@@ -221,16 +220,12 @@ const products = [
     name: 'Brown Denim Jacket',
     category: "Men's outfit",
     price: 1799,
-    imageUrl:
-        'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600',
     description:
         'Classic brown denim jacket with a button front, twin chest pockets '
         'and soft cotton lining. Fits true to size for everyday layering.',
     sizes: ['S', 'M', 'L', 'XL'],
-    offers: [
-      ShopOffer('Urban Threads', 1649),
-      ShopOffer('Velora Store', 1899),
-    ],
+    offers: [ShopOffer('Urban Threads', 1649), ShopOffer('Velora Store', 1899)],
   ),
   Product(
     id: 'p2',
@@ -244,18 +239,14 @@ const products = [
         'Lightweight slip-on casual shoe in grey canvas with a cushioned '
         'insole and flexible rubber sole. Easy to pair with any outfit.',
     sizes: ['S', 'M', 'L', 'XL'],
-    offers: [
-      ShopOffer('Urban Threads', 1099),
-      ShopOffer('Lamazon Store', 949),
-    ],
+    offers: [ShopOffer('Urban Threads', 1099), ShopOffer('Lamazon Store', 949)],
   ),
   Product(
     id: 'p3',
     name: "Men's Pullover Hoodie",
     category: "Men's outfit",
     price: 1499,
-    imageUrl:
-        'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600',
     description:
         'Cozy fleece pullover hoodie with a kangaroo pocket and adjustable '
         'drawstrings. Brushed inner for warmth without the bulk.',
@@ -265,10 +256,7 @@ const products = [
       'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=300',
       'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=300',
     ],
-    offers: [
-      ShopOffer('Urban Threads', 1399),
-      ShopOffer('Velora Store', 1599),
-    ],
+    offers: [ShopOffer('Urban Threads', 1399), ShopOffer('Velora Store', 1599)],
   ),
   Product(
     id: 'p4',
@@ -281,9 +269,7 @@ const products = [
         'Minimal white low-top sneakers with a durable outsole and padded '
         'collar. A wardrobe staple that goes with everything.',
     sizes: ['M', 'L', 'XL'],
-    offers: [
-      ShopOffer('Velora Store', 899),
-    ],
+    offers: [ShopOffer('Velora Store', 899)],
   ),
   Product(
     id: 'p5',
@@ -297,9 +283,7 @@ const products = [
     description:
         'Over-ear wireless headphones with 40mm drivers, 30-hour battery '
         'life and a built-in mic for calls. Bluetooth 5.3, USB-C charging.',
-    offers: [
-      ShopOffer('TechnoWorld', 2799),
-    ],
+    offers: [ShopOffer('TechnoWorld', 2799)],
   ),
   Product(
     id: 'p6',
@@ -313,9 +297,7 @@ const products = [
     description:
         'Fitness smartwatch with heart-rate and sleep tracking, 1.4" AMOLED '
         'display and 7-day battery. Water resistant to 5 ATM.',
-    offers: [
-      ShopOffer('TechnoWorld', 4299),
-    ],
+    offers: [ShopOffer('TechnoWorld', 4299)],
   ),
   Product(
     id: 'p7',
@@ -329,10 +311,7 @@ const products = [
     description:
         'Seasonal mix of 6-8 fresh fruits — apples, oranges, kiwi, grapes '
         'and more. Hand-picked the same morning it ships.',
-    offers: [
-      ShopOffer('Daily Basket', 599),
-      ShopOffer('Nature Fresh', 529),
-    ],
+    offers: [ShopOffer('Daily Basket', 599), ShopOffer('Nature Fresh', 529)],
   ),
   Product(
     id: 'p8',
@@ -346,10 +325,7 @@ const products = [
     description:
         'Weekly box of certified-organic vegetables: potatoes, onions, '
         'tomatoes, leafy greens and seasonal picks. Pesticide-free.',
-    offers: [
-      ShopOffer('Daily Basket', 379),
-      ShopOffer('Nature Fresh', 419),
-    ],
+    offers: [ShopOffer('Daily Basket', 379), ShopOffer('Nature Fresh', 419)],
   ),
   Product(
     id: 'p9',
@@ -363,9 +339,7 @@ const products = [
     description:
         'Wood-fired pizza loaded with capsicum, onion, corn, mushroom and '
         'mozzarella on a hand-stretched base. Serves 2.',
-    offers: [
-      ShopOffer('Cafe Brew', 379),
-    ],
+    offers: [ShopOffer('Cafe Brew', 379)],
   ),
   Product(
     id: 'p10',
@@ -379,9 +353,7 @@ const products = [
     description:
         'Double-patty burger with cheese, lettuce and house sauce, served '
         'with fries and a cold drink.',
-    offers: [
-      ShopOffer('Cafe Brew', 269),
-    ],
+    offers: [ShopOffer('Cafe Brew', 269)],
   ),
   Product(
     id: 'p11',
@@ -389,15 +361,12 @@ const products = [
     category: 'Hampers',
     tab: 'Gifts',
     price: 1299,
-    imageUrl:
-        'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600',
     store: 'Wrap & Give',
     description:
         'Curated hamper with chocolates, scented candle, dry fruits and a '
         'greeting card, wrapped in a reusable keepsake box.',
-    offers: [
-      ShopOffer('Petal & Co', 1399),
-    ],
+    offers: [ShopOffer('Petal & Co', 1399)],
   ),
   Product(
     id: 'p12',
@@ -411,9 +380,7 @@ const products = [
     description:
         'Set of 4 matte lipsticks in everyday shades. Long-stay, transfer-'
         'proof formula enriched with vitamin E.',
-    offers: [
-      ShopOffer('Velvet Touch', 949),
-    ],
+    offers: [ShopOffer('Velvet Touch', 949)],
   ),
   Product(
     id: 'p13',
@@ -427,9 +394,7 @@ const products = [
     description:
         'Slow-cooked basmati rice layered with spiced paneer, saffron and '
         'fried onions. Comes with raita and salan.',
-    offers: [
-      ShopOffer('Spice Kitchen', 329),
-    ],
+    offers: [ShopOffer('Spice Kitchen', 329)],
   ),
   Product(
     id: 'p14',
@@ -456,9 +421,7 @@ const products = [
     description:
         'Half-kg dark chocolate truffle cake with layered ganache. Eggless '
         'option available; delivered chilled.',
-    offers: [
-      ShopOffer('Cafe Brew', 599),
-    ],
+    offers: [ShopOffer('Cafe Brew', 599)],
   ),
   Product(
     id: 'p16',
@@ -472,9 +435,7 @@ const products = [
     description:
         '16cm collectible action figure with articulated joints and display '
         'stand. Official licensed merchandise.',
-    offers: [
-      ShopOffer('Wrap & Give', 849),
-    ],
+    offers: [ShopOffer('Wrap & Give', 849)],
   ),
   Product(
     id: 'p17',
@@ -488,9 +449,7 @@ const products = [
     description:
         'Minimal analog watch with a stainless-steel case, leather strap '
         'and Japanese quartz movement. Gift box included.',
-    offers: [
-      ShopOffer('ToyVerse', 2199),
-    ],
+    offers: [ShopOffer('ToyVerse', 2199)],
   ),
   Product(
     id: 'p18',
@@ -504,9 +463,7 @@ const products = [
     description:
         'Set of 3 soy-wax candles — vanilla, lavender and sandalwood. '
         '25-hour burn time each, in reusable glass jars.',
-    offers: [
-      ShopOffer('Wrap & Give', 549),
-    ],
+    offers: [ShopOffer('Wrap & Give', 549)],
   ),
   Product(
     id: 'p19',
@@ -514,8 +471,7 @@ const products = [
     category: 'Soft Toys',
     tab: 'Gifts',
     price: 599,
-    imageUrl:
-        'https://images.unsplash.com/photo-1562040506-a9b32cb51b94?w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1562040506-a9b32cb51b94?w=600',
     store: 'ToyVerse',
     description:
         '90cm plush teddy bear in ultra-soft fur with embroidered eyes. '
@@ -527,16 +483,12 @@ const products = [
     category: 'Dairy',
     tab: 'Grocery',
     price: 68,
-    imageUrl:
-        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600',
     store: 'Nature Fresh',
     description:
         'Farm-fresh full-cream milk, pasteurised and packed the same day. '
         'No preservatives.',
-    offers: [
-      ShopOffer('FreshMart', 66),
-      ShopOffer('Daily Basket', 70),
-    ],
+    offers: [ShopOffer('FreshMart', 66), ShopOffer('Daily Basket', 70)],
   ),
   Product(
     id: 'p21',
@@ -550,9 +502,7 @@ const products = [
     description:
         'Freshly baked multigrain loaf with oats, flax and sunflower seeds. '
         'Baked daily, zero maida.',
-    offers: [
-      ShopOffer('Nature Fresh', 48),
-    ],
+    offers: [ShopOffer('Nature Fresh', 48)],
   ),
   Product(
     id: 'p22',
@@ -566,10 +516,7 @@ const products = [
     description:
         'Aged long-grain basmati rice with rich aroma. Ideal for biryani '
         'and pulao; 5kg vacuum pack.',
-    offers: [
-      ShopOffer('FreshMart', 529),
-      ShopOffer('Daily Basket', 479),
-    ],
+    offers: [ShopOffer('FreshMart', 529), ShopOffer('Daily Basket', 479)],
   ),
   Product(
     id: 'p23',
@@ -583,8 +530,6 @@ const products = [
     description:
         'Dozen free-range brown eggs from certified farms, graded and '
         'packed within 24 hours.',
-    offers: [
-      ShopOffer('Nature Fresh', 102),
-    ],
+    offers: [ShopOffer('Nature Fresh', 102)],
   ),
 ];

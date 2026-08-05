@@ -33,7 +33,6 @@ const kBg = Color(0xFFF1F1EF);
 /// Tiles built per page of the product grid.
 const _productPage = 12;
 
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -577,10 +576,7 @@ class _MenuDrawer extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'Browse',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
@@ -690,7 +686,8 @@ List<Widget> _branch(
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SearchScreen(initialQuery: node.name, tab: tab.name),
+            builder: (_) =>
+                SearchScreen(initialQuery: node.name, tab: tab.name),
           ),
         );
       },
@@ -1006,15 +1003,19 @@ class _ShopAd extends StatelessWidget {
 /// opens it rather than inventing a second list of the same products.
 /// Search stays inside the department the shopper is browsing.
 void _openSearch(BuildContext context, [String tab = '']) => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => SearchScreen(tab: tab)),
-    );
+  context,
+  MaterialPageRoute(builder: (_) => SearchScreen(tab: tab)),
+);
 
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool serif; // editorial serif look, as in the Shop By Shop design
   final VoidCallback? onSeeAll;
-  const _SectionHeader({required this.title, this.serif = false, this.onSeeAll});
+  const _SectionHeader({
+    required this.title,
+    this.serif = false,
+    this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1164,14 +1165,12 @@ class _BottomNav extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Stack(
                     clipBehavior: Clip.none,
-	                    children: [
-	                      Icon(
-	                        selling
-	                            ? Icons.storefront_outlined
-	                            : LucideIcons.heart,
-	                        size: 22,
-	                        color: kInk,
-	                      ),
+                    children: [
+                      Icon(
+                        selling ? Icons.storefront_outlined : LucideIcons.heart,
+                        size: 22,
+                        color: kInk,
+                      ),
                       if (selling && Seller.instance.openOrders > 0)
                         Positioned(
                           top: -6,
