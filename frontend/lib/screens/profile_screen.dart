@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -25,6 +26,13 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.account),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 620,
@@ -34,7 +42,7 @@ class ProfileScreen extends StatelessWidget {
             builder: (context, _) {
               final loggedIn = Session.instance.loggedIn;
               return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
                 children: [
                   Row(
                     children: [
@@ -442,7 +450,6 @@ class _Row extends StatelessWidget {
     );
   }
 }
-
 
 /// A small pill: the account id, and one per role.
 class _Chip extends StatelessWidget {

@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -13,11 +14,11 @@ const _amber = Color(0xFFE07B00);
 const _blue = Color(0xFF2F6FED);
 
 Color _statusColor(OrderStatus s) => switch (s) {
-      OrderStatus.delivered => _green,
-      OrderStatus.rejected => _red,
-      OrderStatus.picked => _blue,
-      _ => _amber,
-    };
+  OrderStatus.delivered => _green,
+  OrderStatus.rejected => _red,
+  OrderStatus.picked => _blue,
+  _ => _amber,
+};
 
 String _ago(DateTime t) {
   final d = DateTime.now().difference(t);
@@ -45,6 +46,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.none),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 700,
@@ -85,7 +93,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ],
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
                               itemCount: orders.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: 12),
@@ -132,7 +140,10 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: colour.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -209,7 +220,10 @@ class _OrderCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total', style: TextStyle(fontSize: 13, color: _muted)),
+              const Text(
+                'Total',
+                style: TextStyle(fontSize: 13, color: _muted),
+              ),
               Text(
                 '₹${order.amount.toStringAsFixed(0)}',
                 style: const TextStyle(

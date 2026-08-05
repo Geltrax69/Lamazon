@@ -26,16 +26,21 @@ class SellerOnboardingScreen extends StatefulWidget {
 }
 
 class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
-  final _name = TextEditingController();
-  final _location = TextEditingController();
-  final _city = TextEditingController(text: serviceableCities.first);
-  final _picked = <String>{};
-  Uint8List? _photo;
+  // Whatever was left behind last time, so coming back lands where you left.
+  late final _name = TextEditingController(text: StoreDraft.name);
+  late final _location = TextEditingController(text: StoreDraft.location);
+  late final _city = TextEditingController(
+    text: StoreDraft.city.isEmpty ? serviceableCities.first : StoreDraft.city,
+  );
+  late final _picked = <String>{...StoreDraft.categories};
+  late Uint8List? _photo = StoreDraft.photo;
 
   /// A store signs up to departments, not to the categories inside them —
   /// this is what decides which tab the shop appears under.
-  List<String> get _departmentNames =>
-      [for (final d in departments) if (d.name != 'All') d.name];
+  List<String> get _departmentNames => [
+    for (final d in departments)
+      if (d.name != 'All') d.name,
+  ];
 
   @override
   void dispose() {
@@ -57,7 +62,52 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
     return null;
   }
 
+  void _saveDraft() {
+    StoreDraft.photo = _photo;
+    StoreDraft.name = _name.text;
+    StoreDraft.location = _location.text;
+    StoreDraft.city = _city.text;
+    StoreDraft.categories = {..._picked};
+  }
+
+  /// Leaving with something typed asks first. The photo is the expensive part
+  /// — picking it again means going back to the camera roll — so "keep" is
+  /// the default and discarding is the one you have to mean.
+  Future<bool> _confirmLeave() async {
+    _saveDraft();
+    if (StoreDraft.isEmpty) return true;
+    final keep = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Keep this for later?'),
+        content: const Text(
+          'Your photo and what you have filled in are still here. Keep them '
+          'and they will be waiting when you come back.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text(
+              'Discard',
+              style: TextStyle(color: Color(0xFFD32F2F)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Keep draft'),
+          ),
+        ],
+      ),
+    );
+    // Dismissed without choosing: stay on the form rather than guessing.
+    if (keep == null) return false;
+    if (!keep) StoreDraft.clear();
+    return true;
+  }
+
   void _create() {
+    // The form has become a store; there is nothing left to come back to.
+    StoreDraft.clear();
     Seller.instance.openStore(
       SellerStore(
         name: _name.text.trim(),
@@ -76,100 +126,109 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final blocker = _blocker;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
-      body: ReadableBody(
-        maxWidth: 620,
-        child: SafeArea(
-          child: Column(
-            children: [
-              const ScreenHeader(title: 'Open your store'),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                  children: [
-                    const Text(
-                      'Sell to everyone ordering on campus. Takes a minute.',
-                      style: TextStyle(fontSize: 13.5, color: _muted),
-                    ),
-                    const SizedBox(height: 20),
-                    const SellerSection(
-                      title: 'Store photo',
-                      hint: 'Your shopfront, counter or logo',
-                    ),
-                    PhotoTile(
-                      photo: _photo,
-                      emptyLabel: 'Upload store photo',
-                      emptyHint: 'Tap to choose from your device',
-                      onChanged: (p) => setState(() => _photo = p),
-                    ),
-                    const SizedBox(height: 22),
-                    const SellerSection(title: 'Business name'),
-                    SellerField(
-                      controller: _name,
-                      icon: LucideIcons.store,
-                      hint: 'e.g. Campus Snacks Corner',
-                      onChanged: () => setState(() {}),
-                    ),
-                    const SizedBox(height: 22),
-                    const SellerSection(
-                      title: 'Store location',
-                      hint: 'Where buyers collect or you hand over',
-                    ),
-                    SellerField(
-                      controller: _location,
-                      icon: LucideIcons.mapPin,
-                      hint: 'Block / shop number, area',
-                      onChanged: () => setState(() {}),
-                    ),
-                    const SizedBox(height: 10),
-                    SellerField(
-                      controller: _city,
-                      icon: LucideIcons.building2,
-                      hint: 'Campus / city',
-                      onChanged: () => setState(() {}),
-                    ),
-                    if (_city.text.trim().isNotEmpty &&
-                        !isServiceable(_city.text)) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'We only deliver around ${serviceableCities.first} today.',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFD32F2F),
+    return PopScope(
+      // The system back gesture has to ask the same question the arrow does,
+      // or half the ways out of this screen still lose the photo.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmLeave() && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF1F1EF),
+        body: ReadableBody(
+          maxWidth: 620,
+          child: SafeArea(
+            child: Column(
+              children: [
+                ScreenHeader(title: 'Open your store', onBack: _confirmLeave),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                    children: [
+                      const Text(
+                        'Sell to everyone ordering on campus. Takes a minute.',
+                        style: TextStyle(fontSize: 13.5, color: _muted),
+                      ),
+                      const SizedBox(height: 20),
+                      const SellerSection(
+                        title: 'Store photo',
+                        hint: 'Your shopfront, counter or logo',
+                      ),
+                      PhotoTile(
+                        photo: _photo,
+                        emptyLabel: 'Upload store photo',
+                        emptyHint: 'Tap to choose from your device',
+                        onChanged: (p) => setState(() => _photo = p),
+                      ),
+                      const SizedBox(height: 22),
+                      const SellerSection(title: 'Business name'),
+                      SellerField(
+                        controller: _name,
+                        icon: LucideIcons.store,
+                        hint: 'e.g. Campus Snacks Corner',
+                        onChanged: () => setState(() {}),
+                      ),
+                      const SizedBox(height: 22),
+                      const SellerSection(
+                        title: 'Store location',
+                        hint: 'Where buyers collect or you hand over',
+                      ),
+                      SellerField(
+                        controller: _location,
+                        icon: LucideIcons.mapPin,
+                        hint: 'Block / shop number, area',
+                        onChanged: () => setState(() {}),
+                      ),
+                      const SizedBox(height: 10),
+                      SellerField(
+                        controller: _city,
+                        icon: LucideIcons.building2,
+                        hint: 'Campus / city',
+                        onChanged: () => setState(() {}),
+                      ),
+                      if (_city.text.trim().isNotEmpty &&
+                          !isServiceable(_city.text)) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'We only deliver around ${serviceableCities.first} today.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFD32F2F),
+                          ),
                         ),
+                      ],
+                      const SizedBox(height: 22),
+                      const SellerSection(
+                        title: 'What will you sell?',
+                        hint: 'Pick every category that applies',
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final c in _departmentNames)
+                            _CategoryChip(
+                              label: c,
+                              selected: _picked.contains(c),
+                              onTap: () => setState(
+                                () => _picked.contains(c)
+                                    ? _picked.remove(c)
+                                    : _picked.add(c),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 22),
-                    const SellerSection(
-                      title: 'What will you sell?',
-                      hint: 'Pick every category that applies',
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final c in _departmentNames)
-                          _CategoryChip(
-                            label: c,
-                            selected: _picked.contains(c),
-                            onTap: () => setState(
-                              () => _picked.contains(c)
-                                  ? _picked.remove(c)
-                                  : _picked.add(c),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              SellerSubmitBar(
-                label: 'Create store',
-                blocker: blocker,
-                onSubmit: _create,
-              ),
-            ],
+                SellerSubmitBar(
+                  label: 'Create store',
+                  blocker: blocker,
+                  onSubmit: _create,
+                ),
+              ],
+            ),
           ),
         ),
       ),

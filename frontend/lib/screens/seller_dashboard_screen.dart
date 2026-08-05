@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -7,6 +8,7 @@ import '../data/seller.dart';
 import '../widgets/notify_banner.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/screen_header.dart';
+import 'seller_onboarding_screen.dart';
 import 'seller_product_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
@@ -31,6 +33,12 @@ const _pageSize = 8;
 enum _Pane { orders, inventory }
 
 class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
+  /// True until the first read of the store comes back. Without it the screen
+  /// cannot tell "still asking" from "there is no store", and it drew nothing
+  /// for both — a blank page for a second on the way in, and a blank page
+  /// forever for anyone who has not opened a store yet.
+  bool _loading = true;
+
   /// Null until the seller picks a side, so the first view can follow the
   /// shop's own state: a store with no orders yet opens on its stock rather
   /// than on an empty list.
@@ -47,12 +55,21 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     // What the server holds is the store. Reading it on open means a listing
     // that failed to save is visibly absent rather than sitting here looking
     // fine while no shopper can see it.
-    Seller.instance.load();
+    Seller.instance.load().whenComplete(() {
+      if (mounted) setState(() => _loading = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.saved),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 760,
@@ -61,7 +78,13 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             listenable: Seller.instance,
             builder: (context, _) {
               final store = Seller.instance.store;
-              if (store == null) return const SizedBox.shrink();
+              if (store == null) {
+                // Nothing yet, and nothing still coming: this is somebody
+                // arriving to open their first store, so open the form.
+                return _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : const SellerOnboardingScreen();
+              }
               final items = Seller.instance.items;
               return Column(
                 children: [
@@ -216,7 +239,9 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                 value:
                                     '${Seller.instance.countAt(OrderStage.received)}',
                                 color:
-                                    Seller.instance.countAt(OrderStage.received) >
+                                    Seller.instance.countAt(
+                                          OrderStage.received,
+                                        ) >
                                         0
                                     ? _amber
                                     : null,
@@ -254,15 +279,17 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                             // need answering are at the top; the rest is a
                             // record, and a record does not need to be
                             // rendered all at once.
-                            for (final order
-                                in Seller.instance.orders.take(_shownOrders)) ...[
+                            for (final order in Seller.instance.orders.take(
+                              _shownOrders,
+                            )) ...[
                               _OrderRow(order: order),
                               const SizedBox(height: 10),
                             ],
                             if (Seller.instance.orders.length > _shownOrders)
                               _MoreButton(
                                 left:
-                                    Seller.instance.orders.length - _shownOrders,
+                                    Seller.instance.orders.length -
+                                    _shownOrders,
                                 noun: 'orders',
                                 onTap: () =>
                                     setState(() => _shownOrders += _pageSize),
@@ -505,10 +532,9 @@ class _OrderRow extends StatelessWidget {
   void _say(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
   }
 
   @override
@@ -674,9 +700,9 @@ class _ReviewBanner extends StatelessWidget {
                 Text(
                   rejected
                       ? '${store.rejectReason}\n\nFix that and save the store '
-                          'again to send it back for review.'
+                            'again to send it back for review.'
                       : 'An admin is looking at it. You can add products as '
-                          'soon as it is approved — shoppers see it then too.',
+                            'soon as it is approved — shoppers see it then too.',
                   style: const TextStyle(
                     fontSize: 12.5,
                     height: 1.4,
@@ -859,7 +885,6 @@ class _StockButton extends StatelessWidget {
   }
 }
 
-
 /// Shown when something never reached the server. Silence here is what let a
 /// store exist in one browser tab and nowhere else.
 class _SyncBanner extends StatelessWidget {
@@ -878,7 +903,11 @@ class _SyncBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(LucideIcons.triangleAlert, size: 18, color: Color(0xFFD03A3A)),
+          const Icon(
+            LucideIcons.triangleAlert,
+            size: 18,
+            color: Color(0xFFD03A3A),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

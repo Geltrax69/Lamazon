@@ -76,8 +76,10 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
 
   /// A group with no values is one the seller started and abandoned; saving it
   /// would show the buyer a heading with nothing to pick under it.
-  List<ItemOption> get _liveOptions =>
-      [for (final o in _options) if (o.values.isNotEmpty) o];
+  List<ItemOption> get _liveOptions => [
+    for (final o in _options)
+      if (o.values.isNotEmpty) o,
+  ];
 
   double? get _priceValue => double.tryParse(_price.text.trim());
   int? get _stockValue => int.tryParse(_stock.text.trim());
@@ -224,8 +226,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
                     SellerSection(
-                      title:
-                          'Photos (${_photos.length + _savedPhotos.length})',
+                      title: 'Photos (${_photos.length + _savedPhotos.length})',
                       hint: 'Add as many as you like — the first is the cover',
                     ),
                     // The ones already live, so an edit screen does not look
@@ -406,23 +407,14 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
 /// wants Size with S–XL; making them type five boxes to get there is what
 /// makes a seller decide options are not worth it.
 const _presets = <String, ItemOption>{
-  'Size': ItemOption(
-    name: 'Size',
-    values: ['S', 'M', 'L', 'XL'],
-  ),
+  'Size': ItemOption(name: 'Size', values: ['S', 'M', 'L', 'XL']),
   'Colour': ItemOption(
     name: 'Colour',
     kind: 'colour',
     values: ['#1A1A1A', '#FFFFFF', '#D32F2F', '#2F6FED'],
   ),
-  'Weight': ItemOption(
-    name: 'Weight',
-    values: ['250g', '500g', '1kg'],
-  ),
-  'Spice': ItemOption(
-    name: 'Spice',
-    values: ['Mild', 'Medium', 'Hot'],
-  ),
+  'Weight': ItemOption(name: 'Weight', values: ['250g', '500g', '1kg']),
+  'Spice': ItemOption(name: 'Spice', values: ['Mild', 'Medium', 'Hot']),
 };
 
 /// Colours a swatch can be. A named row rather than a colour wheel: a shop is
@@ -446,8 +438,7 @@ const _swatches = <String, String>{
 };
 
 Color _hexColour(String hex) => Color(
-  0xFF000000 |
-      (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0),
+  0xFF000000 | (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0),
 );
 
 /// The option groups on a listing, and the two taps that add one. Mutates the
@@ -622,9 +613,8 @@ class _OptionGroupState extends State<_OptionGroup> {
                 _ValueChip(
                   label: option.isColour ? _nameOf(value) : value,
                   swatch: option.isColour ? _hexColour(value) : null,
-                  onRemove: () => widget.onValues(
-                    [...option.values]..remove(value),
-                  ),
+                  onRemove: () =>
+                      widget.onValues([...option.values]..remove(value)),
                 ),
             ],
           ),
@@ -663,8 +653,10 @@ class _OptionGroupState extends State<_OptionGroup> {
                   hintStyle: const TextStyle(fontSize: 13, color: _muted),
                   filled: true,
                   fillColor: const Color(0xFFF4F4F2),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,

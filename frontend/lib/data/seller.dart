@@ -152,6 +152,37 @@ class SellerOrder {
   });
 }
 
+/// A half-filled store form, kept so that leaving the screen — by accident or
+/// on purpose — does not throw away a photo somebody just picked and a name
+/// they just typed.
+///
+/// In memory, not on disk: it survives navigating away and back, which is the
+/// thing people actually lose work to. A full page reload starts clean, and
+/// the photo is bytes rather than a path, so persisting it would mean writing
+/// a megabyte to preferences for the rarer case.
+class StoreDraft {
+  static Uint8List? photo;
+  static String name = '';
+  static String location = '';
+  static String city = '';
+  static Set<String> categories = {};
+
+  /// Anything worth offering to keep. An empty form is not a draft.
+  static bool get isEmpty =>
+      photo == null &&
+      name.trim().isEmpty &&
+      location.trim().isEmpty &&
+      categories.isEmpty;
+
+  static void clear() {
+    photo = null;
+    name = '';
+    location = '';
+    city = '';
+    categories = {};
+  }
+}
+
 /// ponytail: in-memory seller account, same ChangeNotifier pattern as Cart.
 /// One store per user, which is all a single-account app can have.
 class Seller extends ChangeNotifier {

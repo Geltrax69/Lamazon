@@ -68,8 +68,7 @@ class CompareScreen extends StatelessWidget {
               // cheapest, and which product to buy instead. Categories cannot
               // answer the second — two shops shelve the same charger
               // differently — which is what the comparison group is for.
-              if (product.compareGroup.isNotEmpty)
-                _Rivals(product: product),
+              if (product.compareGroup.isNotEmpty) _Rivals(product: product),
               // Product being compared.
               Row(
                 children: [
@@ -463,7 +462,10 @@ class _RivalsState extends State<_Rivals> {
                           width: 92,
                           child: Text(
                             'Price',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF9A9A9A),
+                            ),
                           ),
                         ),
                         for (final f in fields)

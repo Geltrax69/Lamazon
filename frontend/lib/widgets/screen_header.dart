@@ -5,7 +5,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class ScreenHeader extends StatelessWidget {
   final String title;
   final Widget? action;
-  const ScreenHeader({super.key, required this.title, this.action});
+
+  /// Runs instead of popping straight away. Return false to stay put — a
+  /// screen with unsaved work uses this to ask first.
+  final Future<bool> Function()? onBack;
+  const ScreenHeader({
+    super.key,
+    required this.title,
+    this.action,
+    this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +24,10 @@ class ScreenHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () async {
+              if (onBack != null && !await onBack!()) return;
+              if (context.mounted) Navigator.pop(context);
+            },
             child: Container(
               width: 46,
               height: 46,

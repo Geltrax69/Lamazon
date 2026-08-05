@@ -119,8 +119,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                           // number that changes when you buy two.
                           if (p.discounted)
                             Text(
-                              'You save ₹${((p.mrp - p.price) * _qty)
-                                  .toStringAsFixed(0)}'
+                              'You save ₹${((p.mrp - p.price) * _qty).toStringAsFixed(0)}'
                               ' (${p.discountPercent}%)',
                               style: const TextStyle(
                                 fontSize: 12.5,
@@ -582,9 +581,7 @@ class _OptionPicker extends StatelessWidget {
                         color: _swatchColour(value),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: selected == value
-                              ? _ink
-                              : Colors.black12,
+                          color: selected == value ? _ink : Colors.black12,
                           width: selected == value ? 2.5 : 1,
                         ),
                       ),

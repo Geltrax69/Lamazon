@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -14,6 +15,13 @@ class WishlistScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.saved),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 820,
@@ -89,7 +97,7 @@ class WishlistScreen extends StatelessWidget {
                             ),
                           )
                         : GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                             gridDelegate:
                                 SliverGridDelegateWithMaxCrossAxisExtent(
                                   maxCrossAxisExtent: productTileMax,

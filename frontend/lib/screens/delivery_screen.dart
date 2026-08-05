@@ -56,7 +56,9 @@ class _RiderLoginState extends State<_RiderLogin> {
     try {
       await Api.instance.riderLogin(_phone.text.trim(), _pin.text.trim());
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('ClientException: ', ''));
+      setState(
+        () => _error = e.toString().replaceFirst('ClientException: ', ''),
+      );
     }
     if (mounted) setState(() => _busy = false);
   }
@@ -108,8 +110,10 @@ class _RiderLoginState extends State<_RiderLogin> {
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!,
-                        style: const TextStyle(fontSize: 12.5, color: _red)),
+                    Text(
+                      _error!,
+                      style: const TextStyle(fontSize: 12.5, color: _red),
+                    ),
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
@@ -133,14 +137,14 @@ class _RiderLoginState extends State<_RiderLogin> {
   }
 
   InputDecoration _boxed(String label) => InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      );
+    labelText: label,
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+  );
 }
 
 class _DeliveryHome extends StatefulWidget {
@@ -181,8 +185,9 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _error = e.toString().replaceFirst('ClientException: ', ''));
+        setState(
+          () => _error = e.toString().replaceFirst('ClientException: ', ''),
+        );
       }
     }
     if (mounted) setState(() => _loading = false);
@@ -205,9 +210,7 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
       context: context,
       builder: (dialog) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -266,9 +269,8 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                   borderSide: const BorderSide(color: _green, width: 1.5),
                 ),
               ),
-              onSubmitted: (v) => v.trim().length == 4
-                  ? Navigator.pop(dialog, v.trim())
-                  : null,
+              onSubmitted: (v) =>
+                  v.trim().length == 4 ? Navigator.pop(dialog, v.trim()) : null,
             ),
           ],
         ),
@@ -316,10 +318,9 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
   }
 
   @override
@@ -355,8 +356,10 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                           ),
                           Text(
                             StaffSession.rider.subject,
-                            style:
-                                const TextStyle(fontSize: 12.5, color: _muted),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: _muted,
+                            ),
                           ),
                         ],
                       ),
@@ -381,7 +384,10 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                       color: _green,
                     ),
                     const SizedBox(width: 10),
-                    _Tile(label: 'Ready to collect', value: '${waiting.length}'),
+                    _Tile(
+                      label: 'Ready to collect',
+                      value: '${waiting.length}',
+                    ),
                     const SizedBox(width: 10),
                     _Tile(
                       label: 'Delivered',
@@ -392,8 +398,10 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Text(_error!,
-                        style: const TextStyle(color: _red, fontSize: 13)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: _red, fontSize: 13),
+                    ),
                   ),
                 if (_loading && _panel == null)
                   const Padding(
@@ -429,8 +437,7 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
                 _HistorySection(
                   history: _history,
                   expanded: _showHistory,
-                  onToggle: () =>
-                      setState(() => _showHistory = !_showHistory),
+                  onToggle: () => setState(() => _showHistory = !_showHistory),
                 ),
               ],
             ),
@@ -481,8 +488,10 @@ class _OrderCard extends StatelessWidget {
               if ((order['assignedTo'] as String? ?? '').isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(right: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _green.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -544,8 +553,10 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
               onPressed: onAction,
-              child: Text(action,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(
+                action,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],
@@ -732,8 +743,10 @@ class _Stop extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(fontSize: 11.5, color: _muted)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11.5, color: _muted),
+              ),
               const SizedBox(height: 2),
               Text(
                 name,
@@ -747,7 +760,9 @@ class _Stop extends StatelessWidget {
               // A store with no address on file says so, rather than leaving a
               // gap the rider reads as "same as always".
               Text(
-                address.isEmpty ? 'Address not on file — call the shop' : address,
+                address.isEmpty
+                    ? 'Address not on file — call the shop'
+                    : address,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -807,12 +822,12 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 class _Empty extends StatelessWidget {
@@ -821,7 +836,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
-      );
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
+  );
 }

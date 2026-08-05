@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -21,6 +22,13 @@ class CartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = Cart.instance;
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.cart),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 700,
@@ -52,7 +60,9 @@ class CartScreen extends StatelessWidget {
                             ),
                             if (!cart.isEmpty)
                               Text(
-                                cart.count == 1 ? '1 item' : '${cart.count} items',
+                                cart.count == 1
+                                    ? '1 item'
+                                    : '${cart.count} items',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF6B6B6B),
@@ -68,7 +78,7 @@ class CartScreen extends StatelessWidget {
                     child: cart.isEmpty
                         ? const _EmptyCart()
                         : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
                             itemCount: cart.items.length,
                             separatorBuilder: (_, _) =>
                                 const SizedBox(height: 12),
@@ -219,10 +229,7 @@ class _CartRow extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        DiscountBadge(
-                          percent: p.discountPercent,
-                          fontSize: 9,
-                        ),
+                        DiscountBadge(percent: p.discountPercent, fontSize: 9),
                       ],
                     ],
                   ),
@@ -308,8 +315,8 @@ class _QtyControls extends StatelessWidget {
           color: filled
               ? Colors.white
               : danger
-                  ? const Color(0xFFD32F2F)
-                  : _ink,
+              ? const Color(0xFFD32F2F)
+              : _ink,
         ),
       ),
     );
@@ -339,7 +346,8 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       return;
     }
     // Whatever they picked, or the default — the server lists that one first.
-    final address = AddressBook.instance.selected ??
+    final address =
+        AddressBook.instance.selected ??
         AddressBook.instance.addresses.firstOrNull;
     if (address == null) {
       _say('Add a delivery address first.');
@@ -351,13 +359,10 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
     }
 
     setState(() => _placing = true);
-    final failures = await MyOrders.instance.place(
-      [
-        for (final line in cart.items)
-          (itemId: line.product.id, title: line.product.name, qty: line.qty),
-      ],
-      addressId: address.id,
-    );
+    final failures = await MyOrders.instance.place([
+      for (final line in cart.items)
+        (itemId: line.product.id, title: line.product.name, qty: line.qty),
+    ], addressId: address.id);
     if (!mounted) return;
     setState(() => _placing = false);
 
@@ -378,20 +383,24 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       );
       return;
     }
-    _say(failures.length == 1
-        ? failures.first
-        : '${failures.length} items could not be ordered: '
-            '${failures.join('; ')}');
+    _say(
+      failures.length == 1
+          ? failures.first
+          : '${failures.length} items could not be ordered: '
+                '${failures.join('; ')}',
+    );
   }
 
   void _say(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
   }
 
   @override
@@ -454,7 +463,9 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
           ),
           const SizedBox(height: 8),
           _summaryRow(
-            cart.count == 1 ? 'Sub Total (1 item)' : 'Sub Total (${cart.count} items)',
+            cart.count == 1
+                ? 'Sub Total (1 item)'
+                : 'Sub Total (${cart.count} items)',
             cart.subtotal,
           ),
           const SizedBox(height: 4),
@@ -471,11 +482,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(
-                  LucideIcons.badgePercent,
-                  size: 14,
-                  color: _green,
-                ),
+                const Icon(LucideIcons.badgePercent, size: 14, color: _green),
                 const SizedBox(width: 6),
                 Text(
                   'You saved ₹${cart.saved.toStringAsFixed(0)} on this order',

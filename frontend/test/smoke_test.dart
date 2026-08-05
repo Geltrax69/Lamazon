@@ -123,6 +123,10 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
       expect(find.text('Your account'), findsOneWidget);
       expect(find.text('Your orders'), findsOneWidget);
+      // Below the fold in a test-sized window now that the nav bar leaves
+      // room under the last row.
+      await tester.scrollUntilVisible(find.text('Address book'), 200,
+          scrollable: find.byType(Scrollable).first);
       expect(find.text('Address book'), findsOneWidget);
 
       // Shop screen shows that vendor's products. It asks the API first and

@@ -5,26 +5,22 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 import '../data/addresses.dart';
-import '../data/cart.dart';
 import '../data/catalog.dart';
 import '../data/categories.dart';
 import '../data/session.dart';
 import '../widgets/notify_banner.dart';
-import '../data/seller.dart';
 import '../models/product.dart';
+import '../widgets/app_nav.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/location_prompt.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
 import 'addresses_screen.dart';
-import 'cart_screen.dart';
 import 'details_screen.dart';
-import 'profile_screen.dart';
 import 'search_screen.dart';
 import 'seller_dashboard_screen.dart';
 import 'shop_screen.dart';
 import 'shops_screen.dart';
-import 'wishlist_screen.dart';
 
 const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
@@ -126,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Align(
                 alignment: Alignment.bottomCenter,
-                child: _BottomNav(theme: theme),
+                child: AppBottomNav(theme: theme),
               ),
             ],
           ),
@@ -1051,167 +1047,6 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BottomNav extends StatelessWidget {
-  final Color? theme; // selected tab color; null = default green
-  const _BottomNav({this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 520),
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(36),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            decoration: BoxDecoration(
-              color: (theme ?? kAccent).withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: const Row(
-              children: [
-                Icon(LucideIcons.house, size: 20, color: kInk),
-                SizedBox(width: 8),
-                Text(
-                  'Home',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListenableBuilder(
-                listenable: Cart.instance,
-                builder: (context, _) {
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(
-                        LucideIcons.shoppingCart,
-                        size: 22,
-                        color: kInk,
-                      ),
-                      if (Cart.instance.count > 0)
-                        Positioned(
-                          top: -6,
-                          right: -8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD32F2F),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${Cart.instance.count}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-          // Sellers get their store here instead of the wishlist — stock is
-          // what they open the app for. Saved items move to the account
-          // screen for them.
-          ListenableBuilder(
-            listenable: Seller.instance,
-            builder: (context, _) {
-              final selling =
-                  Session.instance.isSeller || Seller.instance.hasStore;
-              return GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => selling
-                        ? const SellerDashboardScreen()
-                        : const WishlistScreen(),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        selling ? Icons.storefront_outlined : LucideIcons.heart,
-                        size: 22,
-                        color: kInk,
-                      ),
-                      if (selling && Seller.instance.openOrders > 0)
-                        Positioned(
-                          top: -6,
-                          right: -8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF6C00),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${Seller.instance.openOrders}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Icon(LucideIcons.user, size: 22, color: kInk),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

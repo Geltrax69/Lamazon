@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -22,6 +23,13 @@ class ShopsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.none),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 760,
@@ -34,9 +42,7 @@ class ShopsScreen extends StatelessWidget {
                   .toList();
               return Column(
                 children: [
-                  ScreenHeader(
-                    title: _all ? 'Stores near you' : '$tab stores',
-                  ),
+                  ScreenHeader(title: _all ? 'Stores near you' : '$tab stores'),
                   if (!snap.hasData)
                     const Expanded(
                       child: Center(child: CircularProgressIndicator()),
@@ -129,18 +135,29 @@ class _ShopRow extends StatelessWidget {
                   const SizedBox(height: 6),
                   const Row(
                     children: [
-                      Icon(LucideIcons.timer, size: 12, color: Color(0xFF6B6B6B)),
+                      Icon(
+                        LucideIcons.timer,
+                        size: 12,
+                        color: Color(0xFF6B6B6B),
+                      ),
                       SizedBox(width: 4),
                       Text(
                         '12 mins',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF6B6B6B)),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF6B6B6B),
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF9A9A9A)),
+            const Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: Color(0xFF9A9A9A),
+            ),
           ],
         ),
       ),

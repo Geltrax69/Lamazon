@@ -1,3 +1,4 @@
+import '../widgets/app_nav.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -107,6 +108,13 @@ class _SearchScreenState extends State<SearchScreen> {
     final q = _query.trim();
     final results = _hits;
     return Scaffold(
+      // The bar floats over the content rather than reserving a strip, which
+      // is how it sits on home — bottomNavigationBar would push every screen
+      // up by its height and leave a white band under it.
+      extendBody: true,
+      bottomNavigationBar: const SafeArea(
+        child: AppBottomNav(current: AppTab.none),
+      ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
         maxWidth: 980,
@@ -193,7 +201,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     : results.isEmpty
                     ? const _NoResults()
                     : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: productTileMax,
                           mainAxisSpacing: 16,
@@ -258,7 +266,7 @@ class _SearchHint extends StatelessWidget {
     ].take(6).toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 108),
       children: [
         if (!scoped) ...[
           const _HintHeading('Shop by department'),
