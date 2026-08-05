@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shorebird_code_push/shorebird_code_push.dart';
@@ -715,30 +717,93 @@ class _CategoryRow extends StatelessWidget {
 }
 
 /// Promoted shops drifting past like running ads; tap one to open it.
-class _ShopAds extends StatelessWidget {
+class _ShopAds extends StatefulWidget {
   final List<Shop> shops;
   const _ShopAds({required this.shops});
 
   @override
+  State<_ShopAds> createState() => _ShopAdsState();
+}
+
+/// Store cards that advance on their own but yield to a finger. The marquee
+/// this replaced could not be steered at all — a shop slid away mid-read and
+/// tapping one meant chasing it.
+class _ShopAdsState extends State<_ShopAds> {
+  static const _dwell = Duration(seconds: 4);
+
+  /// How long the carousel stays still after a swipe. Long enough to read the
+  /// card you went looking for; without it the next tick drags you onwards
+  /// the moment you stop moving.
+  static const _pauseAfterTouch = Duration(seconds: 8);
+
+  PageController? _controller;
+  Timer? _timer;
+  DateTime _touched = DateTime.fromMillisecondsSinceEpoch(0);
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_dwell, (_) => _advance());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _advance() {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.hasClients ||
+        widget.shops.length < 2) {
+      return;
+    }
+    if (DateTime.now().difference(_touched) < _pauseAfterTouch) return;
+    final next = ((controller.page ?? 0).round() + 1) % widget.shops.length;
+    controller.animateToPage(
+      next,
+      // Wrapping back to the first card animates the whole way rather than
+      // jumping, so the loop reads as a loop and not as a glitch.
+      duration: const Duration(milliseconds: 550),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (shops.isEmpty) return const SizedBox.shrink();
-    // A PageView, not the drifting marquee it used to be: a shop that slides
-    // away on its own is one you cannot read, and cannot tap without chasing.
-    // Swiping is the shopper's now, and each card snaps into place.
+    if (widget.shops.isEmpty) return const SizedBox.shrink();
     final wide = isWide(context);
+    // Built once and kept: a controller made in build loses its page every
+    // rebuild, which the auto-advance would then read as zero.
+    _controller ??= PageController(
+      // Less than one, so the next card peeks in and the row reads as
+      // something that continues rather than as one lonely tile.
+      viewportFraction: wide ? 0.42 : 0.86,
+    );
     return SizedBox(
       height: 96,
-      child: PageView.builder(
-        controller: PageController(
-          // Less than one, so the next card peeks in and the row reads as
-          // something that continues rather than as one lonely tile.
-          viewportFraction: wide ? 0.42 : 0.86,
-        ),
-        padEnds: false,
-        itemCount: shops.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(right: 14),
-          child: _ShopAd(shop: shops[i]),
+      child: NotificationListener<ScrollNotification>(
+        // Only a drag counts as the shopper taking over; the notifications
+        // from our own animateToPage carry no drag details.
+        onNotification: (n) {
+          if (n is ScrollStartNotification && n.dragDetails != null) {
+            _touched = DateTime.now();
+          }
+          if (n is ScrollEndNotification && n.dragDetails != null) {
+            _touched = DateTime.now();
+          }
+          return false;
+        },
+        child: PageView.builder(
+          controller: _controller,
+          padEnds: false,
+          itemCount: widget.shops.length,
+          itemBuilder: (_, i) => Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: _ShopAd(shop: widget.shops[i]),
+          ),
         ),
       ),
     );
