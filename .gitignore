@@ -57,3 +57,6 @@ backend/backend
 
 # Playwright MCP scratch output
 .playwright-mcp/
+
+# A dump of real user data — emails, phones, addresses, session hashes.
+old_Database.sql

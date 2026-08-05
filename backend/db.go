@@ -62,7 +62,16 @@ func (d *DB) Close() error { return d.sql.Close() }
 
 // seedIfEmpty loads the sample catalog the first time only, so restarts do
 // not duplicate rows or undo edits.
+//
+// SKIP_SEED turns it off entirely. "Empty" and "deliberately emptied" look
+// identical from here, so without it a wipe lasts exactly until the next
+// boot puts the samples back.
 func (d *DB) seedIfEmpty(ctx context.Context) error {
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("SKIP_SEED"))); v != "" &&
+		v != "0" && v != "false" {
+		return nil
+	}
+
 	var n int
 	if err := d.sql.QueryRowContext(ctx, `SELECT count(*) FROM products`).Scan(&n); err != nil {
 		return err

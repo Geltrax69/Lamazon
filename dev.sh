@@ -86,9 +86,16 @@ go build -C backend -o "$BIN" .
 # Comment the line out to get the real code flow back.
 SKIP_LOGIN_CODE="${SKIP_LOGIN_CODE:-1}"
 
+# The database was wiped deliberately on 2026-08-05, and an empty catalogue
+# looks the same as a never-seeded one from inside the API. Without this the
+# next boot puts the sample products, shops and campus canteens back.
+# Unset it to get the samples again on an empty database.
+SKIP_SEED="${SKIP_SEED:-1}"
+
 echo "==> starting API on $PORT"
 [ "$SKIP_LOGIN_CODE" = "1" ] && echo "==> sign-in code is OFF (local only)"
-DATABASE_URL="$DB_URL" PORT="$PORT" SKIP_LOGIN_CODE="$SKIP_LOGIN_CODE" "$BIN" &
+DATABASE_URL="$DB_URL" PORT="$PORT" SKIP_LOGIN_CODE="$SKIP_LOGIN_CODE" \
+  SKIP_SEED="$SKIP_SEED" "$BIN" &
 API_PID=$!
 # INT and TERM as well as EXIT: Ctrl-C is how this normally ends, and bash does
 # not always reach the EXIT trap on an untrapped signal.
