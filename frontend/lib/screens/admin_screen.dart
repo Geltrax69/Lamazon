@@ -150,6 +150,10 @@ class _AdminHomeState extends State<_AdminHome> {
   List<dynamic> _riders = const [];
   List<dynamic> _orders = const [];
   List<CompareGroup> _groups = const [];
+
+  /// Which department the Categories tab is showing the inside of. Null is
+  /// the grid of them all.
+  String? _openDept;
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
@@ -1138,14 +1142,60 @@ class _AdminHomeState extends State<_AdminHome> {
 
       case _Tab.categories:
         final real = departments.where((d) => d.name != 'All').toList();
+        final open = real.where((d) => d.name == _openDept).firstOrNull;
+
+        // Drilling in rather than one long scroll. Expanded, this was 103
+        // rows on one page — every department's whole menu at once, which is
+        // not a view of anything.
+        if (open != null) {
+          return [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => setState(() => _openDept = null),
+                  icon: const Icon(LucideIcons.arrowLeft, size: 18),
+                ),
+                Expanded(
+                  child: Text(
+                    open.name,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _addCategory(parent: open.name),
+                  icon: const Icon(LucideIcons.plus, size: 16),
+                  label: const Text('Section'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            if (open.categories.isEmpty)
+              const _Empty(
+                'Nothing in here yet. Sellers list under the department '
+                'itself until you add a section.',
+              )
+            else
+              for (final c in open.categories)
+                _SectionCard(
+                  node: c,
+                  accent: open.colour ?? _ink,
+                  onAdd: (parent) => _addCategory(parent: parent),
+                  onDelete: _deleteCategory,
+                ),
+          ];
+        }
+
         return [
           Row(
             children: [
               const Expanded(
                 child: _Note(
-                  'The tabs across the top of the shop, and what sits under '
-                  'each. Sellers pick from these, so adding one here is what '
-                  'makes it possible to sell in.',
+                  'The tabs across the top of the shop. Open one to see what '
+                  'sits under it — sellers pick from these, so adding one is '
+                  'what makes it possible to sell in.',
                 ),
               ),
               TextButton.icon(
@@ -1161,14 +1211,26 @@ class _AdminHomeState extends State<_AdminHome> {
               'you add one.',
             )
           else
-            for (final d in real)
-              _DepartmentCard(
-                department: d,
-                onAddCategory: () => _addCategory(parent: d.name),
-                onDelete: () => _deleteCategory(d.name),
-                onDeleteCategory: _deleteCategory,
-                onAddInside: (parent) => _addCategory(parent: parent),
+            LayoutBuilder(
+              builder: (context, box) => Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final d in real)
+                    SizedBox(
+                      // Two across when there is room, one when there is not.
+                      width: box.maxWidth > 560
+                          ? (box.maxWidth - 10) / 2
+                          : box.maxWidth,
+                      child: _DepartmentTile(
+                        department: d,
+                        onOpen: () => setState(() => _openDept = d.name),
+                        onDelete: () => _deleteCategory(d.name),
+                      ),
+                    ),
+                ],
               ),
+            ),
         ];
 
       case _Tab.compare:
@@ -1420,173 +1482,240 @@ const _palette = [
 Color _hex(String value) =>
     Color(0xFF000000 | (int.tryParse(value.replaceFirst('#', ''), radix: 16) ?? 0));
 
-/// One department and the categories under it, with the buttons that change
-/// both.
-class _DepartmentCard extends StatelessWidget {
+/// Everything under a department, at every level.
+int _countAll(List<CategoryNode> nodes) =>
+    nodes.fold(0, (n, c) => n + 1 + _countAll(c.children));
+
+/// A department at a glance: what it is, how much is inside, and a taste of
+/// it. The whole tree lives one tap in — a card that lists 69 things is not a
+/// card.
+class _DepartmentTile extends StatelessWidget {
   final Department department;
-  final VoidCallback onAddCategory;
+  final VoidCallback onOpen;
   final VoidCallback onDelete;
-  final void Function(String name) onDeleteCategory;
-  final void Function(String parent) onAddInside;
-  const _DepartmentCard({
+  const _DepartmentTile({
     required this.department,
-    required this.onAddCategory,
+    required this.onOpen,
     required this.onDelete,
-    required this.onDeleteCategory,
-    required this.onAddInside,
   });
 
   @override
   Widget build(BuildContext context) {
     final accent = department.colour ?? _ink;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(11),
+    final total = _countAll(department.categories);
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(department.icon, size: 18, color: accent),
                 ),
-                child: Icon(department.icon, size: 17, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      department.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        department.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    Text(
-                      department.categories.isEmpty
-                          ? 'No categories — sellers list under the '
-                                'department itself'
-                          : '${department.categories.length} sections · '
-                                '${_countAll(department.categories)} in total',
-                      style: const TextStyle(fontSize: 12, color: _muted),
-                    ),
-                  ],
+                      Text(
+                        department.categories.isEmpty
+                            ? 'Empty — sellers list under it directly'
+                            : '${department.categories.length} sections · '
+                                  '$total in total',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: _muted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Add a category',
-                onPressed: onAddCategory,
-                icon: const Icon(LucideIcons.plus, size: 17),
-              ),
-              IconButton(
-                tooltip: 'Remove ${department.name}',
-                onPressed: onDelete,
-                icon: const Icon(LucideIcons.trash2, size: 16, color: _red),
+                IconButton(
+                  tooltip: 'Remove ${department.name}',
+                  onPressed: onDelete,
+                  icon: const Icon(LucideIcons.trash2, size: 15, color: _red),
+                ),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: _muted,
+                ),
+              ],
+            ),
+            if (department.categories.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              // The first few names, so a card says what is in there without
+              // having to be opened.
+              Text(
+                department.categories.take(4).map((c) => c.name).join(' · ') +
+                    (department.categories.length > 4
+                        ? ' · +${department.categories.length - 4} more'
+                        : ''),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Color(0xFF8A8A8A),
+                ),
               ),
             ],
-          ),
-          if (department.categories.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            for (final c in department.categories)
-              _CategoryBranch(
-                node: c,
-                depth: 0,
-                onAdd: onAddInside,
-                onDelete: onDeleteCategory,
-              ),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Everything under a department, at every level — the header says "12
-/// sections · 69 in total" rather than counting only the top row.
-int _countAll(List<CategoryNode> nodes) =>
-    nodes.fold(0, (n, c) => n + 1 + _countAll(c.children));
-
-/// One category and everything inside it, indented by how deep it sits. The
-/// menu goes three levels — Food, Street Food, Chaat — and a flat row of
-/// chips could not show which belongs to which.
-class _CategoryBranch extends StatelessWidget {
+/// One section inside a department, with what it holds folded away. Twelve
+/// sections open at once was the wall; closed, the whole menu fits a screen.
+class _SectionCard extends StatefulWidget {
   final CategoryNode node;
-  final int depth;
+  final Color accent;
   final void Function(String parent) onAdd;
   final void Function(String name) onDelete;
-  const _CategoryBranch({
+  const _SectionCard({
     required this.node,
-    required this.depth,
+    required this.accent,
     required this.onAdd,
     required this.onDelete,
   });
 
   @override
+  State<_SectionCard> createState() => _SectionCardState();
+}
+
+class _SectionCardState extends State<_SectionCard> {
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(6.0 + depth * 18, 3, 0, 3),
-          child: Row(
-            children: [
-              Container(
-                width: 5,
-                height: 5,
-                margin: const EdgeInsets.only(right: 9),
-                decoration: BoxDecoration(
-                  color: depth == 0 ? _ink : const Color(0xFFBDBDB8),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  node.name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    // A section reads as a heading, the things inside it do
-                    // not; without that the tree is 69 identical lines.
-                    fontWeight:
-                        depth == 0 ? FontWeight.w700 : FontWeight.w500,
+    final node = widget.node;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: node.children.isEmpty
+                ? null
+                : () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 11, 6, 11),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      color: widget.accent,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: Text(
+                      node.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (node.children.isNotEmpty)
+                    Text(
+                      '${node.children.length}',
+                      style: const TextStyle(fontSize: 12, color: _muted),
+                    ),
+                  IconButton(
+                    tooltip: 'Add inside ${node.name}',
+                    onPressed: () => widget.onAdd(node.name),
+                    icon: const Icon(LucideIcons.plus, size: 15),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove ${node.name}',
+                    onPressed: () => widget.onDelete(node.name),
+                    icon: const Icon(LucideIcons.x, size: 14, color: _muted),
+                  ),
+                  if (node.children.isNotEmpty)
+                    Icon(
+                      _open
+                          ? LucideIcons.chevronUp
+                          : LucideIcons.chevronDown,
+                      size: 15,
+                      color: _muted,
+                    ),
+                ],
               ),
-              GestureDetector(
-                onTap: () => onAdd(node.name),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(LucideIcons.plus, size: 14, color: _muted),
-                ),
-              ),
-              GestureDetector(
-                onTap: () => onDelete(node.name),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(LucideIcons.x, size: 13, color: _muted),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        for (final child in node.children)
-          _CategoryBranch(
-            node: child,
-            depth: depth + 1,
-            onAdd: onAdd,
-            onDelete: onDelete,
-          ),
-      ],
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 0, 10, 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final child in node.children)
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F1EF),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            child.name,
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
+                          GestureDetector(
+                            onTap: () => widget.onDelete(child.name),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                LucideIcons.x,
+                                size: 12,
+                                color: _muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
