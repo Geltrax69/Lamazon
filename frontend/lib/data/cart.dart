@@ -24,6 +24,15 @@ class Cart extends ChangeNotifier {
   double get shipping => isEmpty ? 0 : 15;
   double get total => subtotal + shipping;
 
+  /// What the discounts took off, across the whole basket. Items without an
+  /// MRP contribute nothing rather than counting their full price as a
+  /// saving, which is what `discounted` is guarding.
+  double get saved => _items.values.fold(
+    0,
+    (s, i) =>
+        s + (i.product.discounted ? (i.product.mrp - i.product.price) * i.qty : 0),
+  );
+
   void add(Product p, [int qty = 1]) {
     _items.update(p.id, (i) => i..qty += qty, ifAbsent: () => CartItem(p, qty));
     notifyListeners();

@@ -100,11 +100,12 @@ class _DetailsScreenState extends State<DetailsScreen> {
                               ),
                               if (p.discounted) ...[
                                 const SizedBox(width: 8),
-                                // The struck-through figure follows the
-                                // stepper too, so the pair stays comparable
-                                // at any quantity.
+                                // Named, not just struck through: a second
+                                // number with a line through it is only
+                                // obviously the old price if you already know
+                                // that is the convention.
                                 Text(
-                                  '₹${(p.mrp * _qty).toStringAsFixed(0)}',
+                                  'MRP ₹${(p.mrp * _qty).toStringAsFixed(0)}',
                                   style: const TextStyle(
                                     fontSize: 15,
                                     color: Color(0xFF8A8A8A),
@@ -117,6 +118,20 @@ class _DetailsScreenState extends State<DetailsScreen> {
                               ],
                             ],
                           ),
+                          // The saving in rupees as well as percent. The
+                          // rupees follow the stepper, because that is the
+                          // number that changes when you buy two.
+                          if (p.discounted)
+                            Text(
+                              'You save ₹${((p.mrp - p.price) * _qty)
+                                  .toStringAsFixed(0)}'
+                              ' (${p.discountPercent}%)',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1B7F3B),
+                              ),
+                            ),
                           Text(
                             _qty == 1
                                 ? 'From: ₹${p.price.toStringAsFixed(0)}'

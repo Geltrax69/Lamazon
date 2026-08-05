@@ -196,12 +196,35 @@ class _CartRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    '₹${(p.price * item.qty).toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '₹${(p.price * item.qty).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      // The saving carries through to where they pay, rather
+                      // than being something they only saw on the way in.
+                      if (p.discounted) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          'MRP ₹${(p.mrp * item.qty).toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF9A9A9A),
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: Color(0xFF9A9A9A),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        DiscountBadge(
+                          percent: p.discountPercent,
+                          fontSize: 9,
+                        ),
+                      ],
+                    ],
                   ),
                   // At one unit the line total and the unit price are the
                   // same number, so only say it when they differ.
@@ -441,6 +464,30 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
             child: Divider(height: 1),
           ),
           _summaryRow('Total', cart.total, bold: true),
+          // Below the total, not inside it: the subtotal is already the
+          // discounted price, so showing this as a deduction would look like
+          // it comes off again.
+          if (cart.saved > 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.badgePercent,
+                  size: 14,
+                  color: _green,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'You saved ₹${cart.saved.toStringAsFixed(0)} on this order',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: _green,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           GestureDetector(
             onTap: _placing ? null : _placeOrder,

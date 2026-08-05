@@ -1,5 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/models/product.dart';
+import 'package:lamazon/screens/cart_screen.dart';
+import 'package:network_image_mock/network_image_mock.dart';
 
 Product at({required double price, required double mrp}) => Product(
   id: 'x',
@@ -35,6 +39,39 @@ void main() {
       expect(at(price: 199, mrp: 249).discountPercent, 20);
       expect(at(price: 750, mrp: 1000).discountPercent, 25);
       expect(at(price: 1, mrp: 3).discountPercent, 67);
+    });
+  });
+
+  group('the buyer sees the saving', () {
+    setUp(() {
+      for (final item in Cart.instance.items) {
+        Cart.instance.remove(item.product.id);
+      }
+    });
+
+    testWidgets('cart names the MRP and totals what was saved',
+        (tester) async {
+      await mockNetworkImagesFor(() async {
+        Cart.instance.add(at(price: 2500, mrp: 5000), 2);
+        await tester.pumpWidget(const MaterialApp(home: CartScreen()));
+
+        expect(find.text('MRP ₹10000'), findsOneWidget);
+        expect(find.text('50% OFF'), findsOneWidget);
+        expect(
+          find.text('You saved ₹5000 on this order'),
+          findsOneWidget,
+        );
+      });
+    });
+
+    testWidgets('an undiscounted basket claims no saving', (tester) async {
+      await mockNetworkImagesFor(() async {
+        Cart.instance.add(at(price: 300, mrp: 0));
+        await tester.pumpWidget(const MaterialApp(home: CartScreen()));
+
+        expect(find.textContaining('You saved'), findsNothing);
+        expect(find.textContaining('MRP'), findsNothing);
+      });
     });
   });
 }
