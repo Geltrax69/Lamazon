@@ -10,43 +10,44 @@ import 'api.dart';
 /// is what made the wishlist look broken.
 List<Product> shownCatalog = products;
 
-/// Catalog from the Go API, falling back to the bundled sample data when the
-/// backend is unreachable — the app stays usable offline and in tests.
+/// Catalog from the Go API, falling back to the bundled samples only when the
+/// call fails — the app stays usable offline and in tests.
+///
+/// An empty reply is an answer, not a failure. Treating the two the same is
+/// what made a deliberately empty shop show FreshMart and a rack of sample
+/// headphones: nothing a real seller had listed, on a server that had said so
+/// perfectly clearly.
 Future<List<Product>> loadCatalog() async {
   try {
     final live = await Api.instance.products();
-    if (live.isNotEmpty) {
-      shownCatalog = live;
-      return live;
-    }
+    shownCatalog = live;
+    return live;
   } catch (e) {
     logApiFailure('products', e);
+    shownCatalog = products;
+    return products;
   }
-  shownCatalog = products;
-  return products;
 }
 
-/// Shops from the API, same fallback.
+/// Shops from the API, same rule: empty is empty, unreachable is bundled.
 Future<List<Shop>> loadShops() async {
   try {
-    final live = await Api.instance.shops();
-    if (live.isNotEmpty) return live;
+    return await Api.instance.shops();
   } catch (e) {
     logApiFailure('shops', e);
+    return shops;
   }
-  return shops;
 }
 
 /// Everything one shop sells, from the API — which knows about real sellers'
 /// stock, unlike the bundled list below.
 Future<List<Product>> loadShopProducts(String shopName) async {
   try {
-    final live = await Api.instance.shopProducts(shopName);
-    if (live.isNotEmpty) return live;
+    return await Api.instance.shopProducts(shopName);
   } catch (e) {
     logApiFailure('shop products', e);
+    return productsAtShop(shopName);
   }
-  return productsAtShop(shopName);
 }
 
 /// Everything a shop sells: its own listings, plus items it stocks that are
@@ -210,8 +211,10 @@ const shops = [
   ),
 ];
 
-// Prices in INR. Each product carries its own description and, where other
-// shops stock the same item, their prices for comparison.
+// The bundled samples. These are no longer what an empty shop falls back to —
+// they are the sign-in backdrop, the offline copy when the API cannot be
+// reached, and the fixture every widget test is written against. Prices in
+// INR; where other shops stock the same item, their prices for comparison.
 const products = [
   Product(
     id: 'p1',

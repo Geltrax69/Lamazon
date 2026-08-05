@@ -164,68 +164,139 @@ class _HomeScreenState extends State<HomeScreen> {
           }),
         ),
         const SizedBox(height: 12),
-        // Shops first: who is open near you is the thing a shopper is
-        // deciding on this screen, and the categories are how they narrow it
-        // down afterwards.
-        _SectionHeader(
-          title: 'Stores near you',
-          serif: true,
-          onSeeAll: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ShopsScreen(tab: tabName)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _ShopAds(shops: shownShops),
-        const SizedBox(height: 22),
-        _SectionHeader(
-          title: 'Shop By Category',
-          onSeeAll: () => _openSearch(context, tabName),
-        ),
-        const SizedBox(height: 12),
-        _CategoryRow(products: shownProducts, tab: tabName),
-        const SizedBox(height: 24),
-        _SectionHeader(
-          title: 'New Arrival',
-          onSeeAll: () => _openSearch(context, tabName),
-        ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: productTileMax,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.68,
-          ),
-          // A page at a time. The Food tab alone is 200-odd products, and
-          // building every tile up front is what made the first scroll stutter
-          // on a phone.
-          itemCount: shown.length,
-          itemBuilder: (_, i) => ProductCard(
-            product: shown[i],
-            showAddToCart:
-                shown[i].tab == 'Food' || shown[i].tab == 'Grocery',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DetailsScreen(product: shown[i]),
+        // Nothing to sell yet is a real state — a fresh install, or a
+        // department nobody stocks — and three headings with nothing under
+        // them says less than one sentence does.
+        if (shownShops.isEmpty && shownProducts.isEmpty)
+          _NothingHere(tab: tabName)
+        else ...[
+          // Shops first: who is open near you is the thing a shopper is
+          // deciding on this screen, and the categories are how they narrow it
+          // down afterwards.
+          if (shownShops.isNotEmpty) ...[
+            _SectionHeader(
+              title: 'Stores near you',
+              serif: true,
+              onSeeAll: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ShopsScreen(tab: tabName)),
               ),
             ),
-          ),
-        ),
-        if (shownProducts.length > shown.length) ...[
-          const SizedBox(height: 16),
-          _ShowMore(
-            left: shownProducts.length - shown.length,
-            onTap: () => setState(() => _shownCount += _productPage),
-          ),
+            const SizedBox(height: 12),
+            _ShopAds(shops: shownShops),
+            const SizedBox(height: 22),
+          ],
+          if (shownProducts.isNotEmpty) ...[
+            _SectionHeader(
+              title: 'Shop By Category',
+              onSeeAll: () => _openSearch(context, tabName),
+            ),
+            const SizedBox(height: 12),
+            _CategoryRow(products: shownProducts, tab: tabName),
+            const SizedBox(height: 24),
+            _SectionHeader(
+              title: 'New Arrival',
+              onSeeAll: () => _openSearch(context, tabName),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: productTileMax,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.68,
+              ),
+              // A page at a time. A big department is hundreds of products,
+              // and building every tile up front is what made the first
+              // scroll stutter on a phone.
+              itemCount: shown.length,
+              itemBuilder: (_, i) => ProductCard(
+                product: shown[i],
+                showAddToCart:
+                    shown[i].tab == 'Food' || shown[i].tab == 'Grocery',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DetailsScreen(product: shown[i]),
+                  ),
+                ),
+              ),
+            ),
+            if (shownProducts.length > shown.length) ...[
+              const SizedBox(height: 16),
+              _ShowMore(
+                left: shownProducts.length - shown.length,
+                onTap: () => setState(() => _shownCount += _productPage),
+              ),
+            ],
+          ],
         ],
         const SizedBox(height: 16),
         const Center(child: _VersionBadge()),
       ],
+    );
+  }
+}
+
+/// An empty shop, said once instead of implied by three empty sections.
+class _NothingHere extends StatelessWidget {
+  final String tab;
+  const _NothingHere({required this.tab});
+
+  @override
+  Widget build(BuildContext context) {
+    final scoped = tab.isNotEmpty && tab != 'All';
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          const Icon(LucideIcons.store, size: 42, color: Color(0xFFBDBDB8)),
+          const SizedBox(height: 14),
+          Text(
+            scoped ? 'No shops in $tab yet' : 'No shops open yet',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            scoped
+                ? 'Try another department, or open a store here yourself.'
+                : 'The first store to open here will show up on this page.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: Color(0xFF6B6B6B),
+            ),
+          ),
+          const SizedBox(height: 18),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: kInk,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SellerDashboardScreen()),
+            ),
+            child: const Text(
+              'Open your store',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
