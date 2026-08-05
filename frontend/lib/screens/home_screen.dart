@@ -480,13 +480,14 @@ class _MenuDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Grouped by tab so a category sits under the department it belongs to,
-    // and sorted so the list does not reshuffle when the catalogue changes.
-    final byTab = <String, Set<String>>{};
-    for (final p in products) {
-      if (p.category.isEmpty) continue;
-      byTab.putIfAbsent(p.tab, () => <String>{}).add(p.category);
-    }
+    // The menu is the admin's tree, not whatever strings the catalogue
+    // happens to contain — that is what makes Street Food sit above Chaat
+    // rather than beside it. Filtered to what is actually on sale, so no
+    // branch leads to an empty shelf.
+    final stocked = <String>{
+      for (final p in products)
+        if (p.category.isNotEmpty) p.category,
+    };
 
     return Drawer(
       backgroundColor: kBg,
@@ -524,22 +525,8 @@ class _MenuDrawer extends StatelessWidget {
               // The 'All' tab is every department at once, so listing its
               // categories here would repeat the whole drawer under it.
               if (i != 0)
-                for (final name in (byTab[tab.name]?.toList()?..sort()) ??
-                    const <String>[])
-                  _DrawerCategory(
-                    name: name,
-                    color: tab.colour,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              SearchScreen(initialQuery: name, tab: tab.name),
-                        ),
-                      );
-                    },
-                  ),
+                for (final node in tab.categories)
+                  ..._branch(context, node, tab, stocked, 0),
               const SizedBox(height: 6),
             ],
             if (products.isEmpty)
@@ -600,14 +587,53 @@ class _DrawerTab extends StatelessWidget {
   }
 }
 
+/// One branch of the menu, and everything under it that has something to
+/// buy. A section whose whole subtree is out of stock is left out rather than
+/// opened onto an empty result.
+List<Widget> _branch(
+  BuildContext context,
+  CategoryNode node,
+  Department tab,
+  Set<String> stocked,
+  int depth,
+) {
+  final children = [
+    for (final c in node.children)
+      ..._branch(context, c, tab, stocked, depth + 1),
+  ];
+  if (children.isEmpty && !stocked.contains(node.name)) return const [];
+  return [
+    _DrawerCategory(
+      name: node.name,
+      color: tab.colour,
+      depth: depth,
+      section: node.children.isNotEmpty,
+      onTap: () {
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SearchScreen(initialQuery: node.name, tab: tab.name),
+          ),
+        );
+      },
+    ),
+    ...children,
+  ];
+}
+
 class _DrawerCategory extends StatelessWidget {
   final String name;
   final Color? color;
+  final int depth;
+  final bool section;
   final VoidCallback onTap;
   const _DrawerCategory({
     required this.name,
     required this.color,
     required this.onTap,
+    this.depth = 0,
+    this.section = false,
   });
 
   @override
@@ -616,9 +642,9 @@ class _DrawerCategory extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        // Indented under its tab: the nesting is the only thing saying which
-        // department a category belongs to.
-        padding: const EdgeInsets.fromLTRB(42, 8, 12, 8),
+        // Indented under its tab, and again per level: the nesting is the
+        // only thing saying which section a category belongs to.
+        padding: EdgeInsets.fromLTRB(42 + depth * 16, 7, 12, 7),
         child: Row(
           children: [
             Container(
@@ -633,7 +659,11 @@ class _DrawerCategory extends StatelessWidget {
             Expanded(
               child: Text(
                 name,
-                style: const TextStyle(fontSize: 13.5, color: Color(0xFF3A3A3A)),
+                style: TextStyle(
+                  fontSize: section ? 13.5 : 13,
+                  fontWeight: section ? FontWeight.w700 : FontWeight.w400,
+                  color: const Color(0xFF3A3A3A),
+                ),
               ),
             ),
             const Icon(

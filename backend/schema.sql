@@ -305,3 +305,164 @@ CREATE INDEX IF NOT EXISTS idx_categories_parent
 -- swatches instead of spelling "Maroon".
 ALTER TABLE inventory_items
     ADD COLUMN IF NOT EXISTS options JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- The Food menu, three deep: the department, its sections, and what sits in
+-- each. Seeded only when Food has nothing under it yet, so an admin who
+-- reshapes the menu keeps their version across restarts.
+--
+-- A name appears once. It is the primary key, and products reference a
+-- category by that text — two rows called "Fried Rice" would leave an item
+-- filed under it unable to say which one it meant. Where the menu listed a
+-- name twice it is filed under the section it belongs to most: Kulcha with
+-- the breads, Fried Rice with Indo-Chinese, and South Indian as a section of
+-- its own rather than also a line in Breakfast.
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Breakfast', 'Food', 1),
+    ('Chole Bhature', 'Breakfast', 1),
+    ('Poori Bhaji', 'Breakfast', 2),
+    ('Paratha', 'Breakfast', 3),
+    ('Street Food', 'Food', 2),
+    ('Chaat', 'Street Food', 1),
+    ('Gol Gappe', 'Street Food', 2),
+    ('Samosa', 'Street Food', 3),
+    ('Kachori', 'Street Food', 4),
+    ('Pav Bhaji', 'Street Food', 5),
+    ('Vada Pav', 'Street Food', 6),
+    ('Main Course', 'Food', 3),
+    ('Paneer', 'Main Course', 1),
+    ('Dal', 'Main Course', 2),
+    ('Mixed Vegetables', 'Main Course', 3),
+    ('Kofta', 'Main Course', 4),
+    ('Curry', 'Main Course', 5),
+    ('Indian Breads', 'Food', 4),
+    ('Naan', 'Indian Breads', 1),
+    ('Kulcha', 'Indian Breads', 2),
+    ('Roti', 'Indian Breads', 3),
+    ('Lachha Paratha', 'Indian Breads', 4),
+    ('Bhature', 'Indian Breads', 5),
+    ('Rice', 'Food', 5),
+    ('Jeera Rice', 'Rice', 1),
+    ('Pulao', 'Rice', 2),
+    ('Biryani', 'Rice', 3),
+    ('Thali', 'Food', 6),
+    ('Veg Thali', 'Thali', 1),
+    ('Deluxe Veg Thali', 'Thali', 2),
+    ('Punjabi Thali', 'Thali', 3),
+    ('South Indian Thali', 'Thali', 4),
+    ('Mini Thali', 'Thali', 5),
+    ('Special Thali', 'Thali', 6),
+    ('South Indian', 'Food', 7),
+    ('Dosa', 'South Indian', 1),
+    ('Uttapam', 'South Indian', 2),
+    ('Idli', 'South Indian', 3),
+    ('Vada', 'South Indian', 4),
+    ('Indo-Chinese', 'Food', 8),
+    ('Noodles', 'Indo-Chinese', 1),
+    ('Fried Rice', 'Indo-Chinese', 2),
+    ('Manchurian', 'Indo-Chinese', 3),
+    ('Spring Rolls', 'Indo-Chinese', 4),
+    ('Chilli Paneer', 'Indo-Chinese', 5),
+    ('Fast Food', 'Food', 9),
+    ('Pizza', 'Fast Food', 1),
+    ('Burger', 'Fast Food', 2),
+    ('Sandwich', 'Fast Food', 3),
+    ('Wrap', 'Fast Food', 4),
+    ('Fries', 'Fast Food', 5),
+    ('Snacks', 'Food', 10),
+    ('Pakoda', 'Snacks', 1),
+    ('Momos', 'Snacks', 2),
+    ('Spring Roll', 'Snacks', 3),
+    ('Crispy Corn', 'Snacks', 4),
+    ('Desserts', 'Food', 11),
+    ('Gulab Jamun', 'Desserts', 1),
+    ('Rasmalai', 'Desserts', 2),
+    ('Ice Cream', 'Desserts', 3),
+    ('Brownie', 'Desserts', 4),
+    ('Halwa', 'Desserts', 5),
+    ('Beverages', 'Food', 12),
+    ('Tea', 'Beverages', 1),
+    ('Coffee', 'Beverages', 2),
+    ('Lassi', 'Beverages', 3),
+    ('Shakes', 'Beverages', 4),
+    ('Mocktails', 'Beverages', 5),
+    ('Soft Drinks', 'Beverages', 6)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Food')
+  AND NOT EXISTS (
+      SELECT 1 FROM catalog_categories WHERE parent = 'Food'
+  );
+
+-- Two more departments, and the sections under the five that carry them.
+-- Each block seeds only when that department has nothing under it yet, so an
+-- admin who reshapes one keeps their version while the others still fill in.
+--
+-- Soft Drinks is not repeated under Snacks & Drinks: it already sits under
+-- Food > Beverages, and a category exists once because products reference it
+-- by name.
+INSERT INTO catalog_categories (name, parent, icon, colour, position)
+SELECT * FROM (VALUES
+    ('Snacks & Drinks', '', 'cookie', '#C9A227', 6),
+    ('Household Essentials', '', 'wrench', '#546E7A', 7)
+) AS seed
+WHERE NOT EXISTS (
+    SELECT 1 FROM catalog_categories WHERE name IN ('Snacks & Drinks',
+                                                    'Household Essentials')
+);
+
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Atta, Rice & Dal', 'Grocery', 1),
+    ('Oil & Ghee', 'Grocery', 2),
+    ('Spices & Masala', 'Grocery', 3),
+    ('Sugar & Salt', 'Grocery', 4),
+    ('Kitchen Tools', 'Grocery', 5),
+    ('Storage Containers', 'Grocery', 6)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Grocery')
+  AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Grocery');
+
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Mobile Accessories', 'Electronics', 1),
+    ('Chargers & Cables', 'Electronics', 2),
+    ('Earphones', 'Electronics', 3),
+    ('Smart Gadgets', 'Electronics', 4),
+    ('Batteries', 'Electronics', 5)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Electronics')
+  AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Electronics');
+
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Chips', 'Snacks & Drinks', 1),
+    ('Biscuits', 'Snacks & Drinks', 2),
+    ('Chocolates', 'Snacks & Drinks', 3),
+    ('Juices', 'Snacks & Drinks', 4),
+    ('Energy Drinks', 'Snacks & Drinks', 5)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Snacks & Drinks')
+  AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Snacks & Drinks');
+
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Skincare', 'Beauty', 1),
+    ('Hair Care', 'Beauty', 2),
+    ('Oral Care', 'Beauty', 3),
+    ('Makeup', 'Beauty', 4),
+    ('Grooming', 'Beauty', 5)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Beauty')
+  AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Beauty');
+
+INSERT INTO catalog_categories (name, parent, position)
+SELECT * FROM (VALUES
+    ('Cleaning Supplies', 'Household Essentials', 1),
+    ('Laundry', 'Household Essentials', 2),
+    ('Dishwashing', 'Household Essentials', 3),
+    ('Air Fresheners', 'Household Essentials', 4),
+    ('Paper Products', 'Household Essentials', 5),
+    ('Garbage Bags', 'Household Essentials', 6)
+) AS seed
+WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Household Essentials')
+  AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Household Essentials');

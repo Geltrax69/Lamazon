@@ -11,10 +11,33 @@ class Department {
 
   /// null is the plain white theme the All tab uses.
   final Color? colour;
-  final List<String> categories;
+  final List<CategoryNode> categories;
 
   const Department(this.name, this.icon, this.colour,
       [this.categories = const []]);
+}
+
+/// A category inside a department, with whatever sits inside it. A food menu
+/// goes three deep — Food, Street Food, Chaat — so this nests rather than
+/// being a flat list of names.
+class CategoryNode {
+  final String name;
+  final List<CategoryNode> children;
+  const CategoryNode(this.name, [this.children = const []]);
+
+  factory CategoryNode.fromJson(Map<String, dynamic> r) => CategoryNode(
+    r['name'] as String? ?? '',
+    [
+      for (final c in (r['children'] as List<dynamic>? ?? const []))
+        CategoryNode.fromJson(c as Map<String, dynamic>),
+    ],
+  );
+
+  /// The names a product can actually be filed under: the deepest level, or
+  /// this one when it has nothing inside it. A seller picking "Street Food"
+  /// when Chaat and Samosa exist is picking the shelf, not the item.
+  List<String> get leaves =>
+      children.isEmpty ? [name] : [for (final c in children) ...c.leaves];
 }
 
 /// The All tab is not a row in the database. It is the absence of a filter,
@@ -51,6 +74,9 @@ const departmentIcons = <String, IconData>{
   'baby': LucideIcons.baby,
   'pill': LucideIcons.pill,
   'wrench': LucideIcons.wrench,
+  'cookie': LucideIcons.cookie,
+  'sprayCan': LucideIcons.sprayCan,
+  'cable': LucideIcons.cable,
   'tag': LucideIcons.tag,
 };
 
@@ -78,7 +104,7 @@ Future<List<Department>> loadDepartments() async {
             _colourOf(r['colour'] as String? ?? ''),
             [
               for (final c in (r['children'] as List<dynamic>? ?? const []))
-                (c as Map<String, dynamic>)['name'] as String,
+                CategoryNode.fromJson(c as Map<String, dynamic>),
             ],
           ),
       ];
@@ -98,7 +124,21 @@ List<String> sellableCategories([String? department]) {
   for (final d in departments) {
     if (d.name == 'All') continue;
     if (department != null && d.name != department) continue;
-    out.addAll(d.categories.isEmpty ? [d.name] : d.categories);
+    out.addAll(
+      d.categories.isEmpty
+          ? [d.name]
+          : [for (final c in d.categories) ...c.leaves],
+    );
   }
   return out;
 }
+
+/// The sections of a department, in order, for anything that shows the menu
+/// rather than the things on it.
+List<CategoryNode> sectionsOf(String department) =>
+    departments
+        .firstWhere(
+          (d) => d.name == department,
+          orElse: () => const Department('', LucideIcons.tag, null),
+        )
+        .categories;

@@ -56,26 +56,25 @@ func (a *API) handleCategories(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(w, http.StatusOK, nest(flat, ""))
+}
+
+// nest builds the tree under one parent, to whatever depth the rows go.
+// A food menu is three deep — Food, then Street Food, then Chaat — and the
+// recursion is what lets a shop add a level without the API changing.
+//
+// A row whose parent was deleted is left out rather than promoted to the top,
+// which is what collecting orphans would quietly do.
+func nest(flat []Category, parent string) []Category {
 	out := make([]Category, 0)
-	at := map[string]int{}
 	for _, c := range flat {
-		if c.Parent == "" {
-			at[c.Name] = len(out)
-			out = append(out, c)
-		}
-	}
-	// A category whose department was deleted is dropped rather than promoted
-	// to a department of its own, which is what appending it to `out` would
-	// quietly do.
-	for _, c := range flat {
-		if c.Parent == "" {
+		if c.Parent != parent {
 			continue
 		}
-		if i, ok := at[c.Parent]; ok {
-			out[i].Children = append(out[i].Children, c)
-		}
+		c.Children = nest(flat, c.Name)
+		out = append(out, c)
 	}
-	writeJSON(w, http.StatusOK, out)
+	return out
 }
 
 // POST /api/admin/categories — add a department, or a category inside one.
@@ -98,21 +97,18 @@ func (a *API) handleAddCategory(w http.ResponseWriter, r *http.Request) {
 			`"All" is the built-in tab that shows everything`)
 		return
 	}
+	// The parent has to exist, but it may sit at any depth: a menu goes
+	// Food, Street Food, Chaat, and capping it at two levels is what stopped
+	// a real one being expressed. Cycles are impossible — names are unique and
+	// a row can only name a parent that already exists.
 	if in.Parent != "" {
-		var parentOf string
-		err := a.db.sql.QueryRowContext(r.Context(),
-			`SELECT parent FROM catalog_categories WHERE name = $1`,
-			in.Parent).Scan(&parentOf)
-		if err != nil {
+		var exists bool
+		a.db.sql.QueryRowContext(r.Context(),
+			`SELECT true FROM catalog_categories WHERE name = $1`,
+			in.Parent).Scan(&exists)
+		if !exists {
 			writeError(w, http.StatusBadRequest,
-				"no department called "+in.Parent)
-			return
-		}
-		// One level only. Nesting deeper has nowhere to render, and the tab
-		// bar would silently stop showing it.
-		if parentOf != "" {
-			writeError(w, http.StatusBadRequest,
-				in.Parent+" is a category, not a department")
+				"nothing called "+in.Parent+" to put it in")
 			return
 		}
 	}

@@ -1044,6 +1044,7 @@ class _AdminHomeState extends State<_AdminHome> {
                 onAddCategory: () => _addCategory(parent: d.name),
                 onDelete: () => _deleteCategory(d.name),
                 onDeleteCategory: _deleteCategory,
+                onAddInside: (parent) => _addCategory(parent: parent),
               ),
         ];
 
@@ -1182,11 +1183,13 @@ class _DepartmentCard extends StatelessWidget {
   final VoidCallback onAddCategory;
   final VoidCallback onDelete;
   final void Function(String name) onDeleteCategory;
+  final void Function(String parent) onAddInside;
   const _DepartmentCard({
     required this.department,
     required this.onAddCategory,
     required this.onDelete,
     required this.onDeleteCategory,
+    required this.onAddInside,
   });
 
   @override
@@ -1230,7 +1233,8 @@ class _DepartmentCard extends StatelessWidget {
                       department.categories.isEmpty
                           ? 'No categories — sellers list under the '
                                 'department itself'
-                          : '${department.categories.length} categories',
+                          : '${department.categories.length} sections · '
+                                '${_countAll(department.categories)} in total',
                       style: const TextStyle(fontSize: 12, color: _muted),
                     ),
                   ],
@@ -1249,39 +1253,96 @@ class _DepartmentCard extends StatelessWidget {
             ],
           ),
           if (department.categories.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final c in department.categories)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F1EF),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(c, style: const TextStyle(fontSize: 12.5)),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () => onDeleteCategory(c),
-                          child: const Icon(
-                            LucideIcons.x,
-                            size: 13,
-                            color: _muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            for (final c in department.categories)
+              _CategoryBranch(
+                node: c,
+                depth: 0,
+                onAdd: onAddInside,
+                onDelete: onDeleteCategory,
+              ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Everything under a department, at every level — the header says "12
+/// sections · 69 in total" rather than counting only the top row.
+int _countAll(List<CategoryNode> nodes) =>
+    nodes.fold(0, (n, c) => n + 1 + _countAll(c.children));
+
+/// One category and everything inside it, indented by how deep it sits. The
+/// menu goes three levels — Food, Street Food, Chaat — and a flat row of
+/// chips could not show which belongs to which.
+class _CategoryBranch extends StatelessWidget {
+  final CategoryNode node;
+  final int depth;
+  final void Function(String parent) onAdd;
+  final void Function(String name) onDelete;
+  const _CategoryBranch({
+    required this.node,
+    required this.depth,
+    required this.onAdd,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(6.0 + depth * 18, 3, 0, 3),
+          child: Row(
+            children: [
+              Container(
+                width: 5,
+                height: 5,
+                margin: const EdgeInsets.only(right: 9),
+                decoration: BoxDecoration(
+                  color: depth == 0 ? _ink : const Color(0xFFBDBDB8),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  node.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    // A section reads as a heading, the things inside it do
+                    // not; without that the tree is 69 identical lines.
+                    fontWeight:
+                        depth == 0 ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => onAdd(node.name),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(LucideIcons.plus, size: 14, color: _muted),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => onDelete(node.name),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(LucideIcons.x, size: 13, color: _muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+        for (final child in node.children)
+          _CategoryBranch(
+            node: child,
+            depth: depth + 1,
+            onAdd: onAdd,
+            onDelete: onDelete,
+          ),
+      ],
     );
   }
 }
