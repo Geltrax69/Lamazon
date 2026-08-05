@@ -104,6 +104,9 @@ void main() {
       // Search
       await tester.pumpWidget(const MaterialApp(home: SearchScreen()));
       await tester.enterText(find.byType(TextField), 'milk');
+      // Search asks the server now, debounced — so it takes a beat, and in a
+      // test the request fails and falls back to the catalogue in memory.
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
       expect(find.text('Fresh Milk 1L'), findsOneWidget);
 

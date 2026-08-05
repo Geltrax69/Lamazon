@@ -147,7 +147,16 @@ type productFilter struct {
 // would mean a seller can add stock nobody can buy. Sold-out lines are left
 // out rather than shown as unavailable.
 const productQuery = `
-	WITH catalogue AS (
+	-- Which department a category belongs to, however deep it sits. A dish is
+	-- filed under Chaat; the tab it has to appear on is Food, three levels up.
+	WITH RECURSIVE tree AS (
+		SELECT name, parent, name AS root
+		FROM catalog_categories WHERE parent = ''
+		UNION ALL
+		SELECT c.name, c.parent, t.root
+		FROM catalog_categories c JOIN tree t ON c.parent = t.name
+	),
+	catalogue AS (
 		SELECT p.id, p.name, p.category, p.tab, p.price,
 		       -- The seeded catalogue has no discounts, and a zero here is
 		       -- what tells the app to show a plain price.
@@ -158,7 +167,11 @@ const productQuery = `
 		FROM products p
 		UNION ALL
 		SELECT i.id, i.title, COALESCE(NULLIF(i.category, ''), 'Food'),
-		       COALESCE(NULLIF(i.category, ''), 'Food'),
+		       -- The department, not the category. These used to be the same
+		       -- column, which was true only while every category was itself
+		       -- a department: the moment a menu had sections, every dish got
+		       -- a tab of its own that no tab bar showed.
+		       COALESCE(t.root, NULLIF(i.category, ''), 'Food'),
 		       i.price, i.mrp, i.options,
 		       COALESCE(i.image_urls[1], ''), s.name, i.description,
 		       -- every photo, not just the cover: the details gallery shows
@@ -166,6 +179,7 @@ const productQuery = `
 		       array_to_string(i.image_urls, E'\n')
 		FROM inventory_items i
 		JOIN seller_stores s ON s.owner = i.owner
+		LEFT JOIN tree t ON t.name = i.category
 		-- Only approved stores reach shoppers: a store still under review is
 		-- real to its owner and to the admin, and to nobody else.
 		WHERE i.stock > 0 AND s.status = 'approved'
