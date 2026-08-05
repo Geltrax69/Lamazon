@@ -61,10 +61,14 @@ type InventoryItem struct {
 	MRP         float64 `json:"mrp"` // 0 when the seller is not running a discount
 	// What the buyer chooses before ordering. Empty for most things — a
 	// samosa has no size — so it stays out of the JSON when there is none.
-	Options   []ItemOption `json:"options,omitempty"`
-	Stock     int          `json:"stock"`
-	Status    string       `json:"status"`    // derived from stock, never stored
-	ImageURLs []string     `json:"imageUrls"` // Cloudinary, in upload order
+	Options []ItemOption `json:"options,omitempty"`
+	// Which products this one can be lined up against, and what it says for
+	// that group's fields. Empty for anything not worth comparing.
+	CompareGroup string            `json:"compareGroup"`
+	Attributes   map[string]string `json:"attributes,omitempty"`
+	Stock        int               `json:"stock"`
+	Status       string            `json:"status"`    // derived from stock, never stored
+	ImageURLs    []string          `json:"imageUrls"` // Cloudinary, in upload order
 }
 
 // ItemOption is one thing a buyer picks, with the choices the shop offers.

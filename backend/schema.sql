@@ -466,3 +466,28 @@ SELECT * FROM (VALUES
 ) AS seed
 WHERE EXISTS (SELECT 1 FROM catalog_categories WHERE name = 'Household Essentials')
   AND NOT EXISTS (SELECT 1 FROM catalog_categories WHERE parent = 'Household Essentials');
+
+-- Comparison groups. Categories answer "where do I browse to find this";
+-- these answer "which products are fundamentally comparable", which is not
+-- the same question: a 20W charger and a 25W charger sit in one group whether
+-- or not the shop filed them under the same shelf.
+--
+-- The attribute template lives on the group as JSONB rather than in attribute
+-- and product_attribute tables. Nothing queries across attribute values — a
+-- comparison reads them with the products it is already loading — so the two
+-- extra tables would buy joins we would never run. Shape:
+--   [{"name":"Power","unit":"W"}]
+CREATE TABLE IF NOT EXISTS comparison_groups (
+    name       TEXT PRIMARY KEY,
+    attributes JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+-- Which group an item is in, and what it says for that group's fields.
+-- Empty group means "not comparable to anything", which is most food.
+--   {"Power": "20", "Warranty": "1 year"}
+ALTER TABLE inventory_items
+    ADD COLUMN IF NOT EXISTS compare_group TEXT  NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS attributes    JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE INDEX IF NOT EXISTS idx_items_compare_group
+    ON inventory_items (compare_group) WHERE compare_group <> '';

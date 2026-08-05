@@ -64,6 +64,35 @@ class Api {
     return jsonDecode(res.body) as List<dynamic>;
   }
 
+  /// Comparison groups and their attribute templates.
+  Future<List<CompareGroup>> compareGroups() async {
+    final rows = await _getList('/api/compare-groups');
+    return [
+      for (final r in rows) CompareGroup.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  /// Everything in one group, cheapest first, with the fields to compare on.
+  Future<Map<String, dynamic>> compare(String group) async {
+    final res = await http
+        .get(_url('/api/compare', {'group': group}))
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<void> saveCompareGroup(String name, List<GroupAttribute> fields) =>
+      _staffCall(StaffSession.admin, 'POST', '/api/admin/compare-groups', {
+        'name': name,
+        'attributes': [for (final f in fields) f.toJson()],
+      });
+
+  Future<void> deleteCompareGroup(String name) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/compare-groups/${Uri.encodeComponent(name)}',
+  );
+
   /// The shop's navigation: departments, each with its categories nested.
   Future<List<dynamic>> categories() => _getList('/api/categories');
 
@@ -316,6 +345,8 @@ class Api {
     required double mrp,
     required int stock,
     List<ItemOption> options = const [],
+    String compareGroup = '',
+    Map<String, String> attributes = const {},
   }) async {
     final res = await http
         .patch(
@@ -328,6 +359,8 @@ class Api {
             'price': price,
             'mrp': mrp,
             'options': [for (final o in options) o.toJson()],
+            'compareGroup': compareGroup,
+            'attributes': attributes,
             'stock': stock,
           }),
         )
@@ -647,6 +680,8 @@ class Api {
           price: (r['price'] as num?)?.toDouble() ?? 0,
           mrp: (r['mrp'] as num?)?.toDouble() ?? 0,
           options: _options(r),
+          compareGroup: r['compareGroup'] as String? ?? '',
+          attributes: _attributes(r),
           stock: (r['stock'] as num?)?.toInt() ?? 0,
         )
         ..serverId = r['id'] as String
@@ -682,6 +717,8 @@ class Api {
     required int stock,
     double mrp = 0,
     List<ItemOption> options = const [],
+    String compareGroup = '',
+    Map<String, String> attributes = const {},
     List<Uint8List> photos = const [],
   }) async {
     final body = await _send('/api/seller/items', {
@@ -693,6 +730,8 @@ class Api {
       // Encoded here rather than passed through: multipart fields are flat
       // strings, and the backend expects one JSON blob either way.
       'options': jsonEncode([for (final o in options) o.toJson()]),
+      'compareGroup': compareGroup,
+      'attributes': jsonEncode(attributes),
       'stock': stock,
     }, photos);
     return (
@@ -780,7 +819,13 @@ class Api {
         ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),
     ],
     options: _options(r),
+    compareGroup: r['compareGroup'] as String? ?? '',
+    attributes: _attributes(r),
   );
+
+  Map<String, String> _attributes(Map<String, dynamic> r) =>
+      (r['attributes'] as Map<String, dynamic>? ?? const {})
+          .map((k, v) => MapEntry(k, '$v'));
 
   List<ItemOption> _options(Map<String, dynamic> r) => [
     for (final o in (r['options'] as List<dynamic>? ?? const []))

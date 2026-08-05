@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/api.dart';
 import '../data/categories.dart';
 import '../models/product.dart';
 import '../data/seller.dart';
@@ -43,6 +44,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   );
   late List<Uint8List> _photos = [...?widget.existing?.photos];
   late final List<ItemOption> _options = [...?widget.existing?.options];
+  late String _group = widget.existing?.compareGroup ?? '';
+  late final Map<String, String> _attrs = {...?widget.existing?.attributes};
+
+  /// Loaded once. A seller cannot invent a group — the admin owns the list,
+  /// because two shops typing "Chargers" and "charger" would compare against
+  /// nothing.
+  late final Future<List<CompareGroup>> _groups = Api.instance.compareGroups();
   late String _category =
       widget.existing?.category ??
       (Seller.instance.store?.categories.first ?? _categoryOptions.first);
@@ -146,7 +154,25 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     );
   }
 
-  void _save() {
+  /// Only the fields the chosen group asks for. Switching group leaves the
+  /// old answers in the map; sending them would file a charger's Wattage
+  /// under a shampoo.
+  Map<String, String> _liveAttrs(List<CompareGroup> groups) {
+    if (_group.isEmpty) return const {};
+    final template = groups
+        .where((g) => g.name == _group)
+        .expand((g) => g.attributes)
+        .map((a) => a.name)
+        .toSet();
+    return {
+      for (final e in _attrs.entries)
+        if (template.contains(e.key) && e.value.trim().isNotEmpty)
+          e.key: e.value.trim(),
+    };
+  }
+
+  void _save(List<CompareGroup> groups) {
+    final attrs = _liveAttrs(groups);
     final item = widget.existing;
     if (item == null) {
       Seller.instance.addItem(
@@ -158,6 +184,8 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           price: _priceValue!,
           mrp: _mrpValue!,
           options: _liveOptions,
+          compareGroup: _group,
+          attributes: attrs,
           stock: _stockValue!,
           photos: _photos,
         ),
@@ -170,6 +198,8 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         ..price = _priceValue!
         ..mrp = _mrpValue!
         ..options = _liveOptions
+        ..compareGroup = _group
+        ..attributes = attrs
         ..stock = _stockValue!
         ..photos = _photos;
       Seller.instance.itemChanged(item);
@@ -329,6 +359,17 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       options: _options,
                       onChanged: () => setState(() {}),
                     ),
+                    const SizedBox(height: 22),
+                    FutureBuilder<List<CompareGroup>>(
+                      future: _groups,
+                      builder: (context, snap) => _CompareSection(
+                        groups: snap.data ?? const [],
+                        chosen: _group,
+                        values: _attrs,
+                        onGroup: (g) => setState(() => _group = g),
+                        onChanged: () => setState(() {}),
+                      ),
+                    ),
                     if (categories.length > 1) ...[
                       const SizedBox(height: 22),
                       const SellerSection(title: 'Category'),
@@ -351,7 +392,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
               SellerSubmitBar(
                 label: editing ? 'Save changes' : 'Add to inventory',
                 blocker: _blocker,
-                onSubmit: _save,
+                onSubmit: () async => _save(await _groups),
               ),
             ],
           ),
@@ -719,6 +760,122 @@ class _AddChip extends StatelessWidget {
           style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
         ),
       ),
+    );
+  }
+}
+
+/// Which products this one can be lined up against, and the fields that
+/// comparison runs on. Collapsed to a single row of chips until one is
+/// picked: most stock is not comparable to anything, and asking every seller
+/// for Wattage is how a form starts feeling like paperwork.
+class _CompareSection extends StatelessWidget {
+  final List<CompareGroup> groups;
+  final String chosen;
+  final Map<String, String> values;
+  final ValueChanged<String> onGroup;
+  final VoidCallback onChanged;
+  const _CompareSection({
+    required this.groups,
+    required this.chosen,
+    required this.values,
+    required this.onGroup,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (groups.isEmpty) return const SizedBox.shrink();
+    final template = groups
+        .where((g) => g.name == chosen)
+        .expand((g) => g.attributes)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SellerSection(
+          title: 'Compare with',
+          hint: 'Optional — puts this beside similar products',
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final g in groups)
+              _AddChip(
+                label: g.name == chosen ? '✓ ${g.name}' : g.name,
+                // Tapping the chosen one clears it, so opting out is the same
+                // gesture as opting in.
+                onTap: () => onGroup(g.name == chosen ? '' : g.name),
+              ),
+          ],
+        ),
+        if (template.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What buyers compare $chosen on',
+                  style: const TextStyle(fontSize: 12.5, color: _muted),
+                ),
+                const SizedBox(height: 10),
+                for (final field in template) ...[
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: Text(
+                          field.name,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: SizedBox(
+                          height: 38,
+                          child: TextFormField(
+                            initialValue: values[field.name] ?? '',
+                            onChanged: (v) {
+                              values[field.name] = v;
+                              onChanged();
+                            },
+                            decoration: InputDecoration(
+                              isDense: true,
+                              // The unit sits in the box, so the seller types
+                              // 20 rather than guessing whether to write 20W.
+                              suffixText: field.unit,
+                              hintText: '—',
+                              filled: true,
+                              fillColor: const Color(0xFFF4F4F2),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(11),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

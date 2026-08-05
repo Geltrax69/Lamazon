@@ -65,6 +65,10 @@ class InventoryItem {
   double mrp;
   /// What the buyer picks: size, colour, whatever this shop sells by.
   List<ItemOption> options;
+  /// Which products this is comparable to, and what it says for that group's
+  /// fields. Empty for anything not worth comparing.
+  String compareGroup;
+  Map<String, String> attributes;
   int stock;
   List<Uint8List> photos; // first one is the cover
 
@@ -81,6 +85,8 @@ class InventoryItem {
     required this.price,
     this.mrp = 0,
     this.options = const [],
+    this.compareGroup = '',
+    this.attributes = const {},
     required this.stock,
     this.photos = const [],
   });
@@ -265,6 +271,8 @@ class Seller extends ChangeNotifier {
         price: item.price,
         mrp: item.mrp,
         options: item.options,
+        compareGroup: item.compareGroup,
+        attributes: item.attributes,
         stock: item.stock,
         photos: item.photos,
       );
@@ -329,6 +337,8 @@ class Seller extends ChangeNotifier {
         price: item.price,
         mrp: item.mrp,
         options: item.options,
+        compareGroup: item.compareGroup,
+        attributes: item.attributes,
         stock: item.stock,
       );
       item.imageUrls = saved.imageUrls;

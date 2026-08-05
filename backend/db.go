@@ -287,7 +287,8 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 // rather than stored — one less column that can drift out of sync.
 func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
-		SELECT id, title, description, category, price, mrp, options, stock,
+		SELECT id, title, description, category, price, mrp, options,
+		       compare_group, attributes, stock,
 		       array_to_string(image_urls, E'\n')
 		FROM inventory_items WHERE owner = $1 ORDER BY id DESC`, owner)
 	if err != nil {
@@ -299,12 +300,16 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	for rows.Next() {
 		var i InventoryItem
 		var urls string
-		var options []byte
+		var options, attributes []byte
 		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
-			&i.Price, &i.MRP, &options, &i.Stock, &urls); err != nil {
+			&i.Price, &i.MRP, &options, &i.CompareGroup, &attributes,
+			&i.Stock, &urls); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(options, &i.Options); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(attributes, &i.Attributes); err != nil {
 			return nil, err
 		}
 		i.Status = stockStatus(i.Stock)

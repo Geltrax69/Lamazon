@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
 import '../data/categories.dart';
+import '../models/product.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
 
@@ -148,6 +149,7 @@ class _AdminHomeState extends State<_AdminHome> {
   List<dynamic> _stores = const [];
   List<dynamic> _riders = const [];
   List<dynamic> _orders = const [];
+  List<CompareGroup> _groups = const [];
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
@@ -163,12 +165,13 @@ class _AdminHomeState extends State<_AdminHome> {
     try {
       // Five independent reads. In series this was five round trips of
       // waiting before anything drew.
-      final (overview, insights, stores, riders, orders, _) = await (
+      final (overview, insights, stores, riders, orders, groups, _) = await (
         Api.instance.adminOverview(),
         Api.instance.adminInsights(),
         Api.instance.adminStores(),
         Api.instance.riders(),
         Api.instance.adminOrders(),
+        Api.instance.compareGroups(),
         // Refreshes the global list the shop draws its tabs from, so adding a
         // department shows up here without a reload.
         loadDepartments(),
@@ -180,6 +183,7 @@ class _AdminHomeState extends State<_AdminHome> {
         _stores = stores;
         _riders = riders;
         _orders = orders;
+        _groups = groups;
         _error = null;
       });
     } catch (e) {
@@ -226,6 +230,124 @@ class _AdminHomeState extends State<_AdminHome> {
     if (given == null || given.isEmpty) return;
     await Api.instance.rejectStore(owner, given);
     await _load();
+  }
+
+  /// A comparison group and the fields it compares on. The template is edited
+  /// as a whole — a list you add to one request at a time cannot be reordered.
+  Future<void> _editGroup([CompareGroup? existing]) async {
+    final name = TextEditingController(text: existing?.name ?? '');
+    final fields = [...?existing?.attributes];
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, setDialog) => AlertDialog(
+          title: Text(existing == null ? 'New group' : existing.name),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (existing == null)
+                    TextField(
+                      controller: name,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Group',
+                        hintText: 'e.g. Chargers, Thali, Shampoo',
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Compared on',
+                    style: TextStyle(fontSize: 12.5, color: _muted),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final (i, f) in fields.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextFormField(
+                              initialValue: f.name,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                hintText: 'Field',
+                              ),
+                              onChanged: (v) =>
+                                  fields[i] = GroupAttribute(v, fields[i].unit),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: f.unit,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                hintText: 'Unit',
+                              ),
+                              onChanged: (v) =>
+                                  fields[i] = GroupAttribute(fields[i].name, v),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () =>
+                                setDialog(() => fields.removeAt(i)),
+                            icon: const Icon(
+                              LucideIcons.x,
+                              size: 15,
+                              color: _muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  TextButton.icon(
+                    onPressed: () => setDialog(
+                      () => fields.add(const GroupAttribute('')),
+                    ),
+                    icon: const Icon(LucideIcons.plus, size: 15),
+                    label: const Text('Add a field'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    final groupName = existing?.name ?? name.text.trim();
+    if (groupName.isEmpty) return;
+    try {
+      await Api.instance.saveCompareGroup(groupName, fields);
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+  }
+
+  Future<void> _deleteGroup(String name) async {
+    try {
+      await Api.instance.deleteCompareGroup(name);
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
   }
 
   /// Which departments a store sells in. Order matters and is kept: the first
@@ -869,6 +991,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.insights:
         (_insights?['topStores'] as List?)?.length ?? 0,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
+    _Tab.compare: _groups.length,
     _Tab.delivery: _riders.length,
     _Tab.people: (_overview?['people'] as List?)?.length ?? 0,
   };
@@ -1048,6 +1171,38 @@ class _AdminHomeState extends State<_AdminHome> {
               ),
         ];
 
+      case _Tab.compare:
+        return [
+          Row(
+            children: [
+              const Expanded(
+                child: _Note(
+                  'Categories say where to browse. These say what can be put '
+                  'side by side — and the fields every product in the group '
+                  'is asked for.',
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _editGroup(),
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('Group'),
+              ),
+            ],
+          ),
+          if (_groups.isEmpty)
+            const _Empty(
+              'No comparison groups yet. Without one, Compare can only show '
+              'the same product at different shops.',
+            )
+          else
+            for (final g in _groups)
+              _GroupCard(
+                group: g,
+                onEdit: () => _editGroup(g),
+                onDelete: () => _deleteGroup(g.name),
+              ),
+        ];
+
       case _Tab.delivery:
         return [
           Row(
@@ -1092,6 +1247,95 @@ class _AdminHomeState extends State<_AdminHome> {
             for (final p in people) _PersonRow(person: p),
         ];
     }
+  }
+}
+
+/// One comparison group: its name, how much is in it, and the fields.
+class _GroupCard extends StatelessWidget {
+  final CompareGroup group;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  const _GroupCard({
+    required this.group,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      group.attributes.isEmpty
+                          ? '${group.items} products · no fields yet, so '
+                                'there is nothing to compare on'
+                          : '${group.items} products · '
+                                '${group.attributes.length} fields',
+                      style: const TextStyle(fontSize: 12, color: _muted),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Edit fields',
+                onPressed: onEdit,
+                icon: const Icon(LucideIcons.pencil, size: 15),
+              ),
+              IconButton(
+                tooltip: 'Remove ${group.name}',
+                onPressed: onDelete,
+                icon: const Icon(LucideIcons.trash2, size: 15, color: _red),
+              ),
+            ],
+          ),
+          if (group.attributes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final a in group.attributes)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F1EF),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      a.unit.isEmpty ? a.name : '${a.name} (${a.unit})',
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -1533,6 +1777,7 @@ enum _Tab {
   orders('Orders'),
   insights('Insights'),
   categories('Categories'),
+  compare('Compare'),
   delivery('Delivery'),
   people('People');
 

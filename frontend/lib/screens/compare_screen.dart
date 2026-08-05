@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/api.dart';
 import '../data/cart.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
@@ -63,6 +64,12 @@ class CompareScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              // Two different questions on one screen: which shop sells this
+              // cheapest, and which product to buy instead. Categories cannot
+              // answer the second — two shops shelve the same charger
+              // differently — which is what the comparison group is for.
+              if (product.compareGroup.isNotEmpty)
+                _Rivals(product: product),
               // Product being compared.
               Row(
                 children: [
@@ -323,6 +330,163 @@ class _VendorRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Everything comparable to this one, on the fields its group is compared by.
+/// Loaded here rather than passed in: the catalogue in hand is one shop's
+/// view, and a rival is by definition somebody else's stock.
+class _Rivals extends StatefulWidget {
+  final Product product;
+  const _Rivals({required this.product});
+
+  @override
+  State<_Rivals> createState() => _RivalsState();
+}
+
+class _RivalsState extends State<_Rivals> {
+  late final Future<Map<String, dynamic>> _future = Api.instance.compare(
+    widget.product.compareGroup,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _future,
+      builder: (context, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+        final fields = [
+          for (final a in (snap.data!['attributes'] as List<dynamic>))
+            GroupAttribute.fromJson(a as Map<String, dynamic>),
+        ];
+        final rows = (snap.data!['products'] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
+        // One product on its own is not a comparison, it is a product.
+        if (rows.length < 2) return const SizedBox.shrink();
+        final cheapest = rows.first['id'];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Other ${snap.data!['group']}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Same job, side by side. Cheapest first.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+            ),
+            const SizedBox(height: 10),
+            // Scrolls sideways: a template can carry five fields, and squeezing
+            // them into a phone's width is what turns a table into a puzzle.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final row in rows)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 170,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${row['title']}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: row['id'] == widget.product.id
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${row['store']}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF9A9A9A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 92,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '₹${(row['price'] as num).toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: row['id'] == cheapest
+                                          ? _green
+                                          : _ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            for (final f in fields)
+                              SizedBox(
+                                width: 96,
+                                child: Text(
+                                  f.show(
+                                    '${(row['values'] as Map?)?[f.name] ?? ''}',
+                                  ),
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    const Divider(height: 14),
+                    // The header goes last in the column but reads first,
+                    // because the rows above set the column widths.
+                    Row(
+                      children: [
+                        const SizedBox(width: 170, child: Text('')),
+                        const SizedBox(
+                          width: 92,
+                          child: Text(
+                            'Price',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                          ),
+                        ),
+                        for (final f in fields)
+                          SizedBox(
+                            width: 96,
+                            child: Text(
+                              f.name,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF9A9A9A),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        );
+      },
     );
   }
 }

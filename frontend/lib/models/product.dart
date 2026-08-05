@@ -15,6 +15,12 @@ class Product {
   /// What the shop asks the buyer to choose. Empty for most things.
   final List<ItemOption> options;
 
+  /// Which products this one is comparable to. Categories say where to browse;
+  /// this says what can be lined up side by side, which is a different
+  /// question — two shops may shelve the same charger differently.
+  final String compareGroup;
+  final Map<String, String> attributes;
+
   const Product({
     required this.id,
     required this.name,
@@ -29,6 +35,8 @@ class Product {
     this.extraImages = const [],
     this.offers = const [],
     this.options = const [],
+    this.compareGroup = '',
+    this.attributes = const {},
   });
 
   /// True only when there is a real saving to show. An MRP equal to the price
@@ -75,6 +83,40 @@ class ItemOption {
     'kind': kind,
     'values': values,
   };
+}
+
+/// A set of comparable products and the fields to compare them on.
+class CompareGroup {
+  final String name;
+  final List<GroupAttribute> attributes;
+  final int items;
+  const CompareGroup(this.name, this.attributes, [this.items = 0]);
+
+  factory CompareGroup.fromJson(Map<String, dynamic> r) => CompareGroup(
+    r['name'] as String? ?? '',
+    [
+      for (final a in (r['attributes'] as List<dynamic>? ?? const []))
+        GroupAttribute.fromJson(a as Map<String, dynamic>),
+    ],
+    (r['items'] as num?)?.toInt() ?? 0,
+  );
+}
+
+class GroupAttribute {
+  final String name;
+  final String unit;
+  const GroupAttribute(this.name, [this.unit = '']);
+
+  factory GroupAttribute.fromJson(Map<String, dynamic> r) => GroupAttribute(
+    r['name'] as String? ?? '',
+    r['unit'] as String? ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {'name': name, 'unit': unit};
+
+  /// "20" plus "W" reads as 20W; a field with no unit is left alone.
+  String show(String value) =>
+      value.isEmpty ? '—' : (unit.isEmpty ? value : '$value$unit');
 }
 
 class ShopOffer {

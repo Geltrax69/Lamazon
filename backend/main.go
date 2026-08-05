@@ -81,6 +81,8 @@ func routes(s *API) http.Handler {
 
 	// Catalog
 	mux.HandleFunc("GET /api/categories", s.handleCategories)
+	mux.HandleFunc("GET /api/compare-groups", s.handleCompareGroups)
+	mux.HandleFunc("GET /api/compare", s.handleCompare)
 	mux.HandleFunc("GET /api/products", s.handleProducts)
 	mux.HandleFunc("GET /api/products/{id}", s.handleProduct)
 	mux.HandleFunc("GET /api/shops", s.handleShops)
@@ -139,6 +141,8 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
 	mux.HandleFunc("POST /api/admin/categories", s.handleAddCategory)
+	mux.HandleFunc("POST /api/admin/compare-groups", s.handleSaveCompareGroup)
+	mux.HandleFunc("DELETE /api/admin/compare-groups/{name}", s.handleDeleteCompareGroup)
 	mux.HandleFunc("DELETE /api/admin/categories/{name}", s.handleDeleteCategory)
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
 	mux.HandleFunc("PATCH /api/admin/stores/{owner}/categories", s.handleStoreCategories)

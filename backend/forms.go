@@ -75,6 +75,12 @@ func decodeItem(r *http.Request) (InventoryItem, [][]byte, error) {
 			return in, nil, errors.New("options must be valid JSON")
 		}
 	}
+	in.CompareGroup = strings.TrimSpace(r.FormValue("compareGroup"))
+	if s := strings.TrimSpace(r.FormValue("attributes")); s != "" {
+		if err := json.Unmarshal([]byte(s), &in.Attributes); err != nil {
+			return in, nil, errors.New("attributes must be valid JSON")
+		}
+	}
 	if s := strings.TrimSpace(r.FormValue("stock")); s != "" {
 		stock, err := strconv.Atoi(s)
 		if err != nil {
