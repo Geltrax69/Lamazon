@@ -228,6 +228,91 @@ class _AdminHomeState extends State<_AdminHome> {
     await _load();
   }
 
+  /// Which departments a store sells in. Order matters and is kept: the first
+  /// one is the tab the shop appears under, so the admin picking Books first
+  /// moves the shop there.
+  Future<void> _editStoreCategories(Map<String, dynamic> store) async {
+    final picked = <String>[
+      ...(store['categories'] as List<dynamic>? ?? const []).cast<String>(),
+    ];
+    final all = [for (final d in departments) if (d.name != 'All') d.name];
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, setDialog) => AlertDialog(
+          title: Text('${store['name']} sells in'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  picked.isEmpty
+                      ? 'Pick at least one.'
+                      : 'Shown under ${picked.first}. Tap to reorder — the '
+                            'first one is the tab it appears on.',
+                  style: const TextStyle(fontSize: 12.5, color: _muted),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final name in all)
+                      _PickChip(
+                        label: name,
+                        // The number says where it sits in the order, which is
+                        // the only thing that makes "first one wins" visible.
+                        rank: picked.indexOf(name),
+                        onTap: () => setDialog(() {
+                          if (picked.contains(name)) {
+                            // Already first: tapping again is how you remove
+                            // it, so a mis-tap is one tap to undo.
+                            if (picked.first == name) {
+                              picked.remove(name);
+                            } else {
+                              picked
+                                ..remove(name)
+                                ..insert(0, name);
+                            }
+                          } else {
+                            picked.add(name);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: picked.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialog, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.instance.setStoreCategories(
+        store['owner'] as String,
+        picked,
+      );
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+  }
+
   /// Adds a department, or a category inside one. A department gets an icon
   /// and a colour because it has a tab to draw; a category is just a name.
   Future<void> _addCategory({String parent = ''}) async {
@@ -807,6 +892,7 @@ class _AdminHomeState extends State<_AdminHome> {
                 store: s,
                 onApprove: () => _approve(s['owner'] as String),
                 onReject: () => _reject(s['owner'] as String),
+                onEditCategories: () => _editStoreCategories(s),
               ),
         ];
 
@@ -821,6 +907,7 @@ class _AdminHomeState extends State<_AdminHome> {
               _StoreCard(
                 store: s,
                 onReject: () => _reject(s['owner'] as String),
+                onEditCategories: () => _editStoreCategories(s),
               ),
         ];
 
@@ -838,6 +925,7 @@ class _AdminHomeState extends State<_AdminHome> {
               _StoreCard(
                 store: s,
                 onApprove: () => _approve(s['owner'] as String),
+                onEditCategories: () => _editStoreCategories(s),
               ),
         ];
 
@@ -1003,6 +1091,70 @@ class _AdminHomeState extends State<_AdminHome> {
             for (final p in people) _PersonRow(person: p),
         ];
     }
+  }
+}
+
+/// A department a store may sell in. Unpicked is plain; picked shows its
+/// place in the order, because the first one decides the shop's tab.
+class _PickChip extends StatelessWidget {
+  final String label;
+  final int rank;
+  final VoidCallback onTap;
+  const _PickChip({
+    required this.label,
+    required this.rank,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final on = rank >= 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: on ? _ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: on ? _ink : const Color(0xFFDDDDD8),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (on) ...[
+              Container(
+                width: 17,
+                height: 17,
+                alignment: Alignment.center,
+                margin: const EdgeInsets.only(right: 7),
+                decoration: const BoxDecoration(
+                  color: Colors.white24,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${rank + 1}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: on ? Colors.white : _ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1365,7 +1517,13 @@ class _StoreCard extends StatelessWidget {
   final Map<String, dynamic> store;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
-  const _StoreCard({required this.store, this.onApprove, this.onReject});
+  final VoidCallback? onEditCategories;
+  const _StoreCard({
+    required this.store,
+    this.onApprove,
+    this.onReject,
+    this.onEditCategories,
+  });
 
   Color get _colour => switch (store['status']) {
     'approved' => _green,
@@ -1448,6 +1606,15 @@ class _StoreCard extends StatelessWidget {
                 OutlinedButton(
                   onPressed: onReject,
                   child: const Text('Reject', style: TextStyle(color: _red)),
+                ),
+              const Spacer(),
+              // A shop that opened as Electronics and grew into Books had no
+              // way to say so — the list was set once at onboarding.
+              if (onEditCategories != null)
+                TextButton.icon(
+                  onPressed: onEditCategories,
+                  icon: const Icon(LucideIcons.pencil, size: 15),
+                  label: const Text('Departments'),
                 ),
             ],
           ),

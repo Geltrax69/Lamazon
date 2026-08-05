@@ -437,6 +437,71 @@ func (a *API) handleAdminStores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// PATCH /api/admin/stores/{owner}/categories — which departments a store
+// sells in. A shop that opened as Electronics and grew into Books and Sports
+// had no way to say so: the list was set once at onboarding and never again.
+//
+// The first one decides which tab the shop appears under, so the order the
+// admin sends is the order stored.
+func (a *API) handleStoreCategories(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Categories []string `json:"categories"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	// Trimmed and de-duplicated: the same department twice would show the
+	// shop's own tag list repeating itself for no reason.
+	seen := map[string]bool{}
+	clean := make([]string, 0, len(in.Categories))
+	for _, c := range in.Categories {
+		c = strings.TrimSpace(c)
+		if c == "" || seen[c] {
+			continue
+		}
+		seen[c] = true
+		clean = append(clean, c)
+	}
+	if len(clean) == 0 {
+		writeError(w, http.StatusBadRequest,
+			"a store has to sell in at least one department")
+		return
+	}
+
+	// Every one has to be a real department. Without this an admin typo puts
+	// a shop on a tab that does not exist, where no shopper will ever find it.
+	for _, c := range clean {
+		var parent string
+		err := a.db.sql.QueryRowContext(r.Context(),
+			`SELECT parent FROM catalog_categories WHERE name = $1`, c).
+			Scan(&parent)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "no department called "+c)
+			return
+		}
+		if parent != "" {
+			writeError(w, http.StatusBadRequest,
+				c+" is a category, not a department")
+			return
+		}
+	}
+
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE seller_stores SET categories = $2 WHERE owner = $1`,
+		r.PathValue("owner"), clean)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no store for that owner")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"categories": clean})
+}
+
 // POST /api/admin/stores/{owner}/approve
 func (a *API) handleApproveStore(w http.ResponseWriter, r *http.Request) {
 	a.reviewStore(w, r, "approved", "")

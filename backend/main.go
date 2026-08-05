@@ -141,6 +141,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/categories", s.handleAddCategory)
 	mux.HandleFunc("DELETE /api/admin/categories/{name}", s.handleDeleteCategory)
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
+	mux.HandleFunc("PATCH /api/admin/stores/{owner}/categories", s.handleStoreCategories)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/reject", s.handleRejectStore)
 	mux.HandleFunc("GET /api/admin/orders", s.handleAdminOrders)

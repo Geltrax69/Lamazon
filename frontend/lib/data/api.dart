@@ -457,8 +457,12 @@ class Api {
     final payload = body == null ? null : jsonEncode(body);
     final res = await switch (method) {
       'POST' => http.post(url, headers: headers, body: payload),
+      'PATCH' => http.patch(url, headers: headers, body: payload),
       'DELETE' => http.delete(url, headers: headers),
-      _ => http.get(url, headers: headers),
+      // Anything unrecognised would otherwise be sent as a GET, which the
+      // server answers with a 404 that reads like the route is missing.
+      'GET' => http.get(url, headers: headers),
+      _ => throw ArgumentError('unsupported staff method $method'),
     }.timeout(_timeout);
     if (res.statusCode == 401) {
       // The token died; sign the panel out rather than looping on errors.
@@ -502,6 +506,16 @@ class Api {
     );
     return body['items'] as List<dynamic>? ?? const [];
   }
+
+  /// Which departments a store sells in. Order is meaningful — the first is
+  /// the tab it shows up on — so the list goes across as sent.
+  Future<void> setStoreCategories(String owner, List<String> categories) =>
+      _staffCall(
+        StaffSession.admin,
+        'PATCH',
+        '/api/admin/stores/${Uri.encodeComponent(owner)}/categories',
+        {'categories': categories},
+      );
 
   Future<void> approveStore(String owner) => _staffCall(
     StaffSession.admin,
