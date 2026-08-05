@@ -21,6 +21,21 @@ void main() {
   PageController controller(WidgetTester tester) =>
       tester.widget<PageView>(find.byType(PageView).first).controller!;
 
+  testWidgets('the store cards fit a narrow phone', (tester) async {
+    await mockNetworkImagesFor(() async {
+      // The card used to be a hard 246 wide whatever slot the carousel gave
+      // it, so a narrow screen overflowed by the difference. An overflow is
+      // reported as an exception in a test, which is what this catches.
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await openHome(tester);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   testWidgets('the store row moves on by itself', (tester) async {
     await mockNetworkImagesFor(() async {
       await openHome(tester);

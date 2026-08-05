@@ -403,9 +403,15 @@ class _SearchBar extends StatelessWidget {
           children: [
             Icon(LucideIcons.search, size: 20, color: Colors.grey),
             SizedBox(width: 10),
-            Text(
-              'what are you looking for?',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+            // Flexible, because the hint is a whole sentence and a narrow
+            // phone has less room for it than the sentence wants.
+            Expanded(
+              child: Text(
+                'what are you looking for?',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
             ),
           ],
         ),
@@ -851,8 +857,10 @@ class _ShopAd extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => ShopScreen(shop: shop)),
       ),
+      // No fixed width: the card fills whatever slot the carousel gives it.
+      // It used to be 246 regardless, so on a narrow phone the PageView handed
+      // it less than that and the row overflowed by the difference.
       child: Container(
-        width: 246,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
