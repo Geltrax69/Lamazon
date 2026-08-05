@@ -284,6 +284,35 @@ class Api {
     )..photoUrl = r['photoUrl'] as String? ?? '';
   }
 
+  /// Saves an edit to a listing that already exists. Photos are not part of
+  /// this — they have their own endpoint, and their own way of failing.
+  Future<InventoryItem> updateItem(
+    String itemId, {
+    required String title,
+    required String description,
+    required String category,
+    required double price,
+    required double mrp,
+    required int stock,
+  }) async {
+    final res = await http
+        .patch(
+          _url('/api/seller/items/$itemId'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'title': title,
+            'description': description,
+            'category': category,
+            'price': price,
+            'mrp': mrp,
+            'stock': stock,
+          }),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return _inventoryItem(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
   Future<List<InventoryItem>> sellerItems() async {
     final res = await http
         .get(_url('/api/seller/items'), headers: await _authHeader())

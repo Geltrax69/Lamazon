@@ -269,6 +269,63 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, it)
 }
 
+// PATCH /api/seller/items/{id} — the details of a listing someone already
+// has: title, description, category, price, MRP, stock.
+//
+// Photos are not here. They go through /photos, which uploads to Cloudinary;
+// mixing the two would mean a rename that fails on an image upload leaves the
+// price half-changed.
+func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
+	var in InventoryItem
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	in.Title = strings.TrimSpace(in.Title)
+	switch {
+	case in.Title == "":
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	case in.Price <= 0:
+		writeError(w, http.StatusBadRequest, "price must be above 0")
+		return
+	case in.Stock < 0:
+		writeError(w, http.StatusBadRequest, "stock cannot be negative")
+		return
+	case in.MRP != 0 && in.MRP < in.Price:
+		writeError(w, http.StatusBadRequest,
+			"MRP cannot be below the selling price")
+		return
+	}
+
+	var it InventoryItem
+	var urls string
+	// The owner is in the WHERE clause, not just the read: without it a seller
+	// could reprice somebody else's stock by guessing an id.
+	err := a.db.sql.QueryRowContext(r.Context(), `
+		UPDATE inventory_items
+		SET title = $2, description = $3, category = $4, price = $5,
+		    mrp = $6, stock = $7
+		WHERE id = $1 AND owner = $8
+		RETURNING id, title, description, category, price, mrp, stock,
+		          array_to_string(image_urls, E'\n')`,
+		r.PathValue("id"), in.Title, in.Description, in.Category, in.Price,
+		in.MRP, in.Stock, a.owner(r)).
+		Scan(&it.ID, &it.Title, &it.Description, &it.Category, &it.Price,
+			&it.MRP, &it.Stock, &urls)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+r.PathValue("id"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	it.Status = stockStatus(it.Stock)
+	it.ImageURLs = splitURLs(urls)
+	writeJSON(w, http.StatusOK, it)
+}
+
 // DELETE /api/seller/items/{id}
 func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

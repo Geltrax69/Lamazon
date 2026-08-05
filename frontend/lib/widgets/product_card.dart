@@ -252,6 +252,10 @@ class NetImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // An empty URL is not a broken image, it is no image — and asking the
+    // browser for "" fetches the page itself, so every one of the 200-odd
+    // photoless rows came back as index.html and logged a decode failure.
+    if (url.trim().isEmpty) return _fallback();
     return Image.network(
       url,
       fit: fit,

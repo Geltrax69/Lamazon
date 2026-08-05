@@ -11,7 +11,12 @@ import 'details_screen.dart';
 class SearchScreen extends StatefulWidget {
   /// Pre-filled query, used when arriving from a category tile.
   final String initialQuery;
-  const SearchScreen({super.key, this.initialQuery = ''});
+
+  /// The department the shopper was in. Empty, or 'All', means everything —
+  /// arriving from Electronics and being shown pizza is the shopper losing
+  /// the filter they set two taps ago.
+  final String tab;
+  const SearchScreen({super.key, this.initialQuery = '', this.tab = ''});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -20,6 +25,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   late String _query = widget.initialQuery;
   late final _controller = TextEditingController(text: widget.initialQuery);
+
+  bool get _scoped => widget.tab.isNotEmpty && widget.tab != 'All';
 
   @override
   void dispose() {
@@ -30,9 +37,15 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final q = _query.trim().toLowerCase();
+    // shownCatalog, not the bundled list: the two do not hold the same
+    // products, and searching the bundle could not find a single thing a real
+    // seller had listed.
+    final inTab = _scoped
+        ? shownCatalog.where((p) => p.tab == widget.tab).toList()
+        : shownCatalog;
     final results = q.isEmpty
         ? const <Product>[]
-        : products
+        : inTab
               .where(
                 (p) =>
                     p.name.toLowerCase().contains(q) ||
@@ -89,9 +102,14 @@ class _SearchScreenState extends State<SearchScreen> {
                                 controller: _controller,
                                 autofocus: widget.initialQuery.isEmpty,
                                 onChanged: (v) => setState(() => _query = v),
-                                decoration: const InputDecoration(
-                                  hintText: 'Search products, shops...',
-                                  hintStyle: TextStyle(
+                                decoration: InputDecoration(
+                                  // The scope is in the hint rather than
+                                  // silent: a search that quietly ignores
+                                  // half the catalogue reads as broken.
+                                  hintText: _scoped
+                                      ? 'Search in ${widget.tab}...'
+                                      : 'Search products, shops...',
+                                  hintStyle: const TextStyle(
                                     color: Colors.grey,
                                     fontSize: 14,
                                   ),

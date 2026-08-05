@@ -11,7 +11,13 @@ import 'shop_screen.dart';
 /// Every store, for when "Stores near you" is not enough. The home row shows
 /// a handful sideways; this is the same data as a list you can scroll.
 class ShopsScreen extends StatelessWidget {
-  const ShopsScreen({super.key});
+  /// The department the shopper came from. Empty, or 'All', lists every shop;
+  /// otherwise this shows the shops registered in that department, which is
+  /// what "See all" under Electronics is asking for.
+  final String tab;
+  const ShopsScreen({super.key, this.tab = ''});
+
+  bool get _all => tab.isEmpty || tab == 'All';
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +29,30 @@ class ShopsScreen extends StatelessWidget {
           child: FutureBuilder<List<Shop>>(
             future: loadShops(),
             builder: (context, snap) {
-              final list = snap.data ?? const <Shop>[];
+              final list = (snap.data ?? const <Shop>[])
+                  .where((s) => _all || s.tab == tab)
+                  .toList();
               return Column(
                 children: [
-                  const ScreenHeader(title: 'Stores near you'),
+                  ScreenHeader(
+                    title: _all ? 'Stores near you' : '$tab stores',
+                  ),
                   if (!snap.hasData)
                     const Expanded(
                       child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (list.isEmpty)
+                    const Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Text(
+                            'No stores in this category yet.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF6B6B6B)),
+                          ),
+                        ),
+                      ),
                     )
                   else
                     Expanded(

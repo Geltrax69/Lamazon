@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/seller.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 
@@ -70,8 +71,16 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     return (((mrp - price) / mrp) * 100).round();
   }
 
+  /// A saved listing keeps its photos on Cloudinary, not in memory — the edit
+  /// screen only holds bytes for pictures picked in this session. Counting
+  /// only those made "Add at least one photo" block every edit of an item
+  /// that already had photos, which is to say every edit.
+  List<String> get _savedPhotos => widget.existing?.imageUrls ?? const [];
+
+  bool get _hasPhotos => _photos.isNotEmpty || _savedPhotos.isNotEmpty;
+
   String? get _blocker {
-    if (_photos.isEmpty) return 'Add at least one photo';
+    if (!_hasPhotos) return 'Add at least one photo';
     if (_title.text.trim().isEmpty) return 'Give the product a title';
     if ((_priceValue ?? 0) <= 0) return 'Set a price above ₹0';
     if (_mrpValue == null) return 'MRP must be a number, or left blank';
@@ -144,7 +153,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         ..mrp = _mrpValue!
         ..stock = _stockValue!
         ..photos = _photos;
-      Seller.instance.itemChanged();
+      Seller.instance.itemChanged(item);
     }
     Navigator.pop(context);
   }
@@ -166,9 +175,31 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
                     SellerSection(
-                      title: 'Photos (${_photos.length})',
+                      title:
+                          'Photos (${_photos.length + _savedPhotos.length})',
                       hint: 'Add as many as you like — the first is the cover',
                     ),
+                    // The ones already live, so an edit screen does not look
+                    // like a listing that lost its pictures. Anything picked
+                    // below is added to these, not swapped for them.
+                    if (_savedPhotos.isNotEmpty) ...[
+                      SizedBox(
+                        height: 74,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _savedPhotos.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (_, i) => ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 74,
+                              child: NetImage(url: _savedPhotos[i]),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     PhotoStrip(
                       photos: _photos,
                       onChanged: (list) => setState(() => _photos = list),

@@ -312,7 +312,34 @@ class Seller extends ChangeNotifier {
   }
 
   /// Edits happen on the live object, so callers mutate then call this.
-  void itemChanged() => notifyListeners();
+  /// An edit to a listing that is already on the server. This used to only
+  /// call notifyListeners, so the screen showed the new price and the shop
+  /// kept selling at the old one until the next reload threw the edit away.
+  void itemChanged([InventoryItem? item]) {
+    notifyListeners();
+    if (item?.serverId != null) _patchItem(item!);
+  }
+
+  Future<void> _patchItem(InventoryItem item) async {
+    try {
+      final saved = await Api.instance.updateItem(
+        item.serverId!,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        price: item.price,
+        mrp: item.mrp,
+        stock: item.stock,
+      );
+      item.imageUrls = saved.imageUrls;
+      _syncError = null;
+    } catch (e) {
+      logApiFailure('item update', e);
+      _syncError = 'Changes to "${item.title}" are not saved — the shop is '
+          'still showing the old ones. Check you are signed in, then retry.';
+    }
+    notifyListeners();
+  }
 
   void removeItem(String id) {
     _items.removeWhere((i) => i.id == id);

@@ -154,23 +154,23 @@ class _HomeScreenState extends State<HomeScreen> {
         // Asked here, not only on the seller screen: order updates matter to
         // whoever is buying too, and this is the first screen after signing in.
         if (Session.instance.loggedIn) const NotifyBanner(),
-        const _SearchBar(),
+        _SearchBar(tab: tabName),
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
         _SectionHeader(
           title: 'Shop By Category',
           serif: true,
-          onSeeAll: () => _openSearch(context),
+          onSeeAll: () => _openSearch(context, tabName),
         ),
         const SizedBox(height: 12),
-        _CategoryRow(products: shownProducts),
+        _CategoryRow(products: shownProducts, tab: tabName),
         const SizedBox(height: 22),
         _SectionHeader(
           title: 'Stores near you',
           onSeeAll: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const ShopsScreen()),
+            MaterialPageRoute(builder: (_) => ShopsScreen(tab: tabName)),
           ),
         ),
         const SizedBox(height: 12),
@@ -178,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 24),
         _SectionHeader(
           title: 'New Arrival',
-          onSeeAll: () => _openSearch(context),
+          onSeeAll: () => _openSearch(context, tabName),
         ),
         const SizedBox(height: 12),
         GridView.builder(
@@ -332,14 +332,15 @@ class _TopBar extends StatelessWidget {
 }
 
 class _SearchBar extends StatelessWidget {
-  const _SearchBar();
+  final String tab;
+  const _SearchBar({this.tab = ''});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const SearchScreen()),
+        MaterialPageRoute(builder: (_) => SearchScreen(tab: tab)),
       ),
       child: Container(
         height: 52,
@@ -483,7 +484,8 @@ class _MenuDrawer extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => SearchScreen(initialQuery: name),
+                          builder: (_) =>
+                              SearchScreen(initialQuery: name, tab: tab.name),
                         ),
                       );
                     },
@@ -599,7 +601,8 @@ class _DrawerCategory extends StatelessWidget {
 /// Product categories in the current tab, each opening a filtered search.
 class _CategoryRow extends StatelessWidget {
   final List<Product> products;
-  const _CategoryRow({required this.products});
+  final String tab;
+  const _CategoryRow({required this.products, this.tab = ''});
 
   @override
   Widget build(BuildContext context) {
@@ -621,7 +624,7 @@ class _CategoryRow extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => SearchScreen(initialQuery: name),
+                builder: (_) => SearchScreen(initialQuery: name, tab: tab),
               ),
             ),
             child: SizedBox(
@@ -773,9 +776,10 @@ class _ShopAd extends StatelessWidget {
 
 /// Browsing everything is what the search screen already does, so "See all"
 /// opens it rather than inventing a second list of the same products.
-void _openSearch(BuildContext context) => Navigator.push(
+/// Search stays inside the department the shopper is browsing.
+void _openSearch(BuildContext context, [String tab = '']) => Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SearchScreen()),
+      MaterialPageRoute(builder: (_) => SearchScreen(tab: tab)),
     );
 
 class _SectionHeader extends StatelessWidget {
