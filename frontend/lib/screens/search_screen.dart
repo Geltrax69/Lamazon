@@ -224,9 +224,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-/// The empty state, which used to be one grey magnifier on a blank page. It
-/// is the whole menu now: the shopper is here to find something, and the
-/// fastest way to help is to show what there is.
+/// The empty state. It used to be a grey magnifier, then a wall of words —
+/// neither of which is a reason to stay on the page. It is the shop now:
+/// departments you can see, categories with a photo of what is in them, and
+/// real products to tap straight into.
 class _SearchHint extends StatelessWidget {
   final String tab;
   final ValueChanged<String> onPick;
@@ -234,77 +235,197 @@ class _SearchHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Inside a department, its own sections. Across the shop, the
-    // departments themselves — a hundred category chips is not a shortcut.
     final scoped = tab.isNotEmpty && tab != 'All';
-    final sections = scoped ? sectionsOf(tab) : const <CategoryNode>[];
-    final departmentNames = [
-      for (final d in departments)
-        if (d.name != 'All') d.name,
-    ];
+    final pool = scoped
+        ? shownCatalog.where((p) => p.tab == tab).toList()
+        : shownCatalog;
+
+    // One product per category, to put a face on the name. Categories with
+    // nothing in them are left out — a tile with no photo is the pale thing
+    // this screen was.
+    final faces = <String, Product>{};
+    for (final p in pool) {
+      if (p.category.isEmpty || p.imageUrl.isEmpty) continue;
+      faces.putIfAbsent(p.category, () => p);
+    }
+    final withPhotos = faces.entries.take(12).toList();
+
+    // Discounts first, then whatever else is in stock: the point is that
+    // something on this page is worth tapping.
+    final picks = [
+      ...pool.where((p) => p.discounted),
+      ...pool.where((p) => !p.discounted),
+    ].take(6).toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
       children: [
-        if (scoped && sections.isNotEmpty) ...[
-          _HintHeading('Browse $tab'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final s in sections)
-                _HintChip(label: s.name, onTap: () => onPick(s.name)),
-            ],
-          ),
-          const SizedBox(height: 22),
-          // The things inside those sections, which is what people actually
-          // type: nobody searches "Street Food", they search "samosa".
-          _HintHeading('Popular in $tab'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final name in sections
-                  .expand((s) => s.children)
-                  .map((c) => c.name)
-                  .take(18))
-                _HintChip(label: name, onTap: () => onPick(name), small: true),
-            ],
-          ),
-        ] else ...[
-          _HintHeading('Departments'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        if (!scoped) ...[
+          const _HintHeading('Shop by department'),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.6,
             children: [
               for (final d in departments)
                 if (d.name != 'All')
-                  _HintChip(
-                    label: d.name,
-                    icon: d.icon,
-                    colour: d.colour,
+                  _DepartmentTile(
+                    department: d,
                     onTap: () => onPick(d.name),
                   ),
             ],
           ),
-          const SizedBox(height: 22),
-          if (departmentNames.isNotEmpty) ...[
-            _HintHeading('Try one of these'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          const SizedBox(height: 24),
+        ],
+        if (withPhotos.isNotEmpty) ...[
+          _HintHeading(scoped ? 'Browse $tab' : 'Shop by category'),
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: withPhotos.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (_, i) {
+                final entry = withPhotos[i];
+                return GestureDetector(
+                  onTap: () => onPick(entry.key),
+                  child: SizedBox(
+                    width: 78,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 74,
+                          height: 74,
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: ClipOval(
+                            child: NetImage(
+                              url: thumb(entry.value.imageUrl, 160),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          entry.key,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        if (picks.isNotEmpty) ...[
+          _HintHeading(
+            picks.first.discounted ? 'On offer right now' : 'Popular right now',
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: productTileMax,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.68,
+            ),
+            itemCount: picks.length,
+            itemBuilder: (_, i) => ProductCard(
+              product: picks[i],
+              showAddToCart:
+                  picks[i].tab == 'Food' || picks[i].tab == 'Grocery',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetailsScreen(product: picks[i]),
+                ),
+              ),
+            ),
+          ),
+        ],
+        // Only when there is nothing at all to show — an empty catalogue is
+        // the one case where words are all there is.
+        if (withPhotos.isEmpty && picks.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 60),
+            child: Column(
               children: [
-                for (final name in departments
-                    .expand((d) => d.categories)
-                    .expand((c) => c.children.isEmpty ? [c] : c.children)
-                    .map((c) => c.name)
-                    .take(20))
-                  _HintChip(label: name, onTap: () => onPick(name), small: true),
+                Icon(LucideIcons.search, size: 40, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'Search across all shops and products',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                ),
               ],
             ),
-          ],
-        ],
+          ),
       ],
+    );
+  }
+}
+
+/// A department as something you can see rather than read: its own colour
+/// behind its own icon.
+class _DepartmentTile extends StatelessWidget {
+  final Department department;
+  final VoidCallback onTap;
+  const _DepartmentTile({required this.department, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = department.colour ?? const Color(0xFF1A1A1A);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.13),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(department.icon, size: 17, color: accent),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                department.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -315,61 +436,12 @@ class _HintHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.only(bottom: 12),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
     ),
   );
-}
-
-class _HintChip extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final Color? colour;
-  final bool small;
-  final VoidCallback onTap;
-  const _HintChip({
-    required this.label,
-    required this.onTap,
-    this.icon,
-    this.colour,
-    this.small = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = colour ?? const Color(0xFF1A1A1A);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: small ? 12 : 14,
-          vertical: small ? 8 : 10,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 15, color: accent),
-              const SizedBox(width: 7),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: small ? 12.5 : 13.5,
-                fontWeight: small ? FontWeight.w500 : FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _NoResults extends StatelessWidget {
