@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/categories.dart';
 import '../data/seller.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
@@ -42,7 +43,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   late List<Uint8List> _photos = [...?widget.existing?.photos];
   late String _category =
       widget.existing?.category ??
-      (Seller.instance.store?.categories.first ?? sellCategories.first);
+      (Seller.instance.store?.categories.first ?? _options.first);
 
   @override
   void dispose() {
@@ -52,6 +53,15 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     _mrp.dispose();
     _stock.dispose();
     super.dispose();
+  }
+
+  /// What this seller may file an item under: the admin's categories inside
+  /// the departments this store signed up for. A department with no
+  /// categories yet offers itself, so a new one is never unsellable in.
+  List<String> get _options {
+    final mine = Seller.instance.store?.categories ?? const <String>[];
+    final out = [for (final d in mine) ...sellableCategories(d)];
+    return out.isEmpty ? sellableCategories() : out;
   }
 
   double? get _priceValue => double.tryParse(_price.text.trim());
@@ -161,7 +171,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
-    final categories = Seller.instance.store?.categories ?? const <String>[];
+    final categories = _options;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(

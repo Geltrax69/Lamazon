@@ -5,6 +5,7 @@ import 'package:shorebird_code_push/shorebird_code_push.dart';
 import '../data/addresses.dart';
 import '../data/cart.dart';
 import '../data/catalog.dart';
+import '../data/categories.dart';
 import '../data/session.dart';
 import '../widgets/notify_banner.dart';
 import '../data/seller.dart';
@@ -28,21 +29,6 @@ const kAccent = Color(0xFFA6D544); // lime green from the design
 const kInk = Color(0xFF1A1A1A);
 const kBg = Color(0xFFF1F1EF);
 
-class _Tab {
-  final String name;
-  final IconData icon;
-  final Color? color; // null = default white theme
-  const _Tab(this.name, this.icon, this.color);
-}
-
-const _tabs = [
-  _Tab('All', LucideIcons.layoutGrid, null),
-  _Tab('Electronics', LucideIcons.headphones, Color(0xFF2F6FED)),
-  _Tab('Grocery', LucideIcons.carrot, Color(0xFF43A047)),
-  _Tab('Food', LucideIcons.utensils, Color(0xFFFF8A3D)),
-  _Tab('Gifts', LucideIcons.gift, Color(0xFF9C6ADE)),
-  _Tab('Beauty', LucideIcons.brush, Color(0xFFF06292)),
-];
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -62,9 +48,14 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Product> _all = const [];
 
   Future<(List<Product>, List<Shop>)> _load() async {
+    // The navigation comes down with the catalogue: the tabs are the admin's
+    // now, and drawing last boot's set would show departments that are gone.
+    await loadDepartments();
     final items = await loadCatalog();
     final shops = await loadShops();
     _all = items;
+    // An admin can delete the department the shopper was standing in.
+    if (_tab >= departments.length) _tab = 0;
     return (items, shops);
   }
 
@@ -89,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _tabs[_tab].color;
+    final theme = departments[_tab].colour;
     return Scaffold(
       backgroundColor: kBg,
       drawer: _MenuDrawer(
@@ -138,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _content(List<Product> items, List<Shop> liveShops) {
-    final tabName = _tabs[_tab].name;
+    final tabName = departments[_tab].name;
     final shownShops = liveShops
         .where((s) => _tab == 0 || s.tab == tabName)
         .toList();
@@ -158,16 +149,12 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _TabBar(active: _tab, onTap: (i) => setState(() => _tab = i)),
         const SizedBox(height: 12),
-        _SectionHeader(
-          title: 'Shop By Category',
-          serif: true,
-          onSeeAll: () => _openSearch(context, tabName),
-        ),
-        const SizedBox(height: 12),
-        _CategoryRow(products: shownProducts, tab: tabName),
-        const SizedBox(height: 22),
+        // Shops first: who is open near you is the thing a shopper is
+        // deciding on this screen, and the categories are how they narrow it
+        // down afterwards.
         _SectionHeader(
           title: 'Stores near you',
+          serif: true,
           onSeeAll: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => ShopsScreen(tab: tabName)),
@@ -175,6 +162,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         _ShopAds(shops: shownShops),
+        const SizedBox(height: 22),
+        _SectionHeader(
+          title: 'Shop By Category',
+          onSeeAll: () => _openSearch(context, tabName),
+        ),
+        const SizedBox(height: 12),
+        _CategoryRow(products: shownProducts, tab: tabName),
         const SizedBox(height: 24),
         _SectionHeader(
           title: 'New Arrival',
@@ -375,12 +369,12 @@ class _TabBar extends StatelessWidget {
       height: 64,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _tabs.length,
+        itemCount: departments.length,
         separatorBuilder: (_, _) => const SizedBox(width: 30),
         itemBuilder: (_, i) {
-          final tab = _tabs[i];
+          final tab = departments[i];
           final isActive = i == active;
-          final activeColor = tab.color ?? kInk;
+          final activeColor = tab.colour ?? kInk;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => onTap(i),
@@ -462,7 +456,7 @@ class _MenuDrawer extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            for (final (i, tab) in _tabs.indexed) ...[
+            for (final (i, tab) in departments.indexed) ...[
               _DrawerTab(
                 tab: tab,
                 selected: i == activeTab,
@@ -478,7 +472,7 @@ class _MenuDrawer extends StatelessWidget {
                     const <String>[])
                   _DrawerCategory(
                     name: name,
-                    color: tab.color,
+                    color: tab.colour,
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -508,7 +502,7 @@ class _MenuDrawer extends StatelessWidget {
 }
 
 class _DrawerTab extends StatelessWidget {
-  final _Tab tab;
+  final Department tab;
   final bool selected;
   final VoidCallback onTap;
   const _DrawerTab({
@@ -519,7 +513,7 @@ class _DrawerTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = tab.color ?? const Color(0xFF1A1A1A);
+    final accent = tab.colour ?? const Color(0xFF1A1A1A);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),

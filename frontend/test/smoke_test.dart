@@ -20,6 +20,7 @@ import 'package:lamazon/screens/notifications_screen.dart';
 import 'package:lamazon/screens/settings_screen.dart';
 import 'package:lamazon/screens/profile_screen.dart';
 import 'package:lamazon/screens/search_screen.dart';
+import 'package:lamazon/screens/shops_screen.dart';
 import 'package:lamazon/screens/seller_onboarding_screen.dart';
 import 'package:lamazon/screens/shop_screen.dart';
 import 'package:lamazon/screens/wishlist_screen.dart';
@@ -419,12 +420,22 @@ void main() {
 
       expect(find.text('See all'), findsWidgets);
 
-      // Shop By Category and New Arrival open search; Stores near you opens
-      // the shops list. A pushed route leaves home mounted underneath, so
-      // assert on the destination, not on home being gone.
+      // Stores near you comes first now and opens the shops list; Shop By
+      // Category and New Arrival open search. A pushed route leaves home
+      // mounted underneath, so assert on the destination, not on home
+      // being gone.
       await tester.tap(find.text('See all').first);
       // Not pumpAndSettle: a spinner somewhere never stops, so settle never
       // returns. A few frames is enough for the route transition.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(ShopsScreen), findsOneWidget);
+
+      // Back to home, then the second one, which is the category row.
+      tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('See all').at(1));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(SearchScreen), findsOneWidget);

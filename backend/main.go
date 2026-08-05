@@ -80,6 +80,7 @@ func routes(s *API) http.Handler {
 	})
 
 	// Catalog
+	mux.HandleFunc("GET /api/categories", s.handleCategories)
 	mux.HandleFunc("GET /api/products", s.handleProducts)
 	mux.HandleFunc("GET /api/products/{id}", s.handleProduct)
 	mux.HandleFunc("GET /api/shops", s.handleShops)
@@ -108,9 +109,10 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/push/test", s.handlePushTest)
 
 	// Seller
-	mux.HandleFunc("GET /api/seller/categories", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, SellCategories)
-	})
+	// Same tree the shop navigates by. It used to be a separate hardcoded
+	// list, which is how a seller ended up able to list under "Stationary"
+	// when no tab had ever shown one.
+	mux.HandleFunc("GET /api/seller/categories", s.handleCategories)
 	mux.HandleFunc("POST /api/seller/store", s.handleCreateStore)
 	mux.HandleFunc("POST /api/seller/store/photo", s.handleStorePhoto)
 	mux.HandleFunc("GET /api/seller/store", s.handleGetStore)
@@ -136,6 +138,8 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
+	mux.HandleFunc("POST /api/admin/categories", s.handleAddCategory)
+	mux.HandleFunc("DELETE /api/admin/categories/{name}", s.handleDeleteCategory)
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/reject", s.handleRejectStore)

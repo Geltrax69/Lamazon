@@ -260,3 +260,37 @@ ALTER TABLE inventory_items
 ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_mrp_check;
 ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_mrp_check
     CHECK (mrp = 0 OR mrp >= price);
+
+-- The departments across the top of the shop, and the categories under each.
+-- One table: a department is a row with no parent, a category is a row whose
+-- parent names one. Two tables would duplicate the name, the ordering and
+-- every query that walks them.
+--
+-- The name is the key because that is what products already store — orders,
+-- inventory and seller stores all reference a category by its text. Which is
+-- also why there is no rename: it would orphan every row pointing at the old
+-- one, and an admin cannot be expected to know that.
+CREATE TABLE IF NOT EXISTS catalog_categories (
+    name     TEXT PRIMARY KEY,
+    parent   TEXT    NOT NULL DEFAULT '',
+    icon     TEXT    NOT NULL DEFAULT '',
+    colour   TEXT    NOT NULL DEFAULT '',
+    position INTEGER NOT NULL DEFAULT 0
+);
+
+-- The five the app shipped with, so a fresh install has a shop rather than an
+-- empty navigation bar. Only when the table is empty: this runs at every
+-- boot, and re-adding a department the admin deleted would make deletion look
+-- like it silently failed.
+INSERT INTO catalog_categories (name, parent, icon, colour, position)
+SELECT * FROM (VALUES
+    ('Electronics', '', 'headphones', '#2F6FED', 1),
+    ('Grocery',     '', 'carrot',     '#43A047', 2),
+    ('Food',        '', 'utensils',   '#FF8A3D', 3),
+    ('Gifts',       '', 'gift',       '#9C6ADE', 4),
+    ('Beauty',      '', 'brush',      '#F06292', 5)
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM catalog_categories);
+
+CREATE INDEX IF NOT EXISTS idx_categories_parent
+    ON catalog_categories (parent, position);

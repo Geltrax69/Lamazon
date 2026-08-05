@@ -2,15 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import 'api.dart';
 
-/// What a seller can list under, mirroring the shopper-side tabs.
-const sellCategories = [
-  'Electronics',
-  'Clothes',
-  'Stationary',
-  'Gifts',
-  'Food',
-  'Grocery',
-];
+// What a seller can list under now comes from the admin's categories — see
+// sellableCategories() in categories.dart. The list used to live here and had
+// drifted: it offered Clothes and Stationary, which no tab has ever shown.
 
 /// Below this many units an item is flagged for restocking.
 const lowStockAt = 5;

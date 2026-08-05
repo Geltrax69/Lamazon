@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
+import '../data/categories.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
 
@@ -162,12 +163,15 @@ class _AdminHomeState extends State<_AdminHome> {
     try {
       // Five independent reads. In series this was five round trips of
       // waiting before anything drew.
-      final (overview, insights, stores, riders, orders) = await (
+      final (overview, insights, stores, riders, orders, _) = await (
         Api.instance.adminOverview(),
         Api.instance.adminInsights(),
         Api.instance.adminStores(),
         Api.instance.riders(),
         Api.instance.adminOrders(),
+        // Refreshes the global list the shop draws its tabs from, so adding a
+        // department shows up here without a reload.
+        loadDepartments(),
       ).wait;
       if (!mounted) return;
       setState(() {
@@ -222,6 +226,158 @@ class _AdminHomeState extends State<_AdminHome> {
     if (given == null || given.isEmpty) return;
     await Api.instance.rejectStore(owner, given);
     await _load();
+  }
+
+  /// Adds a department, or a category inside one. A department gets an icon
+  /// and a colour because it has a tab to draw; a category is just a name.
+  Future<void> _addCategory({String parent = ''}) async {
+    final name = TextEditingController();
+    var icon = departmentIcons.keys.first;
+    var colour = _palette.first;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, setDialog) => AlertDialog(
+          title: Text(
+            parent.isEmpty ? 'New department' : 'New category in $parent',
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: name,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    hintText: parent.isEmpty ? 'e.g. Stationery' : 'e.g. Pens',
+                  ),
+                ),
+                if (parent.isEmpty) ...[
+                  const SizedBox(height: 18),
+                  const Text('Icon', style: TextStyle(fontSize: 12.5,
+                      color: _muted)),
+                  const SizedBox(height: 8),
+                  // A fixed set, not a text field: Flutter drops any icon it
+                  // cannot see referenced in the code, so a name typed here
+                  // would render an empty box in the shop.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final entry in departmentIcons.entries)
+                        GestureDetector(
+                          onTap: () => setDialog(() => icon = entry.key),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: icon == entry.key
+                                  ? _ink
+                                  : const Color(0xFFEDEDE9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              entry.value,
+                              size: 18,
+                              color: icon == entry.key ? Colors.white : _ink,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const Text('Colour', style: TextStyle(fontSize: 12.5,
+                      color: _muted)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final hex in _palette)
+                        GestureDetector(
+                          onTap: () => setDialog(() => colour = hex),
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: _hex(hex),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: colour == hex ? _ink : Colors.black12,
+                                width: colour == hex ? 2.5 : 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || name.text.trim().isEmpty) return;
+    try {
+      await Api.instance.addCategory(
+        name: name.text.trim(),
+        parent: parent,
+        icon: parent.isEmpty ? icon : '',
+        colour: parent.isEmpty ? colour : '',
+      );
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+  }
+
+  /// Deleting asks first, and the server refuses when stock or categories are
+  /// still filed under it — so the confirmation is about intent, and the
+  /// error that may follow is about consequence.
+  Future<void> _deleteCategory(String name) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text('Remove $name?'),
+        content: const Text(
+          'It disappears from the shop and sellers can no longer list under '
+          'it. Anything already filed under it has to be moved first.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _red),
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.instance.deleteCategory(name);
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
   }
 
   /// The PIN exists for exactly one moment — this dialog. It is not stored in
@@ -627,6 +783,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.orders: _orders.length,
     _Tab.insights:
         (_insights?['topStores'] as List?)?.length ?? 0,
+    _Tab.categories: departments.where((d) => d.name != 'All').length,
     _Tab.delivery: _riders.length,
     _Tab.people: (_overview?['people'] as List?)?.length ?? 0,
   };
@@ -768,6 +925,40 @@ class _AdminHomeState extends State<_AdminHome> {
               ),
         ];
 
+      case _Tab.categories:
+        final real = departments.where((d) => d.name != 'All').toList();
+        return [
+          Row(
+            children: [
+              const Expanded(
+                child: _Note(
+                  'The tabs across the top of the shop, and what sits under '
+                  'each. Sellers pick from these, so adding one here is what '
+                  'makes it possible to sell in.',
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _addCategory(),
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('Department'),
+              ),
+            ],
+          ),
+          if (real.isEmpty)
+            const _Empty(
+              'No departments. The shop has nothing but the All tab until '
+              'you add one.',
+            )
+          else
+            for (final d in real)
+              _DepartmentCard(
+                department: d,
+                onAddCategory: () => _addCategory(parent: d.name),
+                onDelete: () => _deleteCategory(d.name),
+                onDeleteCategory: _deleteCategory,
+              ),
+        ];
+
       case _Tab.delivery:
         return [
           Row(
@@ -812,6 +1003,134 @@ class _AdminHomeState extends State<_AdminHome> {
             for (final p in people) _PersonRow(person: p),
         ];
     }
+  }
+}
+
+/// What a department can be coloured. A fixed palette rather than a picker:
+/// these sit behind the whole home screen, and an admin choosing freely is one
+/// tap away from a tab nobody can read the text on.
+const _palette = [
+  '#2F6FED',
+  '#43A047',
+  '#FF8A3D',
+  '#9C6ADE',
+  '#F06292',
+  '#00897B',
+  '#5D4037',
+  '#546E7A',
+];
+
+Color _hex(String value) =>
+    Color(0xFF000000 | (int.tryParse(value.replaceFirst('#', ''), radix: 16) ?? 0));
+
+/// One department and the categories under it, with the buttons that change
+/// both.
+class _DepartmentCard extends StatelessWidget {
+  final Department department;
+  final VoidCallback onAddCategory;
+  final VoidCallback onDelete;
+  final void Function(String name) onDeleteCategory;
+  const _DepartmentCard({
+    required this.department,
+    required this.onAddCategory,
+    required this.onDelete,
+    required this.onDeleteCategory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = department.colour ?? _ink;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(department.icon, size: 17, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      department.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      department.categories.isEmpty
+                          ? 'No categories — sellers list under the '
+                                'department itself'
+                          : '${department.categories.length} categories',
+                      style: const TextStyle(fontSize: 12, color: _muted),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Add a category',
+                onPressed: onAddCategory,
+                icon: const Icon(LucideIcons.plus, size: 17),
+              ),
+              IconButton(
+                tooltip: 'Remove ${department.name}',
+                onPressed: onDelete,
+                icon: const Icon(LucideIcons.trash2, size: 16, color: _red),
+              ),
+            ],
+          ),
+          if (department.categories.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final c in department.categories)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F1EF),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(c, style: const TextStyle(fontSize: 12.5)),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => onDeleteCategory(c),
+                          child: const Icon(
+                            LucideIcons.x,
+                            size: 13,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -1000,6 +1319,7 @@ enum _Tab {
   rejected('Rejected'),
   orders('Orders'),
   insights('Insights'),
+  categories('Categories'),
   delivery('Delivery'),
   people('People');
 

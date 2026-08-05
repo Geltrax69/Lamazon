@@ -88,8 +88,3 @@ var cityAliases = map[string]string{
 	"lpu phagwara":                   "Lovely Professional University",
 	"lpu, phagwara":                  "Lovely Professional University",
 }
-
-// SellCategories are the categories a seller can list under.
-var SellCategories = []string{
-	"Electronics", "Clothes", "Stationary", "Gifts", "Food", "Grocery",
-}

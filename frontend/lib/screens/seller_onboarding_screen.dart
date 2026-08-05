@@ -6,6 +6,7 @@ import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
+import '../data/categories.dart';
 import '../data/seller.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/screen_header.dart';
@@ -30,6 +31,11 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
   final _city = TextEditingController(text: serviceableCities.first);
   final _picked = <String>{};
   Uint8List? _photo;
+
+  /// A store signs up to departments, not to the categories inside them —
+  /// this is what decides which tab the shop appears under.
+  List<String> get _departmentNames =>
+      [for (final d in departments) if (d.name != 'All') d.name];
 
   @override
   void dispose() {
@@ -143,7 +149,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        for (final c in sellCategories)
+                        for (final c in _departmentNames)
                           _CategoryChip(
                             label: c,
                             selected: _picked.contains(c),

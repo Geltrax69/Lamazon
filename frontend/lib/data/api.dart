@@ -64,6 +64,27 @@ class Api {
     return jsonDecode(res.body) as List<dynamic>;
   }
 
+  /// The shop's navigation: departments, each with its categories nested.
+  Future<List<dynamic>> categories() => _getList('/api/categories');
+
+  Future<void> addCategory({
+    required String name,
+    String parent = '',
+    String icon = '',
+    String colour = '',
+  }) => _staffCall(StaffSession.admin, 'POST', '/api/admin/categories', {
+    'name': name,
+    'parent': parent,
+    'icon': icon,
+    'colour': colour,
+  });
+
+  Future<void> deleteCategory(String name) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/categories/${Uri.encodeComponent(name)}',
+  );
+
   /// Catalog straight from Postgres.
   Future<List<Product>> products({String? tab, String? query}) async {
     final q = <String, String>{
