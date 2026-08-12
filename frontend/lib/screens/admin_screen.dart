@@ -1,11 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
+import '../data/catalog.dart';
 import '../data/categories.dart';
 import '../models/product.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/photo_cropper.dart';
+import '../widgets/photo_picker.dart';
+import '../widgets/product_card.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -444,6 +450,7 @@ class _AdminHomeState extends State<_AdminHome> {
     final name = TextEditingController();
     var icon = departmentIcons.keys.first;
     var colour = _palette.first;
+    Uint8List? photo;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -464,6 +471,23 @@ class _AdminHomeState extends State<_AdminHome> {
                     labelText: 'Name',
                     hintText: parent.isEmpty ? 'e.g. Stationery' : 'e.g. Pens',
                   ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Picture',
+                  style: TextStyle(fontSize: 12.5, color: _muted),
+                ),
+                const SizedBox(height: 8),
+                // Square, because that is the shape the shop's category grid
+                // draws it in. Optional: without one the tile falls back to
+                // the icon, which is all this had before.
+                PhotoTile(
+                  photo: photo,
+                  aspect: 1,
+                  height: 120,
+                  emptyLabel: 'Add a picture',
+                  emptyHint: 'Shown on the shop’s category grid',
+                  onChanged: (bytes) => setDialog(() => photo = bytes),
                 ),
                 if (parent.isEmpty) ...[
                   const SizedBox(height: 18),
@@ -554,6 +578,26 @@ class _AdminHomeState extends State<_AdminHome> {
         icon: parent.isEmpty ? icon : '',
         colour: parent.isEmpty ? colour : '',
       );
+      // The row first, then its picture: the upload needs a row to hang the
+      // URL on, and a failed upload leaves a category that simply has no
+      // picture yet rather than no category.
+      if (photo != null) {
+        await Api.instance.setCategoryPhoto(name.text.trim(), photo!);
+      }
+      await _load();
+    } catch (e) {
+      _say(e.toString().replaceFirst('ClientException: ', ''));
+    }
+  }
+
+  /// Adds or replaces the picture of a category that already exists. One name
+  /// per category in Cloudinary, so this overwrites rather than piles up.
+  Future<void> _setCategoryPhoto(String name) async {
+    final picked = await pickPhotos(multiple: false);
+    if (picked.isEmpty || !mounted) return;
+    final cropped = await cropPhoto(context, picked.first, aspect: 1);
+    try {
+      await Api.instance.setCategoryPhoto(name, cropped ?? picked.first);
       await _load();
     } catch (e) {
       _say(e.toString().replaceFirst('ClientException: ', ''));
@@ -1182,6 +1226,7 @@ class _AdminHomeState extends State<_AdminHome> {
                   accent: open.colour ?? _ink,
                   onAdd: (parent) => _addCategory(parent: parent),
                   onDelete: _deleteCategory,
+                  onPhoto: _setCategoryPhoto,
                 ),
           ];
         }
@@ -1224,6 +1269,7 @@ class _AdminHomeState extends State<_AdminHome> {
                         department: d,
                         onOpen: () => setState(() => _openDept = d.name),
                         onDelete: () => _deleteCategory(d.name),
+                        onPhoto: () => _setCategoryPhoto(d.name),
                       ),
                     ),
                 ],
@@ -1490,10 +1536,12 @@ class _DepartmentTile extends StatelessWidget {
   final Department department;
   final VoidCallback onOpen;
   final VoidCallback onDelete;
+  final VoidCallback onPhoto;
   const _DepartmentTile({
     required this.department,
     required this.onOpen,
     required this.onDelete,
+    required this.onPhoto,
   });
 
   @override
@@ -1514,15 +1562,13 @@ class _DepartmentTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(department.icon, size: 18, color: accent),
+                // The picture, and the way to change it: tapping the badge is
+                // where an admin looks for it, so it needs no second button.
+                _CategoryBadge(
+                  imageUrl: department.imageUrl,
+                  icon: department.icon,
+                  accent: accent,
+                  onTap: onPhoto,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1583,6 +1629,67 @@ class _DepartmentTile extends StatelessWidget {
   }
 }
 
+/// The picture of a category, or its icon when it has none, with a tap to
+/// change it. The camera corner is what says the square is a control.
+class _CategoryBadge extends StatelessWidget {
+  final String imageUrl;
+  final IconData icon;
+  final Color accent;
+  final double size;
+  final VoidCallback onTap;
+  const _CategoryBadge({
+    required this.imageUrl,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+    this.size = 36,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: imageUrl.isEmpty ? 'Add a picture' : 'Replace the picture',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: imageUrl.isEmpty
+                  ? Icon(icon, size: size * 0.5, color: accent)
+                  : NetImage(url: thumb(imageUrl, 120)),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: _ink,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.camera,
+                  size: 8,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// One section inside a department, with what it holds folded away. Twelve
 /// sections open at once was the wall; closed, the whole menu fits a screen.
 class _SectionCard extends StatefulWidget {
@@ -1590,11 +1697,13 @@ class _SectionCard extends StatefulWidget {
   final Color accent;
   final void Function(String parent) onAdd;
   final void Function(String name) onDelete;
+  final void Function(String name) onPhoto;
   const _SectionCard({
     required this.node,
     required this.accent,
     required this.onAdd,
     required this.onDelete,
+    required this.onPhoto,
   });
 
   @override
@@ -1624,13 +1733,14 @@ class _SectionCardState extends State<_SectionCard> {
               padding: const EdgeInsets.fromLTRB(14, 11, 6, 11),
               child: Row(
                 children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(
-                      color: widget.accent,
-                      shape: BoxShape.circle,
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: _CategoryBadge(
+                      imageUrl: node.imageUrl,
+                      icon: LucideIcons.image,
+                      accent: widget.accent,
+                      size: 30,
+                      onTap: () => widget.onPhoto(node.name),
                     ),
                   ),
                   Expanded(
@@ -1676,7 +1786,7 @@ class _SectionCardState extends State<_SectionCard> {
                 children: [
                   for (final child in node.children)
                     Container(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F1EF),
                         borderRadius: BorderRadius.circular(18),
@@ -1684,6 +1794,14 @@ class _SectionCardState extends State<_SectionCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          _CategoryBadge(
+                            imageUrl: child.imageUrl,
+                            icon: LucideIcons.image,
+                            accent: widget.accent,
+                            size: 22,
+                            onTap: () => widget.onPhoto(child.name),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             child.name,
                             style: const TextStyle(fontSize: 12.5),

@@ -4,6 +4,7 @@ class Product {
   final String category;
   final String tab; // which top tab this belongs to; 'All' tab shows everything
   final double price;
+
   /// Price before the discount. Zero means the seller is not running one.
   final double mrp;
   final String imageUrl; // any web image link works here
@@ -92,14 +93,11 @@ class CompareGroup {
   final int items;
   const CompareGroup(this.name, this.attributes, [this.items = 0]);
 
-  factory CompareGroup.fromJson(Map<String, dynamic> r) => CompareGroup(
-    r['name'] as String? ?? '',
-    [
-      for (final a in (r['attributes'] as List<dynamic>? ?? const []))
-        GroupAttribute.fromJson(a as Map<String, dynamic>),
-    ],
-    (r['items'] as num?)?.toInt() ?? 0,
-  );
+  factory CompareGroup.fromJson(Map<String, dynamic> r) =>
+      CompareGroup(r['name'] as String? ?? '', [
+        for (final a in (r['attributes'] as List<dynamic>? ?? const []))
+          GroupAttribute.fromJson(a as Map<String, dynamic>),
+      ], (r['items'] as num?)?.toInt() ?? 0);
 }
 
 class GroupAttribute {
@@ -107,10 +105,8 @@ class GroupAttribute {
   final String unit;
   const GroupAttribute(this.name, [this.unit = '']);
 
-  factory GroupAttribute.fromJson(Map<String, dynamic> r) => GroupAttribute(
-    r['name'] as String? ?? '',
-    r['unit'] as String? ?? '',
-  );
+  factory GroupAttribute.fromJson(Map<String, dynamic> r) =>
+      GroupAttribute(r['name'] as String? ?? '', r['unit'] as String? ?? '');
 
   Map<String, dynamic> toJson() => {'name': name, 'unit': unit};
 

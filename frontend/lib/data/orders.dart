@@ -9,12 +9,12 @@ enum OrderStatus { placed, accepted, rejected, picked, delivered }
 
 extension OrderStatusInfo on OrderStatus {
   String get title => switch (this) {
-        OrderStatus.placed => 'Waiting for the shop',
-        OrderStatus.accepted => 'Accepted — being prepared',
-        OrderStatus.rejected => 'Not accepted',
-        OrderStatus.picked => 'On the way',
-        OrderStatus.delivered => 'Delivered',
-      };
+    OrderStatus.placed => 'Waiting for the shop',
+    OrderStatus.accepted => 'Accepted — being prepared',
+    OrderStatus.rejected => 'Not accepted',
+    OrderStatus.picked => 'On the way',
+    OrderStatus.delivered => 'Delivered',
+  };
 
   /// Nothing else is going to happen to these.
   bool get isOver =>
@@ -22,21 +22,21 @@ extension OrderStatusInfo on OrderStatus {
 }
 
 OrderStatus statusFrom(String? stage) => switch (stage) {
-      'accepted' => OrderStatus.accepted,
-      'rejected' => OrderStatus.rejected,
-      'picked' => OrderStatus.picked,
-      'delivered' => OrderStatus.delivered,
-      _ => OrderStatus.placed,
-    };
+  'accepted' => OrderStatus.accepted,
+  'rejected' => OrderStatus.rejected,
+  'picked' => OrderStatus.picked,
+  'delivered' => OrderStatus.delivered,
+  _ => OrderStatus.placed,
+};
 
 /// Shared with the seller side, which speaks the same stage names.
 OrderStage stageFrom(String? stage) => switch (stage) {
-      'accepted' => OrderStage.accepted,
-      'rejected' => OrderStage.rejected,
-      'picked' => OrderStage.picked,
-      'delivered' => OrderStage.delivered,
-      _ => OrderStage.received,
-    };
+  'accepted' => OrderStage.accepted,
+  'rejected' => OrderStage.rejected,
+  'picked' => OrderStage.picked,
+  'delivered' => OrderStage.delivered,
+  _ => OrderStage.received,
+};
 
 /// One order as the person who placed it sees it.
 class MyOrder {
@@ -68,18 +68,18 @@ class MyOrder {
   });
 
   factory MyOrder.fromJson(Map<String, dynamic> r) => MyOrder(
-        id: r['id'] as String,
-        itemTitle: r['itemTitle'] as String? ?? '',
-        storeName: r['storeName'] as String? ?? '',
-        units: (r['units'] as num?)?.toInt() ?? 1,
-        amount: (r['amount'] as num?)?.toDouble() ?? 0,
-        placedAt:
-            DateTime.tryParse(r['placedAt'] as String? ?? '') ?? DateTime.now(),
-        status: statusFrom(r['stage'] as String?),
-        rejectReason: r['rejectReason'] as String? ?? '',
-        address: r['receiverAddress'] as String? ?? '',
-        deliveryCode: r['deliveryCode'] as String? ?? '',
-      );
+    id: r['id'] as String,
+    itemTitle: r['itemTitle'] as String? ?? '',
+    storeName: r['storeName'] as String? ?? '',
+    units: (r['units'] as num?)?.toInt() ?? 1,
+    amount: (r['amount'] as num?)?.toDouble() ?? 0,
+    placedAt:
+        DateTime.tryParse(r['placedAt'] as String? ?? '') ?? DateTime.now(),
+    status: statusFrom(r['stage'] as String?),
+    rejectReason: r['rejectReason'] as String? ?? '',
+    address: r['receiverAddress'] as String? ?? '',
+    deliveryCode: r['deliveryCode'] as String? ?? '',
+  );
 }
 
 /// The buyer's order history, straight from the server. There is no local

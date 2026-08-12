@@ -133,18 +133,21 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
     StoreDraft.clear();
     Seller.instance.openStore(
       SellerStore(
-        name: _name.text.trim(),
-        photo: _photo,
-        location: _location.text.trim(),
-        city: _city.text.trim(),
-        categories: _picked.toList(),
-        // Editing keeps the standing it already has. The server decides
-        // anyway — it only sends a store back for review when it had been
-        // rejected — but saying so here stops the screen flashing "pending"
-        // at an approved shop in the meantime.
-        status: widget.existing?.status ?? 'pending',
-        rejectReason: widget.existing?.rejectReason ?? '',
-      ),
+          name: _name.text.trim(),
+          photo: _photo,
+          location: _location.text.trim(),
+          city: _city.text.trim(),
+          categories: _picked.toList(),
+          // Editing keeps the standing it already has. The server decides
+          // anyway — it only sends a store back for review when it had been
+          // rejected — but saying so here stops the screen flashing "pending"
+          // at an approved shop in the meantime.
+          status: widget.existing?.status ?? 'pending',
+          rejectReason: widget.existing?.rejectReason ?? '',
+        )
+        // Carried over so an edit that did not touch the photo does not show
+        // the dashboard a store with no picture.
+        ..photoUrl = widget.existing?.photoUrl ?? '',
     );
     if (_editing) {
       Navigator.pop(context);
@@ -196,6 +199,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                       ),
                       PhotoTile(
                         photo: _photo,
+                        url: widget.existing?.photoUrl ?? '',
                         emptyLabel: 'Upload store photo',
                         emptyHint: 'Tap to choose, then frame it',
                         // The shape the dashboard and the store card show it

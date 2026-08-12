@@ -42,10 +42,10 @@ void main() {
       // The catalog now comes from the API and falls back to bundled data
       // when it is unreachable, which is instant in tests.
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Shop By Category'), findsOneWidget);
       expect(find.text('Stores near you'), findsOneWidget);
       expect(find.text('New Arrival'), findsOneWidget);
-      expect(find.text('Electronics'), findsOneWidget);
+      // Once in the tab bar, once as the heading of its category board.
+      expect(find.text('Electronics'), findsWidgets);
       expect(find.text('Home'), findsOneWidget);
       // The location prompt covers home until it is answered.
       await tester.tap(find.text('Enable device location'));

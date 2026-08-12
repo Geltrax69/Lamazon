@@ -17,6 +17,7 @@ type Category struct {
 	Parent   string `json:"parent,omitempty"`
 	Icon     string `json:"icon,omitempty"`
 	Colour   string `json:"colour,omitempty"`
+	ImageURL string `json:"imageUrl,omitempty"`
 	Position int    `json:"position"`
 
 	// Only filled in on departments, and only by the public listing.
@@ -28,7 +29,7 @@ type Category struct {
 // a recursive CTE costs to read.
 func (d *DB) categories(r *http.Request) ([]Category, error) {
 	rows, err := d.sql.QueryContext(r.Context(), `
-		SELECT name, parent, icon, colour, position
+		SELECT name, parent, icon, colour, image_url, position
 		FROM catalog_categories ORDER BY position, name`)
 	if err != nil {
 		return nil, err
@@ -39,7 +40,7 @@ func (d *DB) categories(r *http.Request) ([]Category, error) {
 	for rows.Next() {
 		var c Category
 		if err := rows.Scan(&c.Name, &c.Parent, &c.Icon, &c.Colour,
-			&c.Position); err != nil {
+			&c.ImageURL, &c.Position); err != nil {
 			return nil, err
 		}
 		flat = append(flat, c)
@@ -135,6 +136,66 @@ func (a *API) handleAddCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, in)
+}
+
+// POST /api/admin/categories/{name}/photo — the picture the shop draws for
+// this department or category, filed under Lamazon/Categories/<Department>.
+//
+// Separate from creating the row: the same call replaces the picture later,
+// and one name per category means a replacement overwrites rather than piles
+// up beside the old one.
+func (a *API) handleCategoryPhoto(w http.ResponseWriter, r *http.Request) {
+	if a.cloud == nil {
+		writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
+		return
+	}
+	name := r.PathValue("name")
+	root, err := a.db.rootCategory(r, name)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "no category called "+name)
+		return
+	}
+
+	imgs, err := uploadedPhotos(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	url, err := a.cloud.upload(r.Context(), categoryFolder(root), slug(name), imgs[0])
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if _, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE catalog_categories SET image_url = $2 WHERE name = $1`,
+		name, url); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"imageUrl": url})
+}
+
+// rootCategory walks up to the department a category sits under, which is the
+// folder its picture belongs in — Food, Street Food and Chaat all file under
+// Categories/Food. Errors when the name is not a category at all.
+//
+// ponytail: a loop rather than a recursive CTE. The tree is three deep in
+// practice and the cap stops a hand-edited cycle spinning here.
+func (d *DB) rootCategory(r *http.Request, name string) (string, error) {
+	for range 8 {
+		var parent string
+		if err := d.sql.QueryRowContext(r.Context(),
+			`SELECT parent FROM catalog_categories WHERE name = $1`,
+			name).Scan(&parent); err != nil {
+			return "", err
+		}
+		if parent == "" {
+			return name, nil
+		}
+		name = parent
+	}
+	return name, nil
 }
 
 // DELETE /api/admin/categories/{name} — only when nothing is filed under it.

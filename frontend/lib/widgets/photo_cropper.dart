@@ -176,6 +176,10 @@ class _CropScreenState extends State<_CropScreen> {
                               zoom: _zoom,
                               offset: _offset,
                             ),
+                            // Guides only — a foreground painter, so the
+                            // export (which runs _paint alone) never has
+                            // lines burnt into it.
+                            foregroundPainter: const _GridPainter(),
                           ),
                         ),
                       ),
@@ -283,6 +287,35 @@ class _CropPainter extends CustomPainter {
   @override
   bool shouldRepaint(_CropPainter old) =>
       old.zoom != zoom || old.offset != offset || old.image != image;
+}
+
+/// Thirds and a frame edge, so lining a shopfront up is a matter of putting
+/// it on a line rather than eyeballing the middle.
+class _GridPainter extends CustomPainter {
+  const _GridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45)
+      ..strokeWidth = 1;
+    for (var i = 1; i < 3; i++) {
+      final x = size.width * i / 3;
+      final y = size.height * i / 3;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
+    }
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GridPainter old) => false;
 }
 
 /// The visible frame, rendered at print size and encoded as PNG. Public so the

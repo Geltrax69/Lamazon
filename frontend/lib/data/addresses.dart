@@ -8,10 +8,10 @@ enum AddressLabel { home, office, other }
 
 extension AddressLabelInfo on AddressLabel {
   String get title => switch (this) {
-        AddressLabel.home => 'Home',
-        AddressLabel.office => 'Office',
-        AddressLabel.other => 'Other',
-      };
+    AddressLabel.home => 'Home',
+    AddressLabel.office => 'Office',
+    AddressLabel.other => 'Other',
+  };
 }
 
 class Address {
@@ -20,7 +20,7 @@ class Address {
   final String line; // house / street
   final String city;
   final String pincode;
-  final String name;  // who the delivery is for
+  final String name; // who the delivery is for
   final String phone; // and how the porter reaches them
 
   const Address({
@@ -34,17 +34,18 @@ class Address {
   });
 
   factory Address.fromJson(Map<String, dynamic> r) => Address(
-        id: r['id'] as String,
-        label: AddressLabel.values.firstWhere(
-          (l) => l.title.toLowerCase() == (r['label'] as String? ?? '').toLowerCase(),
-          orElse: () => AddressLabel.home,
-        ),
-        line: r['line'] as String? ?? '',
-        city: r['city'] as String? ?? '',
-        pincode: r['pincode'] as String? ?? '',
-        name: r['name'] as String? ?? '',
-        phone: r['phone'] as String? ?? '',
-      );
+    id: r['id'] as String,
+    label: AddressLabel.values.firstWhere(
+      (l) =>
+          l.title.toLowerCase() == (r['label'] as String? ?? '').toLowerCase(),
+      orElse: () => AddressLabel.home,
+    ),
+    line: r['line'] as String? ?? '',
+    city: r['city'] as String? ?? '',
+    pincode: r['pincode'] as String? ?? '',
+    name: r['name'] as String? ?? '',
+    phone: r['phone'] as String? ?? '',
+  );
 
   String get full => '$line, $city $pincode';
 }
@@ -152,7 +153,9 @@ class AddressBook extends ChangeNotifier {
   }
 
   void remove(String id) {
-    Api.instance.deleteAddress(id).catchError((e) => logApiFailure('delete address', e));
+    Api.instance
+        .deleteAddress(id)
+        .catchError((e) => logApiFailure('delete address', e));
     _addresses.removeWhere((a) => a.id == id);
     if (_selectedId == id && _addresses.isNotEmpty) {
       _selectedId = _addresses.first.id;

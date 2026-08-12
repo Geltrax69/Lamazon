@@ -50,6 +50,13 @@ func storeFolder(store string) string {
 	return cloudRoot + "/" + slug(store)
 }
 
+// categoryFolder is where a department's pictures live:
+// Lamazon/Categories/<Department>, holding the department's own picture and
+// one per category inside it, each named after the category.
+func categoryFolder(department string) string {
+	return cloudRoot + "/Categories/" + slug(department)
+}
+
 // storePhotoName is the cover photo of a store. One name per store, so
 // replacing the photo overwrites rather than piles up.
 const storePhotoName = "store_image"

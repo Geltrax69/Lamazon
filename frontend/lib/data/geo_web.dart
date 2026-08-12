@@ -44,24 +44,43 @@ class Geo {
         'getCurrentPosition'.toJS,
         ((JSObject position) {
           final coords = position.getProperty<JSObject>('coords'.toJS);
-          final lat = (coords.getProperty<JSNumber>('latitude'.toJS)).toDartDouble;
-          final lng = (coords.getProperty<JSNumber>('longitude'.toJS)).toDartDouble;
-          final acc = coords.getProperty<JSNumber?>('accuracy'.toJS)?.toDartDouble ?? 0;
-          finish(GeoFix(
-            latitude: lat,
-            longitude: lng,
-            accuracyMetres: acc,
-            metresFromCampus: _metresBetween(lat, lng, _campusLat, _campusLng),
-          ));
+          final lat = (coords.getProperty<JSNumber>(
+            'latitude'.toJS,
+          )).toDartDouble;
+          final lng = (coords.getProperty<JSNumber>(
+            'longitude'.toJS,
+          )).toDartDouble;
+          final acc =
+              coords.getProperty<JSNumber?>('accuracy'.toJS)?.toDartDouble ?? 0;
+          finish(
+            GeoFix(
+              latitude: lat,
+              longitude: lng,
+              accuracyMetres: acc,
+              metresFromCampus: _metresBetween(
+                lat,
+                lng,
+                _campusLat,
+                _campusLng,
+              ),
+            ),
+          );
         }).toJS,
         ((JSObject _) => finish(null)).toJS,
-        {'enableHighAccuracy': true, 'timeout': 15000, 'maximumAge': 60000}.jsify(),
+        {
+          'enableHighAccuracy': true,
+          'timeout': 15000,
+          'maximumAge': 60000,
+        }.jsify(),
       );
     } catch (_) {
       finish(null);
     }
     // A browser that never calls either callback would hang the UI forever.
-    return done.future.timeout(const Duration(seconds: 20), onTimeout: () => null);
+    return done.future.timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => null,
+    );
   }
 }
 
@@ -72,8 +91,11 @@ double _metresBetween(double lat1, double lng1, double lat2, double lng2) {
   double radians(double deg) => deg * math.pi / 180;
   final dLat = radians(lat2 - lat1);
   final dLng = radians(lng2 - lng1);
-  final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-      math.cos(radians(lat1)) * math.cos(radians(lat2)) *
-          math.sin(dLng / 2) * math.sin(dLng / 2);
+  final a =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(radians(lat1)) *
+          math.cos(radians(lat2)) *
+          math.sin(dLng / 2) *
+          math.sin(dLng / 2);
   return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
 }

@@ -13,8 +13,16 @@ class Department {
   final Color? colour;
   final List<CategoryNode> categories;
 
-  const Department(this.name, this.icon, this.colour,
-      [this.categories = const []]);
+  /// The picture the admin uploaded, or '' to fall back to [icon].
+  final String imageUrl;
+
+  const Department(
+    this.name,
+    this.icon,
+    this.colour, [
+    this.categories = const [],
+    this.imageUrl = '',
+  ]);
 }
 
 /// A category inside a department, with whatever sits inside it. A food menu
@@ -23,15 +31,16 @@ class Department {
 class CategoryNode {
   final String name;
   final List<CategoryNode> children;
-  const CategoryNode(this.name, [this.children = const []]);
 
-  factory CategoryNode.fromJson(Map<String, dynamic> r) => CategoryNode(
-    r['name'] as String? ?? '',
-    [
-      for (final c in (r['children'] as List<dynamic>? ?? const []))
-        CategoryNode.fromJson(c as Map<String, dynamic>),
-    ],
-  );
+  /// The picture the admin uploaded, or '' when it has none yet.
+  final String imageUrl;
+  const CategoryNode(this.name, [this.children = const [], this.imageUrl = '']);
+
+  factory CategoryNode.fromJson(Map<String, dynamic> r) =>
+      CategoryNode(r['name'] as String? ?? '', [
+        for (final c in (r['children'] as List<dynamic>? ?? const []))
+          CategoryNode.fromJson(c as Map<String, dynamic>),
+      ], r['imageUrl'] as String? ?? '');
 
   /// The names a product can actually be filed under: the deepest level, or
   /// this one when it has nothing inside it. A seller picking "Street Food"
@@ -106,6 +115,7 @@ Future<List<Department>> loadDepartments() async {
               for (final c in (r['children'] as List<dynamic>? ?? const []))
                 CategoryNode.fromJson(c as Map<String, dynamic>),
             ],
+            r['imageUrl'] as String? ?? '',
           ),
       ];
       return departments;
@@ -133,12 +143,45 @@ List<String> sellableCategories([String? department]) {
   return out;
 }
 
+/// The department a category sits under, at whatever depth. Empty when the
+/// category belongs to nothing the app knows about — a product filed under a
+/// department the admin has since deleted.
+String departmentOf(String category) {
+  for (final d in departments) {
+    if (d.name == 'All') continue;
+    if (d.name == category) return d.name;
+    for (final c in d.categories) {
+      if (c.name == category || c.leaves.contains(category)) return d.name;
+    }
+  }
+  return '';
+}
+
+/// The same names as [sellableCategories], but kept under the section they
+/// sit in, so a picker can ask for the section first instead of dropping
+/// eighty leaves on one screen. A department with no categories is its own
+/// section, holding itself.
+Map<String, List<String>> sellableGroups([String? department]) {
+  final out = <String, List<String>>{};
+  for (final d in departments) {
+    if (d.name == 'All') continue;
+    if (department != null && d.name != department) continue;
+    if (d.categories.isEmpty) {
+      out.putIfAbsent(d.name, () => []).add(d.name);
+      continue;
+    }
+    for (final c in d.categories) {
+      out.putIfAbsent(c.name, () => []).addAll(c.leaves);
+    }
+  }
+  return out;
+}
+
 /// The sections of a department, in order, for anything that shows the menu
 /// rather than the things on it.
-List<CategoryNode> sectionsOf(String department) =>
-    departments
-        .firstWhere(
-          (d) => d.name == department,
-          orElse: () => const Department('', LucideIcons.tag, null),
-        )
-        .categories;
+List<CategoryNode> sectionsOf(String department) => departments
+    .firstWhere(
+      (d) => d.name == department,
+      orElse: () => const Department('', LucideIcons.tag, null),
+    )
+    .categories;

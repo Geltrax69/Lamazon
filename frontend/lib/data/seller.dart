@@ -14,10 +14,10 @@ enum StockStatus { inStock, low, out }
 
 extension StockStatusInfo on StockStatus {
   String get label => switch (this) {
-        StockStatus.inStock => 'In stock',
-        StockStatus.low => 'Low stock',
-        StockStatus.out => 'Sold out',
-      };
+    StockStatus.inStock => 'In stock',
+    StockStatus.low => 'Low stock',
+    StockStatus.out => 'Sold out',
+  };
 }
 
 class SellerStore {
@@ -60,11 +60,14 @@ class InventoryItem {
   String description;
   String category;
   double price;
+
   /// Price before the discount, 0 when the seller is not running one. Never
   /// below price — the server rejects that, and so does the form.
   double mrp;
+
   /// What the buyer picks: size, colour, whatever this shop sells by.
   List<ItemOption> options;
+
   /// Which products this is comparable to, and what it says for that group's
   /// fields. Empty for anything not worth comparing.
   String compareGroup;
@@ -100,8 +103,8 @@ class InventoryItem {
   StockStatus get status => stock <= 0
       ? StockStatus.out
       : stock <= lowStockAt
-          ? StockStatus.low
-          : StockStatus.inStock;
+      ? StockStatus.low
+      : StockStatus.inStock;
 
   /// What this line is worth at listed price.
   double get value => price * stock;
@@ -113,12 +116,12 @@ enum OrderStage { received, accepted, rejected, picked, delivered }
 
 extension OrderStageInfo on OrderStage {
   String get label => switch (this) {
-        OrderStage.received => 'New',
-        OrderStage.accepted => 'Accepted',
-        OrderStage.rejected => 'Rejected',
-        OrderStage.picked => 'With the rider',
-        OrderStage.delivered => 'Delivered',
-      };
+    OrderStage.received => 'New',
+    OrderStage.accepted => 'Accepted',
+    OrderStage.rejected => 'Rejected',
+    OrderStage.picked => 'With the rider',
+    OrderStage.delivered => 'Delivered',
+  };
 
   /// Once a rider has it, the shop has nothing left to do.
   bool get needsSeller => this == OrderStage.received;
@@ -202,10 +205,12 @@ class Seller extends ChangeNotifier {
       _orders.where((o) => o.stage == stage).length;
 
   /// Orders still waiting on the seller — the number worth acting on.
-  int get openOrders => _orders.where((o) => o.stage != OrderStage.delivered).length;
+  int get openOrders =>
+      _orders.where((o) => o.stage != OrderStage.delivered).length;
 
   int get skuCount => _items.length;
-  int get unitsInStock => _items.fold(0, (n, i) => n + (i.stock.clamp(0, 1 << 30)));
+  int get unitsInStock =>
+      _items.fold(0, (n, i) => n + (i.stock.clamp(0, 1 << 30)));
   int get lowOrOutCount =>
       _items.where((i) => i.status != StockStatus.inStock).length;
   double get inventoryValue => _items.fold(0.0, (n, i) => n + i.value);
@@ -254,13 +259,16 @@ class Seller extends ChangeNotifier {
   /// of leaving a store that only exists on this screen.
   Future<void> _pushStore(SellerStore store) async {
     try {
-      store.photoUrl = await Api.instance.createStore(
+      // Empty means this save carried no photo, and the server kept the one
+      // it had. Assigning it would blank the picture on screen.
+      final url = await Api.instance.createStore(
         name: store.name,
         location: store.location,
         city: store.city,
         categories: store.categories,
         photo: store.photo,
       );
+      if (url.isNotEmpty) store.photoUrl = url;
       _syncError = null;
       notifyListeners();
       // The server decides the status — a new store comes back pending, and
@@ -268,7 +276,8 @@ class Seller extends ChangeNotifier {
       await load();
     } catch (e) {
       logApiFailure('store sync', e);
-      _syncError = 'Your store is not saved yet — shoppers cannot see it. '
+      _syncError =
+          'Your store is not saved yet — shoppers cannot see it. '
           'Check you are signed in, then retry.';
       notifyListeners();
     }
@@ -313,7 +322,8 @@ class Seller extends ChangeNotifier {
       _syncError = null;
     } catch (e) {
       logApiFailure('item sync', e);
-      _syncError = '"${item.title}" is not saved yet — it will not appear in '
+      _syncError =
+          '"${item.title}" is not saved yet — it will not appear in '
           'the shop until it is. Check you are signed in, then retry.';
     }
     notifyListeners();
@@ -324,16 +334,16 @@ class Seller extends ChangeNotifier {
   /// tells them why and gives the units back. Returns the failure to show, or
   /// null when it worked.
   Future<String?> acceptOrder(String id) => _move(id, () async {
-        final saved = await Api.instance.acceptOrder(id);
-        _orders.firstWhere((o) => o.id == id).stage = saved.stage;
-      });
+    final saved = await Api.instance.acceptOrder(id);
+    _orders.firstWhere((o) => o.id == id).stage = saved.stage;
+  });
 
   Future<String?> rejectOrder(String id, String reason) => _move(id, () async {
-        final saved = await Api.instance.rejectOrder(id, reason);
-        final order = _orders.firstWhere((o) => o.id == id);
-        order.stage = saved.stage;
-        order.rejectReason = saved.rejectReason;
-      });
+    final saved = await Api.instance.rejectOrder(id, reason);
+    final order = _orders.firstWhere((o) => o.id == id);
+    order.stage = saved.stage;
+    order.rejectReason = saved.rejectReason;
+  });
 
   Future<String?> _move(String id, Future<void> Function() call) async {
     try {
@@ -376,7 +386,8 @@ class Seller extends ChangeNotifier {
       _syncError = null;
     } catch (e) {
       logApiFailure('item update', e);
-      _syncError = 'Changes to "${item.title}" are not saved — the shop is '
+      _syncError =
+          'Changes to "${item.title}" are not saved — the shop is '
           'still showing the old ones. Check you are signed in, then retry.';
     }
     notifyListeners();

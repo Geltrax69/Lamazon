@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'photo_cropper.dart';
+import 'product_card.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -29,6 +30,11 @@ Future<List<Uint8List>> pickPhotos({required bool multiple}) async {
 /// with replace and remove over it.
 class PhotoTile extends StatelessWidget {
   final Uint8List? photo;
+
+  /// The copy already uploaded, shown when there are no local bytes — a
+  /// reload keeps the URL and drops the bytes, and without this the tile
+  /// invites you to upload a photo the store already has.
+  final String url;
   final String emptyLabel;
   final String emptyHint;
   final double height;
@@ -43,6 +49,7 @@ class PhotoTile extends StatelessWidget {
     super.key,
     required this.photo,
     required this.onChanged,
+    this.url = '',
     this.emptyLabel = 'Add a photo',
     this.emptyHint = 'JPG or PNG from your device',
     this.height = 150,
@@ -65,6 +72,33 @@ class PhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (photo == null && url.isNotEmpty) {
+      // Only Replace: there are no bytes here to re-crop, and the upload
+      // keeps the last picture when a save carries none, so a Remove would
+      // do nothing.
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              NetImage(url: url),
+              Positioned(
+                right: 10,
+                bottom: 10,
+                child: _OverlayButton(
+                  icon: LucideIcons.repeat2,
+                  label: 'Replace',
+                  onTap: () => _pick(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (photo == null) {
       return _DashedBox(
         height: height,

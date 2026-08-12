@@ -14,7 +14,7 @@ import 'staff.dart';
 ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.5:8080
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://localhost:8080',
+  defaultValue: 'https://api.geltrax.engineer',
 );
 
 /// What a successful sign-in or refresh hands back.
@@ -107,6 +107,24 @@ class Api {
     'icon': icon,
     'colour': colour,
   });
+
+  /// The picture the shop draws for a department or a category. Sent on its
+  /// own so the same call replaces one later; the server files it under
+  /// `Categories/<department>`. Returns the stored URL.
+  Future<String> setCategoryPhoto(String name, Uint8List photo) async {
+    final req = http.MultipartRequest(
+      'POST',
+      _url('/api/admin/categories/${Uri.encodeComponent(name)}/photo'),
+    )..headers.addAll(_staffHeader(StaffSession.admin));
+    req.files.add(
+      http.MultipartFile.fromBytes('file', photo, filename: 'category.jpg'),
+    );
+    final res = await http.Response.fromStream(
+      await req.send().timeout(_uploadTimeout),
+    );
+    if (res.statusCode != 201) throw http.ClientException(_reason(res));
+    return (jsonDecode(res.body) as Map<String, dynamic>)['imageUrl'] as String;
+  }
 
   Future<void> deleteCategory(String name) => _staffCall(
     StaffSession.admin,
@@ -831,8 +849,9 @@ class Api {
   );
 
   Map<String, String> _attributes(Map<String, dynamic> r) =>
-      (r['attributes'] as Map<String, dynamic>? ?? const {})
-          .map((k, v) => MapEntry(k, '$v'));
+      (r['attributes'] as Map<String, dynamic>? ?? const {}).map(
+        (k, v) => MapEntry(k, '$v'),
+      );
 
   List<ItemOption> _options(Map<String, dynamic> r) => [
     for (final o in (r['options'] as List<dynamic>? ?? const []))

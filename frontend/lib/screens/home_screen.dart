@@ -183,13 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (shownProducts.isNotEmpty) ...[
             _SectionHeader(
-              title: 'Shop By Category',
-              onSeeAll: () => _openSearch(context, tabName),
-            ),
-            const SizedBox(height: 12),
-            _CategoryRow(products: shownProducts, tab: tabName),
-            const SizedBox(height: 24),
-            _SectionHeader(
               title: 'New Arrival',
               onSeeAll: () => _openSearch(context, tabName),
             ),
@@ -229,6 +222,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ],
         ],
+        // The admin's own menu, with the pictures they uploaded. Drawn even
+        // when nothing is stocked: it is the map of the shop rather than a
+        // view of the shelves, and it is what fills the page on a quiet day.
+        ..._categoryBoard(context, tabName),
         const SizedBox(height: 16),
         const Center(child: _VersionBadge()),
       ],
@@ -748,70 +745,107 @@ class _DrawerCategory extends StatelessWidget {
   }
 }
 
-/// Product categories in the current tab, each opening a filtered search.
-class _CategoryRow extends StatelessWidget {
-  final List<Product> products;
-  final String tab;
-  const _CategoryRow({required this.products, this.tab = ''});
+/// The shop's menu as a board of pictures: a heading per department, then a
+/// grid of what sits inside it. On a department tab it is that one department;
+/// on All it is every one of them, which is the whole shop on one page.
+List<Widget> _categoryBoard(BuildContext context, String tab) {
+  final shown = departments.where(
+    (d) => d.name != 'All' && (tab == 'All' || d.name == tab),
+  );
+  return [
+    for (final d in shown) ...[
+      _SectionHeader(
+        title: tab == 'All' ? d.name : 'Shop by category',
+        onSeeAll: () => _openSearch(context, d.name),
+      ),
+      const SizedBox(height: 12),
+      _CategoryGrid(
+        department: d,
+        // A department with nothing inside it is still somewhere to go — one
+        // tile of itself, rather than a heading over a gap.
+        nodes: d.categories.isEmpty
+            ? [CategoryNode(d.name, const [], d.imageUrl)]
+            : d.categories,
+      ),
+      const SizedBox(height: 22),
+    ],
+  ];
+}
+
+/// One department's categories, four or so across, each opening a search
+/// filtered to it.
+class _CategoryGrid extends StatelessWidget {
+  final Department department;
+  final List<CategoryNode> nodes;
+  const _CategoryGrid({required this.department, required this.nodes});
 
   @override
   Widget build(BuildContext context) {
-    // One tile per category present, illustrated by the first product in it.
-    final seen = <String, Product>{};
-    for (final p in products) {
-      seen.putIfAbsent(p.category, () => p);
-    }
-    final entries = seen.entries.toList();
-    return SizedBox(
-      height: 124,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: entries.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final name = entries[i].key;
-          return GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SearchScreen(initialQuery: name, tab: tab),
-              ),
-            ),
-            child: SizedBox(
-              width: 82,
-              child: Column(
-                children: [
-                  Container(
-                    width: 78,
-                    height: 78,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    padding: const EdgeInsets.all(5),
-                    child: ClipOval(
-                      child: NetImage(
-                        url: thumb(entries[i].value.imageUrl, 160),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+    final tint = (department.colour ?? kAccent).withValues(alpha: 0.14);
+    return GridView.builder(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 128,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 12,
+        // Room for the square plus two lines of name under it.
+        childAspectRatio: 0.74,
       ),
+      itemCount: nodes.length,
+      itemBuilder: (context, i) {
+        final node = nodes[i];
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  SearchScreen(initialQuery: node.name, tab: department.name),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  padding: node.imageUrl.isEmpty
+                      ? const EdgeInsets.all(6)
+                      : EdgeInsets.zero,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  // No picture yet is the ordinary state of a fresh category,
+                  // so it falls back to the department's icon rather than to
+                  // a broken-image box.
+                  child: node.imageUrl.isEmpty
+                      ? Icon(
+                          department.icon,
+                          size: 30,
+                          color: department.colour ?? kInk,
+                        )
+                      : NetImage(url: thumb(node.imageUrl, 256)),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                node.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

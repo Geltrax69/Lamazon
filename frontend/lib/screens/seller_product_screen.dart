@@ -74,6 +74,28 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     return out.isEmpty ? sellableCategories() : out;
   }
 
+  /// The same options, kept under their section. The picker shows the sections
+  /// first — a food shop has eighty leaves, and a wall of them is not a menu.
+  Map<String, List<String>> get _categorySections {
+    final mine = Seller.instance.store?.categories ?? const <String>[];
+    final out = <String, List<String>>{};
+    for (final d in mine) {
+      out.addAll(sellableGroups(d));
+    }
+    return out.isEmpty ? sellableGroups() : out;
+  }
+
+  /// Which section chip is open. Follows the chosen category, so editing an
+  /// item lands on the section it was already filed under.
+  late String _section = _sectionOf(_category);
+
+  String _sectionOf(String category) {
+    for (final e in _categorySections.entries) {
+      if (e.value.contains(category)) return e.key;
+    }
+    return _categorySections.keys.first;
+  }
+
   /// A group with no values is one the seller started and abandoned; saving it
   /// would show the buyer a heading with nothing to pick under it.
   List<ItemOption> get _liveOptions => [
@@ -213,6 +235,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
     final categories = _categoryOptions;
+    final sections = _categorySections;
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
@@ -262,6 +285,44 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       hint: 'e.g. Cold Coffee 300ml',
                       onChanged: () => setState(() {}),
                     ),
+                    // Above the rest because it decides the rest: the options
+                    // a food stall is offered are not the ones a phone shop is.
+                    if (categories.length > 1) ...[
+                      const SizedBox(height: 22),
+                      const SellerSection(title: 'Category'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final s in sections.keys)
+                            SellerChoice(
+                              label: s,
+                              selected: _section == s,
+                              onTap: () => setState(() {
+                                _section = s;
+                                _category = sections[s]!.first;
+                              }),
+                            ),
+                        ],
+                      ),
+                      // A section holding only itself has nothing to narrow to.
+                      if ((sections[_section] ?? const []).length > 1) ...[
+                        const SizedBox(height: 12),
+                        SellerSection(title: _section),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final c in sections[_section]!)
+                              SellerChoice(
+                                label: c,
+                                selected: _category == c,
+                                onTap: () => setState(() => _category = c),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 22),
                     const SellerSection(
                       title: 'Description',
@@ -353,11 +414,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                     SellerSection(
                       title: 'Options',
                       hint: _options.isEmpty
-                          ? 'Only if buyers have to choose — size, colour…'
+                          ? 'Only if buyers have to choose — '
+                                '${_presetHint(_category)}…'
                           : 'Buyers pick one of each before ordering',
                     ),
                     _OptionsEditor(
                       options: _options,
+                      presets: presetsFor(departmentOf(_category)),
                       onChanged: () => setState(() {}),
                     ),
                     const SizedBox(height: 22),
@@ -371,22 +434,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                         onChanged: () => setState(() {}),
                       ),
                     ),
-                    if (categories.length > 1) ...[
-                      const SizedBox(height: 22),
-                      const SellerSection(title: 'Category'),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final c in categories)
-                            SellerChoice(
-                              label: c,
-                              selected: _category == c,
-                              onTap: () => setState(() => _category = c),
-                            ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -406,16 +453,64 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
 /// Presets, so the common cases are one tap and not a form. A clothes shop
 /// wants Size with S–XL; making them type five boxes to get there is what
 /// makes a seller decide options are not worth it.
-const _presets = <String, ItemOption>{
-  'Size': ItemOption(name: 'Size', values: ['S', 'M', 'L', 'XL']),
-  'Colour': ItemOption(
-    name: 'Colour',
-    kind: 'colour',
-    values: ['#1A1A1A', '#FFFFFF', '#D32F2F', '#2F6FED'],
-  ),
-  'Weight': ItemOption(name: 'Weight', values: ['250g', '500g', '1kg']),
-  'Spice': ItemOption(name: 'Spice', values: ['Mild', 'Medium', 'Hot']),
+///
+/// Offered by department, because "Size" means S–XL to one shop and 30ml to
+/// another, and a thali seller has no use for a storage chip. Anything not
+/// listed here falls back to [_anyPresets]; the seller can still name their
+/// own, so a wrong guess costs a tap, not the option.
+const _colourOption = ItemOption(
+  name: 'Colour',
+  kind: 'colour',
+  values: ['#1A1A1A', '#FFFFFF', '#D32F2F', '#2F6FED'],
+);
+
+const _presetsByDepartment = <String, List<ItemOption>>{
+  'Food': [
+    ItemOption(name: 'Portion', values: ['Half', 'Full']),
+    ItemOption(name: 'Spice', values: ['Mild', 'Medium', 'Hot']),
+    ItemOption(name: 'Serves', values: ['1', '2', '4']),
+  ],
+  'Grocery': [
+    ItemOption(name: 'Weight', values: ['250g', '500g', '1kg', '5kg']),
+    ItemOption(name: 'Pack', values: ['Pack of 1', 'Pack of 2', 'Pack of 6']),
+  ],
+  'Snacks & Drinks': [
+    ItemOption(name: 'Size', values: ['250ml', '500ml', '1L']),
+    ItemOption(name: 'Pack', values: ['Pack of 1', 'Pack of 4', 'Pack of 12']),
+  ],
+  'Electronics': [
+    _colourOption,
+    ItemOption(name: 'Storage', values: ['64GB', '128GB', '256GB']),
+    ItemOption(name: 'Warranty', values: ['6 months', '1 year', '2 years']),
+  ],
+  'Beauty': [
+    ItemOption(name: 'Shade', kind: 'colour', values: ['#D7CCC8', '#6D4C41']),
+    ItemOption(name: 'Size', values: ['30ml', '50ml', '100ml']),
+  ],
+  'Household Essentials': [
+    ItemOption(name: 'Size', values: ['500ml', '1L', '5L']),
+    ItemOption(name: 'Pack', values: ['Pack of 1', 'Pack of 2', 'Pack of 6']),
+  ],
+  'Gifts': [
+    _colourOption,
+    ItemOption(name: 'Size', values: ['Small', 'Medium', 'Large']),
+  ],
 };
+
+const _anyPresets = <ItemOption>[
+  ItemOption(name: 'Size', values: ['S', 'M', 'L', 'XL']),
+  _colourOption,
+  ItemOption(name: 'Weight', values: ['250g', '500g', '1kg']),
+];
+
+List<ItemOption> presetsFor(String department) =>
+    _presetsByDepartment[department] ?? _anyPresets;
+
+/// The first two presets, named in the hint, so the example matches what the
+/// chips below actually offer.
+String _presetHint(String category) => presetsFor(
+  departmentOf(category),
+).take(2).map((p) => p.name.toLowerCase()).join(', ');
 
 /// Colours a swatch can be. A named row rather than a colour wheel: a shop is
 /// picking "the red one", not #B71C1C exactly, and a wheel is a decision they
@@ -445,13 +540,18 @@ Color _hexColour(String hex) => Color(
 /// list it is given — the screen owns it and saves it, this only edits.
 class _OptionsEditor extends StatelessWidget {
   final List<ItemOption> options;
+  final List<ItemOption> presets;
   final VoidCallback onChanged;
-  const _OptionsEditor({required this.options, required this.onChanged});
+  const _OptionsEditor({
+    required this.options,
+    required this.presets,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final unused = _presets.keys
-        .where((k) => !options.any((o) => o.name == k))
+    final unused = presets
+        .where((p) => !options.any((o) => o.name == p.name))
         .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,11 +580,11 @@ class _OptionsEditor extends StatelessWidget {
           children: [
             // Named presets come filled in; the shop deletes what it does not
             // sell rather than typing what it does.
-            for (final name in unused)
+            for (final preset in unused)
               _AddChip(
-                label: '+ $name',
+                label: '+ ${preset.name}',
                 onTap: () {
-                  options.add(_presets[name]!);
+                  options.add(preset);
                   onChanged();
                 },
               ),

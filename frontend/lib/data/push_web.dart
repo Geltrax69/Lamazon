@@ -137,10 +137,8 @@ class Push {
 Future<String> _fcmToken(String vapidKey) async {
   final fn = _firebaseMessagingToken;
   if (fn == null) return '';
-  final promise = fn.callAsFunction(
-    globalContext,
-    vapidKey.toJS,
-  ) as JSPromise<JSString>?;
+  final promise =
+      fn.callAsFunction(globalContext, vapidKey.toJS) as JSPromise<JSString>?;
   if (promise == null) return '';
   return (await promise.toDart).toDart;
 }

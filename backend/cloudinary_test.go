@@ -19,4 +19,10 @@ func TestPhotoNaming(t *testing.T) {
 	if got := itemPhotoName("../etc", "a/b", 1); got != "etc_a_b_1" {
 		t.Fatalf("hostile item: %s", got)
 	}
+	// Category pictures live one folder per department, so Grocery's own
+	// picture and everything inside it land together.
+	if got := categoryFolder("Snacks & Drinks"); got !=
+		"Lamazon/Categories/Snacks_Drinks" {
+		t.Fatalf("category folder: %s", got)
+	}
 }

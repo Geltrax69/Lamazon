@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../data/seller.dart';
 import '../widgets/notify_banner.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
 import 'seller_onboarding_screen.dart';
 import 'seller_product_screen.dart';
@@ -124,17 +125,28 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           child: SizedBox(
                             height: 140,
                             width: double.infinity,
-                            child: store.photo == null
-                                ? Container(
-                                    color: const Color(0xFFE8E8E4),
-                                    alignment: Alignment.center,
-                                    child: const Icon(
-                                      LucideIcons.store,
-                                      size: 36,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                : Image.memory(store.photo!, fit: BoxFit.cover),
+                            // Bytes when the seller just picked them, the
+                            // uploaded copy otherwise: a reload drops the
+                            // bytes, and only reading photo made a saved
+                            // photo look like it had never been saved.
+                            child: switch (store) {
+                              SellerStore(photo: final p?) => Image.memory(
+                                p,
+                                fit: BoxFit.cover,
+                              ),
+                              SellerStore(photoUrl: final u)
+                                  when u.isNotEmpty =>
+                                NetImage(url: u),
+                              _ => Container(
+                                color: const Color(0xFFE8E8E4),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  LucideIcons.store,
+                                  size: 36,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            },
                           ),
                         ),
                         const SizedBox(height: 14),

@@ -271,12 +271,18 @@ ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_mrp_check
 -- also why there is no rename: it would orphan every row pointing at the old
 -- one, and an admin cannot be expected to know that.
 CREATE TABLE IF NOT EXISTS catalog_categories (
-    name     TEXT PRIMARY KEY,
-    parent   TEXT    NOT NULL DEFAULT '',
-    icon     TEXT    NOT NULL DEFAULT '',
-    colour   TEXT    NOT NULL DEFAULT '',
-    position INTEGER NOT NULL DEFAULT 0
+    name      TEXT PRIMARY KEY,
+    parent    TEXT    NOT NULL DEFAULT '',
+    icon      TEXT    NOT NULL DEFAULT '',
+    colour    TEXT    NOT NULL DEFAULT '',
+    image_url TEXT    NOT NULL DEFAULT '',
+    position  INTEGER NOT NULL DEFAULT 0
 );
+
+-- A picture beats a glyph on the shop's category grid, and the icon set is a
+-- fixed list an admin cannot add to. Empty means fall back to the icon.
+ALTER TABLE catalog_categories
+    ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
 
 -- The five the app shipped with, so a fresh install has a shop rather than an
 -- empty navigation bar. Only when the table is empty: this runs at every

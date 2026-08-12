@@ -30,7 +30,8 @@ class Cart extends ChangeNotifier {
   double get saved => _items.values.fold(
     0,
     (s, i) =>
-        s + (i.product.discounted ? (i.product.mrp - i.product.price) * i.qty : 0),
+        s +
+        (i.product.discounted ? (i.product.mrp - i.product.price) * i.qty : 0),
   );
 
   void add(Product p, [int qty = 1]) {

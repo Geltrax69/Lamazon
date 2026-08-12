@@ -144,6 +144,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/compare-groups", s.handleSaveCompareGroup)
 	mux.HandleFunc("DELETE /api/admin/compare-groups/{name}", s.handleDeleteCompareGroup)
 	mux.HandleFunc("DELETE /api/admin/categories/{name}", s.handleDeleteCategory)
+	mux.HandleFunc("POST /api/admin/categories/{name}/photo", s.handleCategoryPhoto)
 	mux.HandleFunc("GET /api/admin/stores", s.handleAdminStores)
 	mux.HandleFunc("PATCH /api/admin/stores/{owner}/categories", s.handleStoreCategories)
 	mux.HandleFunc("POST /api/admin/stores/{owner}/approve", s.handleApproveStore)
