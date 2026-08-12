@@ -1,0 +1,68 @@
+name: Deploy API
+
+# Push a backend change, the Hetzner box runs it. The web app already works this
+# way through Vercel; this is the same deal for the Go API.
+#
+# Only the binary is shipped. The server has no Go toolchain and does not need
+# the source: schema.sql is go:embed'ed, and the web app is Vercel's job.
+on:
+  push:
+    branches: [web, main]
+    # Frontend-only pushes must not restart the API.
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HOST: root@46.62.157.163
+      BIN: /var/www/Lamazon/bin/lamazon-api
+      SVC: lamazon-api
+      HEALTH: https://api.geltrax.engineer/api/health
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # From go.mod, so the runner and the laptop never drift apart.
+          go-version-file: backend/go.mod
+
+      - name: Test
+        # A deploy that ships a binary failing its own tests is worse than no
+        # deploy: the old one was working.
+        run: go test -C backend ./...
+
+      - name: Build for the server
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -C backend -o lamazon-api .
+
+      - name: Ship it
+        env:
+          KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # ponytail: trust-on-first-use each run, so a hijacked IP would be
+          # trusted silently. Pin it by putting the output of
+          # `ssh-keyscan 46.62.157.163` in a KNOWN_HOSTS secret if that matters.
+          ssh-keyscan -H "${HOST#*@}" >> ~/.ssh/known_hosts 2>/dev/null
+          # Two steps: scp onto the live path fails with "text file busy" while
+          # the old binary runs. A same-filesystem mv swaps it atomically.
+          scp -q backend/lamazon-api "$HOST:$BIN.new"
+          ssh "$HOST" "mv $BIN.new $BIN && systemctl restart $SVC"
+
+      - name: Prove it came back
+        # A crash-loop leaves nginx answering 502, and a restart that failed
+        # outright leaves the *old* binary serving — which from the outside looks
+        # exactly like a successful deploy.
+        run: |
+          for _ in $(seq 20); do
+            curl -sf "$HEALTH" >/dev/null && { echo "API healthy"; exit 0; }
+            sleep 1
+          done
+          echo "API never answered $HEALTH"
+          ssh "$HOST" "journalctl -u $SVC -n 50 --no-pager"
+          exit 1
