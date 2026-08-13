@@ -103,7 +103,7 @@ class _ShopRow extends StatelessWidget {
               child: SizedBox(
                 width: 76,
                 height: 76,
-                child: NetImage(url: thumb(shop.imageUrl, 160), pad: false),
+                child: NetImage(url: thumb(shop.imageUrl, 160), padTo: 16 / 9),
               ),
             ),
             const SizedBox(width: 12),

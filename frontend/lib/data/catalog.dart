@@ -92,28 +92,36 @@ List<Product> productsAtShop(String shopName) {
 String thumb(String url, int width) =>
     url.replaceFirst(RegExp(r'w=\d+'), 'w=$width');
 
-/// Squares a Cloudinary image to [size]x[size] without cutting anything off.
+/// Pads a Cloudinary image into [aspect] (width ÷ height) without cutting
+/// anything off.
 ///
-/// Uploads arrive at whatever shape the seller's camera or screenshot was, and
-/// a grid of mixed shapes either crops heads off products or leaves the tiles
-/// ragged. c_pad scales the whole picture to fit and fills the leftover with
-/// b_auto — a colour sampled from the image's own edge, so a photo on white
-/// stays on white rather than gaining grey bars.
+/// Nobody is made to crop an upload, so pictures arrive at whatever shape the
+/// seller's camera or screenshot was. Drawn as-is they either lose their edges
+/// to BoxFit.cover or leave the tiles ragged. c_pad scales the whole picture
+/// to fit and fills the leftover with b_auto — a colour sampled from the
+/// image's own edge, so a photo on white stays on white rather than gaining
+/// grey bars.
 ///
 /// Rewriting the delivery URL rather than the stored one means the pictures
 /// already in Postgres are fixed too, with nothing re-uploaded: Cloudinary
-/// renders the variant on first request and caches it.
+/// renders the variant on first request and caches it. It is also what lets
+/// the crop stay optional — a seller who does frame their photo simply hands
+/// us one that is already the right shape, and this changes nothing about it.
 ///
 /// ponytail: a string insert, not an image pipeline. Non-Cloudinary URLs
 /// (the sample catalogue is Unsplash) are returned untouched.
-String square(String url, [int size = 512]) {
+String padded(String url, [double aspect = 1]) {
   const marker = '/image/upload/';
-  final at = url.indexOf(marker);
-  // Already transformed — inserting a second set would silently win or clash.
-  if (at < 0 || url.contains('c_pad')) return url;
+  // Already transformed — a second c_pad would scale the padding, not the
+  // picture, and quietly win.
+  if (!url.contains(marker) || url.contains('c_pad')) return url;
+  // Wide shapes are drawn full-bleed across the screen, so they get the wider
+  // source; a square is a tile at most a third of that.
+  final width = aspect > 1 ? 1024 : 512;
+  final height = (width / aspect).round();
   return url.replaceFirst(
     marker,
-    '${marker}c_pad,w_$size,h_$size,b_auto,f_auto,q_auto/',
+    '${marker}c_pad,w_$width,h_$height,b_auto,f_auto,q_auto/',
   );
 }
 

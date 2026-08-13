@@ -9,7 +9,6 @@ import '../data/categories.dart';
 import '../models/product.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
-import '../widgets/photo_cropper.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
 
@@ -594,10 +593,11 @@ class _AdminHomeState extends State<_AdminHome> {
   /// per category in Cloudinary, so this overwrites rather than piles up.
   Future<void> _setCategoryPhoto(String name) async {
     final picked = await pickPhotos(multiple: false);
-    if (picked.isEmpty || !mounted) return;
-    final cropped = await cropPhoto(context, picked.first, aspect: 1);
+    if (picked.isEmpty) return;
+    // Straight up as picked: it is squared on delivery, so making an admin
+    // crop a picture to a shape we can produce ourselves is busywork.
     try {
-      await Api.instance.setCategoryPhoto(name, cropped ?? picked.first);
+      await Api.instance.setCategoryPhoto(name, picked.first);
       await _load();
     } catch (e) {
       _say(e.toString().replaceFirst('ClientException: ', ''));

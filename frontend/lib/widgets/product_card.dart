@@ -247,19 +247,19 @@ class _CartButtonState extends State<CartButton> {
 /// Renders any pasted image link; broken links fall back to a grey placeholder
 /// instead of crashing the grid.
 ///
-/// A product or category picture is squared by Cloudinary first (see [square])
-/// and drawn with BoxFit.contain, so nothing is cropped or blown up — products
+/// Cloudinary pads the picture into [padTo] first (see [padded]) and it is
+/// drawn with BoxFit.contain, so nothing is cropped or blown up — products
 /// looking zoomed was BoxFit.cover filling a tile with the middle of whatever
-/// shape the seller uploaded.
+/// shape the seller happened to upload.
 ///
-/// Pass `pad: false` for a picture the person already framed themselves: a
-/// store's cover photo goes through the 16:9 cropper, and squaring it would
-/// both undo that framing and bar the sides of the banner it sits in.
+/// [padTo] is the shape this image is drawn in: 1 for a product or category
+/// tile, 16/9 for a store's cover banner. Pass null to leave the picture
+/// alone, for the rare place that wants the original bytes.
 class NetImage extends StatelessWidget {
   final String url;
   final BoxFit? fit;
-  final bool pad;
-  const NetImage({super.key, required this.url, this.fit, this.pad = true});
+  final double? padTo;
+  const NetImage({super.key, required this.url, this.fit, this.padTo = 1});
 
   @override
   Widget build(BuildContext context) {
@@ -268,8 +268,8 @@ class NetImage extends StatelessWidget {
     // photoless rows came back as index.html and logged a decode failure.
     if (url.trim().isEmpty) return _fallback();
     return Image.network(
-      pad ? square(url) : url,
-      fit: fit ?? (pad ? BoxFit.contain : BoxFit.cover),
+      padTo == null ? url : padded(url, padTo!),
+      fit: fit ?? (padTo == null ? BoxFit.cover : BoxFit.contain),
       loadingBuilder: (_, child, progress) =>
           progress == null ? child : Container(color: const Color(0xFFE8E8E4)),
       errorBuilder: (_, error, _) {

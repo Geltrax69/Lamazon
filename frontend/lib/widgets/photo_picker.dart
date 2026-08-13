@@ -40,9 +40,9 @@ class PhotoTile extends StatelessWidget {
   final double height;
   final ValueChanged<Uint8List?> onChanged;
 
-  /// The shape the photo will be shown in. Cropping to it here means the
-  /// person decides what gets cut off, rather than BoxFit.cover deciding for
-  /// them at the moment a shopper looks at the card.
+  /// The shape the photo will be shown in, offered by the Adjust button for
+  /// someone who wants to frame it themselves. Nobody has to: a photo left
+  /// alone is padded to this shape on delivery instead of being cut down.
   final double aspect;
 
   const PhotoTile({
@@ -58,11 +58,11 @@ class PhotoTile extends StatelessWidget {
 
   Future<void> _pick(BuildContext context) async {
     final picked = await pickPhotos(multiple: false);
-    if (picked.isEmpty || !context.mounted) return;
-    // Straight into the cropper: framing it is part of choosing it, and a
-    // separate "now adjust it" step is one most people would skip.
-    final cropped = await cropPhoto(context, picked.first, aspect: aspect);
-    onChanged(cropped ?? picked.first);
+    if (picked.isEmpty) return;
+    // The picture goes in as it is. Being marched through a cropper to add a
+    // photo is a chore, and the shape is handled for them on the way out —
+    // Adjust is there for the seller who does want to frame it.
+    onChanged(picked.first);
   }
 
   Future<void> _adjust(BuildContext context) async {
@@ -84,7 +84,7 @@ class PhotoTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              NetImage(url: url),
+              NetImage(url: url, padTo: aspect),
               Positioned(
                 right: 10,
                 bottom: 10,
@@ -133,7 +133,7 @@ class PhotoTile extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.memory(photo!, fit: BoxFit.cover),
+            Image.memory(photo!, fit: BoxFit.contain),
             Positioned(
               right: 10,
               bottom: 10,
@@ -237,7 +237,7 @@ class PhotoStrip extends StatelessWidget {
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.memory(photos[i], fit: BoxFit.cover),
+                    child: Image.memory(photos[i], fit: BoxFit.contain),
                   ),
                 ),
                 if (i == 0)
@@ -311,7 +311,7 @@ class PhotoOrPlaceholder extends StatelessWidget {
                   color: Colors.grey,
                 ),
               )
-            : Image.memory(photo!, fit: BoxFit.cover),
+            : Image.memory(photo!, fit: BoxFit.contain),
       ),
     );
   }
