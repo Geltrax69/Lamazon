@@ -359,6 +359,12 @@ class _RivalsState extends State<_Rivals> {
           for (final a in (snap.data!['attributes'] as List<dynamic>))
             GroupAttribute.fromJson(a as Map<String, dynamic>),
         ];
+        final derived = [
+          for (final d in (snap.data!['derived'] as List<dynamic>? ?? []))
+            DerivedRow.fromJson(d as Map<String, dynamic>),
+        ];
+        final highlights = (snap.data!['highlights'] as List<dynamic>? ?? [])
+            .cast<String>();
         final rows = (snap.data!['products'] as List<dynamic>)
             .cast<Map<String, dynamic>>();
         // One product on its own is not a comparison, it is a product.
@@ -377,6 +383,29 @@ class _RivalsState extends State<_Rivals> {
               'Same job, side by side. Cheapest first.',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
             ),
+            // The findings go above the table: the answer should arrive before
+            // the detail, and they are plural on purpose — the cheapest pack
+            // and the best value per 100g are usually different products.
+            if (highlights.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final line in highlights)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(LucideIcons.check, size: 13, color: _green),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          line,
+                          style: const TextStyle(fontSize: 12.5, height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
             const SizedBox(height: 10),
             // Scrolls sideways: a template can carry five fields, and squeezing
             // them into a phone's width is what turns a table into a puzzle.
@@ -439,14 +468,27 @@ class _RivalsState extends State<_Rivals> {
                                 ],
                               ),
                             ),
+                            // A won cell is green and bold. Nothing marks the
+                            // others: a comparison where most rows have no
+                            // winner is the honest case, not a broken one.
                             for (final f in fields)
                               SizedBox(
                                 width: 96,
-                                child: Text(
-                                  f.show(
+                                child: _Cell(
+                                  text: f.show(
                                     '${(row['values'] as Map?)?[f.name] ?? ''}',
                                   ),
-                                  style: const TextStyle(fontSize: 12.5),
+                                  won: f.winner == row['id'],
+                                ),
+                              ),
+                            for (final d in derived)
+                              SizedBox(
+                                width: 96,
+                                child: _Cell(
+                                  text: d.values[row['id']] == null
+                                      ? '—'
+                                      : '₹${d.values[row['id']]!.toStringAsFixed(2)}',
+                                  won: d.winner == row['id'],
                                 ),
                               ),
                           ],
@@ -479,6 +521,17 @@ class _RivalsState extends State<_Rivals> {
                               ),
                             ),
                           ),
+                        for (final d in derived)
+                          SizedBox(
+                            width: 96,
+                            child: Text(
+                              d.name,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF9A9A9A),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -489,6 +542,28 @@ class _RivalsState extends State<_Rivals> {
           ],
         );
       },
+    );
+  }
+}
+
+/// One value in the comparison table. Winning cells are the only ones marked:
+/// most rows have no winner — everyone tied, only one shop filled the field
+/// in, or the field is not the ranking kind — and that is the honest answer
+/// rather than a gap to paper over.
+class _Cell extends StatelessWidget {
+  final String text;
+  final bool won;
+  const _Cell({required this.text, required this.won});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 12.5,
+        fontWeight: won ? FontWeight.w800 : FontWeight.w400,
+        color: won ? _green : _ink,
+      ),
     );
   }
 }

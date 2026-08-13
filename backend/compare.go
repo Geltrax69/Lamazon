@@ -12,9 +12,20 @@ import (
 // GroupAttribute is one field every product in a comparison group is asked
 // for. Unit is what goes after the number — "W", "ml", "months" — so the
 // seller types 20 and the shopper reads 20W.
+//
+// Keeping the unit here rather than in the value is what makes ranking cheap:
+// there is no "1.5 L" against "1500ml" to reconcile, because the litres were
+// never in the cell.
 type GroupAttribute struct {
 	Name string `json:"name"`
 	Unit string `json:"unit,omitempty"`
+	// Mode says what "better" means for this field: higher_better,
+	// lower_better, feature, info or equal. Empty means info — shown, never
+	// ranked — so every template written before this existed still behaves.
+	Mode string `json:"mode,omitempty"`
+	// PerUnit marks the field that holds how much you get, which is what the
+	// price is divided by for the ₹/100 g row. One per group.
+	PerUnit bool `json:"perUnit,omitempty"`
 }
 
 // ComparisonGroup is a set of products that can be lined up against each
@@ -208,9 +219,22 @@ func (a *API) handleCompare(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	// Ranking happens here rather than in the query: it needs every listing at
+	// once to know who won, and SQL that could do it would be unreadable and
+	// still could not express "nobody won this row".
+	items := make([]comparable, 0, len(out))
+	for _, it := range out {
+		items = append(items, comparable{it.ID, it.Title, it.Price, it.Values})
+	}
+	ranked := rank(template, items)
+	derived := derive(template, items)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"group":      group,
-		"attributes": template,
+		"attributes": ranked,
+		"derived":    derived,
+		"highlights": highlights(ranked, derived, items),
 		"products":   out,
 	})
 }

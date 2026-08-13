@@ -100,19 +100,92 @@ class CompareGroup {
       ], (r['items'] as num?)?.toInt() ?? 0);
 }
 
+/// What "better" means for one compared field. Empty is deliberate and means
+/// "show it, do not rank it" — a template written before modes existed keeps
+/// working, and nothing invents a winner for brand or flavour.
+class CompareMode {
+  static const none = '';
+  static const higher = 'higher_better';
+  static const lower = 'lower_better';
+  static const feature = 'feature';
+  static const info = 'info';
+
+  /// What the admin picks from, and what each one reads as in the editor.
+  static const labels = {
+    none: 'Not ranked',
+    higher: 'Higher is better',
+    lower: 'Lower is better',
+    feature: 'Has it or not',
+    info: 'Just show it',
+  };
+}
+
 class GroupAttribute {
   final String name;
   final String unit;
-  const GroupAttribute(this.name, [this.unit = '']);
+  final String mode;
 
-  factory GroupAttribute.fromJson(Map<String, dynamic> r) =>
-      GroupAttribute(r['name'] as String? ?? '', r['unit'] as String? ?? '');
+  /// The field the price is divided by for the ₹/100 g row. One per group.
+  final bool perUnit;
 
-  Map<String, dynamic> toJson() => {'name': name, 'unit': unit};
+  /// Product id that won this field on the compare screen, filled in by the
+  /// API. Empty is the common answer: everyone tied, only one product
+  /// answered, nobody did, or the field is not the ranking kind.
+  final String winner;
+
+  const GroupAttribute(
+    this.name, [
+    this.unit = '',
+    this.mode = CompareMode.none,
+    this.perUnit = false,
+    this.winner = '',
+  ]);
+
+  factory GroupAttribute.fromJson(Map<String, dynamic> r) => GroupAttribute(
+    r['name'] as String? ?? '',
+    r['unit'] as String? ?? '',
+    r['mode'] as String? ?? '',
+    r['perUnit'] as bool? ?? false,
+    r['winner'] as String? ?? '',
+  );
+
+  /// The winner is decided per request and never sent back, so it stays out.
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'unit': unit,
+    if (mode.isNotEmpty) 'mode': mode,
+    if (perUnit) 'perUnit': true,
+  };
+
+  GroupAttribute copyWith({String? name, String? unit, String? mode, bool? perUnit}) =>
+      GroupAttribute(
+        name ?? this.name,
+        unit ?? this.unit,
+        mode ?? this.mode,
+        perUnit ?? this.perUnit,
+      );
 
   /// "20" plus "W" reads as 20W; a field with no unit is left alone.
   String show(String value) =>
       value.isEmpty ? '—' : (unit.isEmpty ? value : '$value$unit');
+}
+
+/// A row nobody typed: price per unit, computed per request from the price and
+/// the quantity field, so it moves the moment a seller changes a price.
+class DerivedRow {
+  final String name;
+  final Map<String, double> values;
+  final String winner;
+  const DerivedRow(this.name, this.values, this.winner);
+
+  factory DerivedRow.fromJson(Map<String, dynamic> r) => DerivedRow(
+    r['name'] as String? ?? '',
+    {
+      for (final e in (r['values'] as Map? ?? {}).entries)
+        '${e.key}': (e.value as num).toDouble(),
+    },
+    r['winner'] as String? ?? '',
+  );
 }
 
 class ShopOffer {

@@ -276,41 +276,98 @@ class _AdminHomeState extends State<_AdminHome> {
                   const SizedBox(height: 8),
                   for (final (i, f) in fields.indexed)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              initialValue: f.name,
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                hintText: 'Field',
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextFormField(
+                                  initialValue: f.name,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    hintText: 'Field',
+                                  ),
+                                  onChanged: (v) =>
+                                      fields[i] = fields[i].copyWith(name: v),
+                                ),
                               ),
-                              onChanged: (v) =>
-                                  fields[i] = GroupAttribute(v, fields[i].unit),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: f.unit,
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                hintText: 'Unit',
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextFormField(
+                                  initialValue: f.unit,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    hintText: 'Unit',
+                                  ),
+                                  onChanged: (v) =>
+                                      fields[i] = fields[i].copyWith(unit: v),
+                                ),
                               ),
-                              onChanged: (v) =>
-                                  fields[i] = GroupAttribute(fields[i].name, v),
-                            ),
+                              IconButton(
+                                onPressed: () =>
+                                    setDialog(() => fields.removeAt(i)),
+                                icon: const Icon(
+                                  LucideIcons.x,
+                                  size: 15,
+                                  color: _muted,
+                                ),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed: () =>
-                                setDialog(() => fields.removeAt(i)),
-                            icon: const Icon(
-                              LucideIcons.x,
-                              size: 15,
-                              color: _muted,
-                            ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              // Which way is better. Left alone, a field is
+                              // shown and never ranked — which is the right
+                              // answer for brand, colour and flavour.
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: f.mode,
+                                  isDense: true,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: _ink,
+                                  ),
+                                  items: [
+                                    for (final e
+                                        in CompareMode.labels.entries)
+                                      DropdownMenuItem(
+                                        value: e.key,
+                                        child: Text(e.value),
+                                      ),
+                                  ],
+                                  onChanged: (v) => setDialog(
+                                    () => fields[i] = fields[i].copyWith(
+                                      mode: v ?? CompareMode.none,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // The quantity the price is divided by. Only one
+                              // can hold it: a product has one price, and a
+                              // second would be the same money split another
+                              // way.
+                              FilterChip(
+                                label: const Text('₹ per unit'),
+                                labelStyle: const TextStyle(fontSize: 11.5),
+                                visualDensity: VisualDensity.compact,
+                                selected: f.perUnit,
+                                onSelected: (on) => setDialog(() {
+                                  for (final (j, g) in fields.indexed) {
+                                    fields[j] = g.copyWith(
+                                      perUnit: on && i == j,
+                                    );
+                                  }
+                                }),
+                              ),
+                            ],
                           ),
                         ],
                       ),
