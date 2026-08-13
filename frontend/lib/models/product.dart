@@ -165,6 +165,11 @@ class GroupAttribute {
         perUnit ?? this.perUnit,
       );
 
+  /// Whether the compare screen picks a winner for this field. Only these two
+  /// modes rank; feature, info and unset are shown and left alone.
+  bool get ranked =>
+      mode == CompareMode.higher || mode == CompareMode.lower;
+
   /// "20" plus "W" reads as 20W; a field with no unit is left alone.
   String show(String value) =>
       value.isEmpty ? '—' : (unit.isEmpty ? value : '$value$unit');

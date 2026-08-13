@@ -881,6 +881,13 @@ class _CompareSection extends StatelessWidget {
         .where((g) => g.name == chosen)
         .expand((g) => g.attributes)
         .toList();
+    // Fields the shopper's table actually ranks, that this listing has not
+    // answered. A field with no mode is displayed rather than ranked, so
+    // leaving it blank costs the seller nothing and is not nagged about.
+    final unwinnable = [
+      for (final f in template)
+        if (f.ranked && (values[f.name] ?? '').trim().isEmpty) f.name,
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -916,6 +923,39 @@ class _CompareSection extends StatelessWidget {
                   'What buyers compare $chosen on',
                   style: const TextStyle(fontSize: 12.5, color: _muted),
                 ),
+                // A ranked field left blank is a row this product cannot win —
+                // the shopper sees a dash while a rival shows a number. Worth
+                // saying plainly here, where it takes ten seconds to fix,
+                // rather than never. Only the ranked ones: leaving Flavour
+                // blank costs nothing, because nobody wins Flavour.
+                if (unwinnable.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        LucideIcons.circleAlert,
+                        size: 14,
+                        color: Color(0xFFB4531F),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          unwinnable.length == 1
+                              ? 'Fill in ${unwinnable.first} — buyers rank on '
+                                    'it, and a blank never wins.'
+                              : 'Fill in ${unwinnable.join(', ')} — buyers '
+                                    'rank on these, and a blank never wins.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: Color(0xFFB4531F),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 10),
                 for (final field in template) ...[
                   Row(
