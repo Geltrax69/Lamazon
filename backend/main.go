@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -69,6 +70,28 @@ func main() {
 	}
 }
 
+// commit is the git revision this binary was built from, which the Go
+// toolchain stamps in by itself whenever it builds inside a checkout — so
+// there is no version to bump and nothing to pass at build time.
+//
+// "unknown" is honest rather than broken: a `go build` outside a repository,
+// or with -buildvcs=false, genuinely does not know.
+func commit() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" {
+			if len(s.Value) > 7 {
+				return s.Value[:7] // what `git log --oneline` shows
+			}
+			return s.Value
+		}
+	}
+	return "unknown"
+}
+
 // routes wires every endpoint. Go 1.22 pattern routing, so no router
 // dependency. ponytail: one mux, no middleware stack until there is a
 // second cross-cutting concern.
@@ -76,7 +99,15 @@ func routes(s *API) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+			// Which commit is actually answering. Otherwise "did the deploy
+			// land?" is a question about a binary on a box nobody can see,
+			// and the honest check — grep the sha out of the file over ssh —
+			// is wrong the moment a frontend-only commit means backend/ did
+			// not deploy at all.
+			"commit": commit(),
+		})
 	})
 
 	// Catalog

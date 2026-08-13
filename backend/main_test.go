@@ -486,3 +486,26 @@ func TestPreflightAllowsTheHeadersWeSend(t *testing.T) {
 		}
 	}
 }
+
+// The whole point of the field is answering "is the deploy live?" without
+// ssh, so an empty or missing commit is the failure worth catching. Under
+// `go test` the toolchain stamps vcs.revision like it does for a build.
+func TestHealthSaysWhichCommitIsAnswering(t *testing.T) {
+	h := testAPI(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", rec.Code)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("health is not JSON: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Errorf("status: want ok, got %q", body["status"])
+	}
+	if body["commit"] == "" {
+		t.Error("health carries no commit, so a deploy cannot be checked")
+	}
+}
