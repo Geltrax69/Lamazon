@@ -136,7 +136,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                               ),
                               SellerStore(photoUrl: final u)
                                   when u.isNotEmpty =>
-                                NetImage(url: u),
+                                NetImage(url: u, pad: false),
                               _ => Container(
                                 color: const Color(0xFFE8E8E4),
                                 alignment: Alignment.center,

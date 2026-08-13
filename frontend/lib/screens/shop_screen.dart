@@ -68,7 +68,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 borderRadius: BorderRadius.circular(24),
                 child: SizedBox(
                   height: 160,
-                  child: NetImage(url: shop.imageUrl),
+                  child: NetImage(url: shop.imageUrl, pad: false),
                 ),
               ),
               const SizedBox(height: 14),

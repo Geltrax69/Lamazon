@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
+import '../data/catalog.dart';
 import '../data/wishlist.dart';
 import '../models/product.dart';
 import 'status_views.dart';
@@ -245,10 +246,20 @@ class _CartButtonState extends State<CartButton> {
 
 /// Renders any pasted image link; broken links fall back to a grey placeholder
 /// instead of crashing the grid.
+///
+/// A product or category picture is squared by Cloudinary first (see [square])
+/// and drawn with BoxFit.contain, so nothing is cropped or blown up — products
+/// looking zoomed was BoxFit.cover filling a tile with the middle of whatever
+/// shape the seller uploaded.
+///
+/// Pass `pad: false` for a picture the person already framed themselves: a
+/// store's cover photo goes through the 16:9 cropper, and squaring it would
+/// both undo that framing and bar the sides of the banner it sits in.
 class NetImage extends StatelessWidget {
   final String url;
-  final BoxFit fit;
-  const NetImage({super.key, required this.url, this.fit = BoxFit.cover});
+  final BoxFit? fit;
+  final bool pad;
+  const NetImage({super.key, required this.url, this.fit, this.pad = true});
 
   @override
   Widget build(BuildContext context) {
@@ -257,8 +268,8 @@ class NetImage extends StatelessWidget {
     // photoless rows came back as index.html and logged a decode failure.
     if (url.trim().isEmpty) return _fallback();
     return Image.network(
-      url,
-      fit: fit,
+      pad ? square(url) : url,
+      fit: fit ?? (pad ? BoxFit.contain : BoxFit.cover),
       loadingBuilder: (_, child, progress) =>
           progress == null ? child : Container(color: const Color(0xFFE8E8E4)),
       errorBuilder: (_, error, _) {
