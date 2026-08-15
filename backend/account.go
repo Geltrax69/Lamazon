@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -323,5 +324,34 @@ func (d *DB) seedDemoUser(ctx context.Context) error {
 		SELECT $1, 'Home', $2, $3, $4, $5, true
 		WHERE NOT EXISTS (SELECT 1 FROM addresses WHERE email = $1)`,
 		demoEmail, demoAddress, ServiceableCities[0], demoName, demoPhone)
+	return err
+}
+
+// seedUser creates or updates one shopper account from the environment, so
+// there is always an address that can sign in with a password rather than
+// waiting on an emailed code — the account a demo, a test run or a locked-out
+// afternoon needs.
+//
+// Same rule as seedAdmin: the credentials never live in this repository. This
+// one is a public repo, so a password written into a seed file would be
+// published to the world and stay in the git history after it was removed.
+//
+// Runs on every boot, so changing SEED_USER_PASSWORD and restarting is how the
+// password is rotated. Only the password is touched: a name, phone or address
+// this person saved is theirs and survives.
+func (d *DB) seedUser(ctx context.Context) error {
+	email := strings.ToLower(strings.TrimSpace(os.Getenv("SEED_USER")))
+	pass := os.Getenv("SEED_USER_PASSWORD")
+	if email == "" || pass == "" {
+		return nil
+	}
+	hash, err := hashPassword(pass)
+	if err != nil {
+		return err
+	}
+	_, err = d.sql.ExecContext(ctx, `
+		INSERT INTO users (email, pass_hash) VALUES ($1,$2)
+		ON CONFLICT (email) DO UPDATE SET pass_hash = EXCLUDED.pass_hash`,
+		email, hash)
 	return err
 }

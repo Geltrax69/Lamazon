@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"testing"
 )
@@ -149,4 +150,69 @@ func TestSellerStockAppearsInTheCatalog(t *testing.T) {
 		}
 	}
 	t.Fatal("the seller's store is missing from /api/shops")
+}
+
+// The seeded shopper must be able to sign in with the password, and rotating
+// it must not cost them their profile.
+func TestSeedUserSetsAPasswordAndKeepsTheProfile(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	t.Setenv("SEED_USER", "Seed@Example.com") // mixed case on purpose
+	t.Setenv("SEED_USER_PASSWORD", "first-pass")
+	if err := db.seedUser(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Addresses are stored lowercase, so a seed typed with capitals must not
+	// create a second account nobody can sign in to.
+	var hash, name string
+	if err := db.sql.QueryRowContext(ctx,
+		`SELECT pass_hash, name FROM users WHERE email = 'seed@example.com'`).
+		Scan(&hash, &name); err != nil {
+		t.Fatalf("seeded user not found: %v", err)
+	}
+	if !passwordMatches(hash, "first-pass") {
+		t.Error("the seeded password does not verify")
+	}
+
+	// They fill in their profile, then the password gets rotated.
+	if _, err := db.sql.ExecContext(ctx,
+		`UPDATE users SET name = 'Lalit' WHERE email = 'seed@example.com'`); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SEED_USER_PASSWORD", "second-pass")
+	if err := db.seedUser(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.sql.QueryRowContext(ctx,
+		`SELECT pass_hash, name FROM users WHERE email = 'seed@example.com'`).
+		Scan(&hash, &name); err != nil {
+		t.Fatal(err)
+	}
+	if !passwordMatches(hash, "second-pass") {
+		t.Error("rotating the password did not take")
+	}
+	if passwordMatches(hash, "first-pass") {
+		t.Error("the old password still works")
+	}
+	if name != "Lalit" {
+		t.Errorf("the seed wiped the profile: name = %q", name)
+	}
+}
+
+// Unset means "leave the database alone", not "create a blank account".
+func TestSeedUserWithoutEnvDoesNothing(t *testing.T) {
+	db := testDB(t)
+	t.Setenv("SEED_USER", "")
+	t.Setenv("SEED_USER_PASSWORD", "")
+	if err := db.seedUser(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	db.sql.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
+	if n != 0 {
+		t.Errorf("want no users, got %d", n)
+	}
 }

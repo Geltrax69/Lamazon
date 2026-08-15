@@ -33,6 +33,12 @@ func main() {
 		log.Print("ADMIN_USER/ADMIN_PASSWORD unset: no admin can sign in")
 	}
 
+	// The same deal for one shopper account, so there is always an address
+	// that can sign in without an emailed code.
+	if err := db.seedUser(context.Background()); err != nil {
+		log.Fatalf("seed user: %v", err)
+	}
+
 	// The demo shopper, so there is always one account that signs in with a
 	// password and needs no inbox.
 	if err := db.seedDemoUser(context.Background()); err != nil {
