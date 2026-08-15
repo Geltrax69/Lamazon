@@ -9,6 +9,8 @@ import '../data/session.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/image_marquee.dart';
 import 'home_screen.dart';
+import 'policy_screen.dart';
+import 'profile_setup_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -23,12 +25,17 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+/// What the sign-in card is asking for right now.
+enum _Step { email, code, password }
+
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _code = TextEditingController();
+  final _password = TextEditingController();
 
-  /// Null until a code has been mailed; then the card asks for the code.
-  bool _codeSent = false;
+  /// What the card is asking for. The address decides: one that has a
+  /// password is asked for it, everyone else gets a code in the post.
+  _Step _step = _Step.email;
   bool _busy = false;
   String? _error;
 
@@ -36,32 +43,33 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _email.dispose();
     _code.dispose();
+    _password.dispose();
     super.dispose();
   }
 
-  bool get _valid => _codeSent
-      ? _code.text.trim().length == 6
-      : Session.isValidEmail(_email.text);
+  bool get _valid => switch (_step) {
+    _Step.email => Session.isValidEmail(_email.text),
+    _Step.code => _code.text.trim().length == 6,
+    _Step.password => _password.text.isNotEmpty,
+  };
 
-  /// Step one: ask the backend to mail a code.
-  Future<void> _sendCode() async {
+  /// Step one: find out what this address is signed in with.
+  Future<void> _start() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final straightIn = await Api.instance.requestLoginCode(
-        _email.text.trim(),
-      );
+      final next = await Api.instance.startLogin(_email.text.trim());
       // The server can sign someone in on the spot when it is running with
       // the code switched off; asking for one that was never sent would be a
       // dead end.
-      if (straightIn != null) {
-        await Session.instance.signIn(straightIn);
+      if (next.tokens != null) {
+        await Session.instance.signIn(next.tokens!);
         _go();
         return;
       }
-      setState(() => _codeSent = true);
+      setState(() => _step = next.needsPassword ? _Step.password : _Step.code);
     } on http.ClientException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -103,17 +111,54 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// One button, two steps: mail the code, then check it.
-  void _submit() => _codeSent ? _verifyCode() : _sendCode();
+  /// The password path, for an address that has one.
+  Future<void> _verifyPassword() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final tokens = await Api.instance.passwordLogin(
+        _email.text.trim(),
+        _password.text,
+      );
+      await Session.instance.signIn(tokens);
+      _go();
+    } on http.ClientException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      logApiFailure('password login', e);
+      setState(() => _error = 'Could not reach the server. Try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// One button, whichever step it is on.
+  void _submit() => switch (_step) {
+    _Step.email => _start(),
+    _Step.code => _verifyCode(),
+    _Step.password => _verifyPassword(),
+  };
 
   void _enter({required bool skip}) {
     if (skip) Session.instance.skip();
     _go();
   }
 
-  /// Leaves the login screen for wherever the user came from.
-  void _go() {
+  /// Leaves the login screen for wherever the user came from — via the
+  /// details form when this is somebody's first time, since an order needs a
+  /// name, a number and an address and now is the one moment they will fill
+  /// them in.
+  Future<void> _go() async {
     if (!mounted) return;
+    if (Session.instance.loggedIn && !Session.instance.ready) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+      );
+      if (!mounted) return;
+    }
     // Opened from the account screen: go back to it, now signed in. At app
     // launch there is nothing to go back to, so home takes over instead.
     if (Navigator.canPop(context)) {
@@ -247,20 +292,36 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.fromLTRB(16, 0, 12, 0),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    12,
+                                    0,
+                                  ),
                                   child: Icon(
-                                    LucideIcons.mail,
+                                    switch (_step) {
+                                      _Step.email => LucideIcons.mail,
+                                      _Step.code => LucideIcons.keyRound,
+                                      _Step.password => LucideIcons.lock,
+                                    },
                                     size: 18,
                                     color: _muted,
                                   ),
                                 ),
                                 Expanded(
                                   child: TextField(
-                                    controller: _codeSent ? _code : _email,
-                                    keyboardType: _codeSent
-                                        ? TextInputType.number
-                                        : TextInputType.emailAddress,
+                                    controller: switch (_step) {
+                                      _Step.email => _email,
+                                      _Step.code => _code,
+                                      _Step.password => _password,
+                                    },
+                                    keyboardType: switch (_step) {
+                                      _Step.email => TextInputType.emailAddress,
+                                      _Step.code => TextInputType.number,
+                                      _Step.password => TextInputType.text,
+                                    },
+                                    obscureText: _step == _Step.password,
                                     autocorrect: false,
                                     onChanged: (_) => setState(() {}),
                                     onSubmitted: (_) {
@@ -268,9 +329,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     },
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
-                                      hintText: _codeSent
-                                          ? 'Enter the 6-digit code'
-                                          : 'Enter email address',
+                                      hintText: switch (_step) {
+                                        _Step.email => 'Enter email address',
+                                        _Step.code => 'Enter the 6-digit code',
+                                        _Step.password => 'Enter password',
+                                      },
                                       contentPadding:
                                           const EdgeInsets.symmetric(
                                             vertical: 16,
@@ -308,9 +371,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Text(
                                 _busy
                                     ? 'Please wait…'
-                                    : _codeSent
-                                    ? 'Verify code'
-                                    : 'Send me a code',
+                                    : switch (_step) {
+                                        _Step.email => 'Continue',
+                                        _Step.code => 'Verify code',
+                                        _Step.password => 'Sign in',
+                                      },
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
@@ -321,9 +386,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _error ??
-                                (_codeSent
-                                    ? 'We sent a code to ${_email.text.trim()}. It expires in 10 minutes.'
-                                    : 'We only use your email for order updates and receipts.'),
+                                switch (_step) {
+                                  _Step.email =>
+                                    'We only use your email for order updates '
+                                        'and receipts.',
+                                  _Step.code =>
+                                    'We sent a code to ${_email.text.trim()}. '
+                                        'It expires in 10 minutes.',
+                                  _Step.password =>
+                                    'Signing in as ${_email.text.trim()}.',
+                                },
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 11.5,
@@ -338,13 +410,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    'By continuing, you agree to our Terms of service & '
-                    'Privacy policy',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                // Named and reachable. Agreeing to two documents you cannot
+                // open is not agreeing to anything.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'By continuing, you agree to our ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF9A9A9A),
+                        ),
+                      ),
+                      _PolicyLink(policy: Policy.terms),
+                      const Text(
+                        ' & ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF9A9A9A),
+                        ),
+                      ),
+                      _PolicyLink(policy: Policy.privacy),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -363,3 +453,29 @@ const _fallback = [
   'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300',
   'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300',
 ];
+
+/// One underlined policy name in the sign-in footer.
+class _PolicyLink extends StatelessWidget {
+  final Policy policy;
+  const _PolicyLink({required this.policy});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PolicyScreen(policy: policy)),
+      ),
+      child: Text(
+        policy.title,
+        style: const TextStyle(
+          fontSize: 11,
+          color: Color(0xFF6B6B6B),
+          fontWeight: FontWeight.w700,
+          decoration: TextDecoration.underline,
+          decorationColor: Color(0xFF9A9A9A),
+        ),
+      ),
+    );
+  }
+}

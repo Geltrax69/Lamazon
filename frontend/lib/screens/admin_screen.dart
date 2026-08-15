@@ -336,8 +336,7 @@ class _AdminHomeState extends State<_AdminHome> {
                                     color: _ink,
                                   ),
                                   items: [
-                                    for (final e
-                                        in CompareMode.labels.entries)
+                                    for (final e in CompareMode.labels.entries)
                                       DropdownMenuItem(
                                         value: e.key,
                                         child: Text(e.value),

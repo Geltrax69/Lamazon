@@ -19,6 +19,22 @@ type User struct {
 	Phone    string   `json:"phone"`
 	Roles    []string `json:"roles"` // ["buyer"] or ["buyer","seller"]
 	HasStore bool     `json:"hasStore"`
+
+	// Whether they have a password, so the sign-in screen knows to ask for
+	// one instead of mailing a code. Never the hash itself.
+	HasPassword bool `json:"hasPassword"`
+	HasAddress  bool `json:"hasAddress"`
+
+	// True once we know who they are, how to reach them and where to
+	// deliver. False sends them to the details screen rather than into a
+	// shop that cannot deliver to them.
+	Ready bool `json:"ready"`
+}
+
+// SetUp reports whether we have what an order needs: who they are, a number
+// to call, and somewhere to deliver.
+func (u User) SetUp() bool {
+	return u.Name != "" && u.Phone != "" && u.HasAddress
 }
 
 // upsertUser creates the row on first sign-in and returns it either way. The
@@ -36,13 +52,17 @@ func (d *DB) user(ctx context.Context, email string) (User, error) {
 	u := User{Email: email}
 	err := d.sql.QueryRowContext(ctx, `
 		SELECT u.public_id, u.name, u.phone,
-		       EXISTS (SELECT 1 FROM seller_stores s WHERE s.owner = u.email)
+		       EXISTS (SELECT 1 FROM seller_stores s WHERE s.owner = u.email),
+		       u.pass_hash <> '',
+		       EXISTS (SELECT 1 FROM addresses a WHERE a.email = u.email)
 		FROM users u WHERE u.email = $1`, email).
-		Scan(&u.PublicID, &u.Name, &u.Phone, &u.HasStore)
+		Scan(&u.PublicID, &u.Name, &u.Phone, &u.HasStore, &u.HasPassword,
+			&u.HasAddress)
 	if err != nil {
 		return u, err
 	}
 	u.Roles = []string{"buyer"}
+	u.Ready = u.SetUp()
 	if u.HasStore {
 		u.Roles = append(u.Roles, "seller")
 	}
@@ -61,11 +81,12 @@ func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, u)
 }
 
-// PATCH /api/me — name and phone, the two things we ask for at checkout.
+// PATCH /api/me — name, phone, and a password if they want one.
 func (a *API) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name  *string `json:"name"`
-		Phone *string `json:"phone"`
+		Name     *string `json:"name"`
+		Phone    *string `json:"phone"`
+		Password *string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -76,10 +97,29 @@ func (a *API) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// COALESCE so a call that sends only one field leaves the other alone.
+
+	// Hashed here, never stored or logged in the clear. Sent as null by
+	// anyone who is only changing their name, which leaves it untouched.
+	var hash *string
+	if in.Password != nil {
+		if len(*in.Password) < minPasswordLength {
+			writeError(w, http.StatusBadRequest,
+				"a password needs at least 8 characters")
+			return
+		}
+		h, err := hashPassword(*in.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		hash = &h
+	}
+
+	// COALESCE so a call that sends only one field leaves the others alone.
 	if _, err := a.db.sql.ExecContext(r.Context(), `
-		UPDATE users SET name = COALESCE($2, name), phone = COALESCE($3, phone)
-		WHERE email = $1`, email, in.Name, in.Phone); err != nil {
+		UPDATE users SET name = COALESCE($2, name), phone = COALESCE($3, phone),
+		                 pass_hash = COALESCE($4, pass_hash)
+		WHERE email = $1`, email, in.Name, in.Phone, hash); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -239,4 +279,49 @@ func (a *API) handleDeleteAddress(w http.ResponseWriter, r *http.Request) {
 		                            WHERE email = $1 AND is_default)
 		            ORDER BY created_at LIMIT 1)`, a.owner(r))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// The demonstration account. It exists so the shop can be shown without
+// waiting on an inbox, and it is seeded on every boot so a wiped database
+// still has it.
+//
+// Its password is in the source, which means anyone who reads this repository
+// can sign in as it. That is the point of it — it owns nothing, sells nothing
+// and can be emptied without consequence — but it is a real account on a real
+// API, so keep it that way: no store, no admin, nothing worth taking.
+const (
+	demoEmail    = "lalit@lamazon.in"
+	demoPassword = "Lamazon.2113"
+	demoName     = "Lalit Test 1"
+	demoPhone    = "123456789"
+	demoAddress  = "Test 1"
+)
+
+// seedDemoUser creates it, and resets the password if it has drifted. Details
+// are only filled in when blank, so poking at the account from the app is not
+// undone by the next restart.
+func (d *DB) seedDemoUser(ctx context.Context) error {
+	hash, err := hashPassword(demoPassword)
+	if err != nil {
+		return err
+	}
+	if _, err := d.sql.ExecContext(ctx, `
+		INSERT INTO users (email, name, phone, pass_hash)
+		VALUES ($1,$2,$3,$4)
+		ON CONFLICT (email) DO UPDATE SET
+			pass_hash = EXCLUDED.pass_hash,
+			name = CASE WHEN users.name = '' THEN EXCLUDED.name ELSE users.name END,
+			phone = CASE WHEN users.phone = '' THEN EXCLUDED.phone ELSE users.phone END`,
+		demoEmail, demoName, demoPhone, hash); err != nil {
+		return err
+	}
+
+	// One address, so the account is ready to order rather than landing on
+	// the details screen every time.
+	_, err = d.sql.ExecContext(ctx, `
+		INSERT INTO addresses (email, label, line, city, name, phone, is_default)
+		SELECT $1, 'Home', $2, $3, $4, $5, true
+		WHERE NOT EXISTS (SELECT 1 FROM addresses WHERE email = $1)`,
+		demoEmail, demoAddress, ServiceableCities[0], demoName, demoPhone)
+	return err
 }

@@ -142,6 +142,21 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An address with a password is asked for it instead. That is the whole
+	// difference: no code is minted, nothing is emailed, and the app shows a
+	// password field because the answer said to.
+	var hasPassword bool
+	a.db.sql.QueryRowContext(r.Context(),
+		`SELECT pass_hash <> '' FROM users WHERE email = $1`, email).
+		Scan(&hasPassword)
+	if hasPassword {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"email":         email,
+			"needsPassword": true,
+		})
+		return
+	}
+
 	code, err := sixDigits()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -273,6 +288,36 @@ func (a *API) issueSession(w http.ResponseWriter, r *http.Request, email string)
 	}
 	session.User = &user
 	writeJSON(w, http.StatusOK, session)
+}
+
+// minPasswordLength is short enough to type on a phone and long enough that
+// guessing it is not a plan.
+const minPasswordLength = 8
+
+// POST /api/login/password — for an address that has one. Same session at the
+// end of it as a mailed code produces; only the proof differs.
+func (a *API) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(in.Email))
+
+	var stored string
+	err := a.db.sql.QueryRowContext(r.Context(),
+		`SELECT pass_hash FROM users WHERE email = $1`, email).Scan(&stored)
+
+	// One message for "no such address", "no password set" and "wrong
+	// password". Telling them apart tells a stranger which addresses exist.
+	if err != nil || stored == "" || !passwordMatches(stored, in.Password) {
+		writeError(w, http.StatusUnauthorized, "wrong email or password")
+		return
+	}
+	a.issueSession(w, r, email)
 }
 
 // POST /api/login/refresh — trades a refresh token for a fresh pair.

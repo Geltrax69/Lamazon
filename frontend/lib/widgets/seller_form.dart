@@ -41,6 +41,7 @@ class SellerField extends StatelessWidget {
   final TextInputType? keyboard;
   final int maxLines;
   final String? prefix;
+  final bool obscure;
   const SellerField({
     super.key,
     required this.controller,
@@ -50,6 +51,7 @@ class SellerField extends StatelessWidget {
     this.keyboard,
     this.maxLines = 1,
     this.prefix,
+    this.obscure = false,
   });
 
   @override
@@ -83,7 +85,10 @@ class SellerField extends StatelessWidget {
             child: TextField(
               controller: controller,
               keyboardType: keyboard,
-              maxLines: maxLines,
+              // obscureText forbids more than one line, and a password field
+              // asking for several would be a strange thing anyway.
+              maxLines: obscure ? 1 : maxLines,
+              obscureText: obscure,
               onChanged: (_) => onChanged(),
               decoration: InputDecoration(
                 border: InputBorder.none,

@@ -266,10 +266,15 @@ void main() {
     expect(isServiceable(''), isFalse);
   });
 
-  testWidgets('location screen blocks unserved city, saves served one',
+  testWidgets('the address form asks only what a porter needs',
       (tester) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: LocationScreen()));
+
+      // City and pincode are gone. We deliver to one campus, so the city is
+      // decided rather than typed, and nothing has ever used the pincode.
+      expect(find.widgetWithText(TextField, 'City'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Pincode'), findsNothing);
 
       // A porter needs someone to hand the bag to, so the form asks who and
       // on what number before it will save anything.
@@ -277,29 +282,23 @@ void main() {
           find.widgetWithText(TextField, 'Full name'), 'Lalit Singh');
       await tester.enterText(
           find.widgetWithText(TextField, 'Mobile number'), '9876543210');
-
-      // Fill an address in a city we do not cover.
       await tester.enterText(
-          find.widgetWithText(TextField, 'House / Flat, street, area'),
-          '5 MG Road');
-      await tester.enterText(
-          find.widgetWithText(TextField, 'City'), 'Mumbai');
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Pincode'), '400001');
+          find.widgetWithText(TextField, 'Hostel and room, or block and shop'),
+          'Hostel BH-9, Room 214');
       await tester.pump();
 
-      await tester.tap(find.text('Check availability'));
-      await tester.pump();
-      expect(find.text('Not available in your location'), findsOneWidget);
-
-      // Switch to the covered campus and it becomes saveable.
-      await tester.enterText(find.widgetWithText(TextField, 'City'), 'LPU');
-      await tester.pump();
       await tester.tap(find.text('Check availability'));
       await tester.pump();
       expect(find.text('We deliver here'), findsOneWidget);
       expect(find.text('Save address'), findsOneWidget);
     });
+  });
+
+  test('the campus we cover is still the only one we cover', () {
+    // The form cannot offer an unserved city any more, but the check behind
+    // it is what other callers lean on.
+    expect(isServiceable('Lovely Professional University'), isTrue);
+    expect(isServiceable('Mumbai'), isFalse);
   });
 
   // Orders come from the server now, so with no server there is nothing to

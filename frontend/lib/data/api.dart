@@ -175,14 +175,12 @@ class Api {
 
   // ---- Sign in ----------------------------------------------------------
 
-  /// Asks the backend to email a six-digit code. Throws with the server's
-  /// reason (bad address, or a resend too soon after the last one).
-  ///
-  /// Returns tokens instead of null when the server is running with the
-  /// sign-in code switched off — a development setup signs straight in, and
-  /// the caller skips the second step rather than asking for a code that was
-  /// never sent.
-  Future<AuthTokens?> requestLoginCode(String email) async {
+  /// What the sign-in screen should ask for next. A null AuthTokens with
+  /// [needsPassword] true means the address has a password; tokens mean the
+  /// server signed them straight in; neither means a code is on its way.
+  Future<({AuthTokens? tokens, bool needsPassword})> startLogin(
+    String email,
+  ) async {
     final res = await http
         .post(
           _url('/api/login'),
@@ -192,7 +190,22 @@ class Api {
         .timeout(_authTimeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return body.containsKey('token') ? AuthTokens.fromJson(body) : null;
+    return (
+      tokens: body.containsKey('token') ? AuthTokens.fromJson(body) : null,
+      needsPassword: body['needsPassword'] == true,
+    );
+  }
+
+  Future<AuthTokens> passwordLogin(String email, String password) async {
+    final res = await http
+        .post(
+          _url('/api/login/password'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email, 'password': password}),
+        )
+        .timeout(_authTimeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return AuthTokens.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// Trades the code for a token pair.
@@ -244,13 +257,17 @@ class Api {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  Future<void> updateMe({String? name, String? phone}) async {
+  Future<void> updateMe({String? name, String? phone, String? password}) async {
     final res = await http
         .patch(
           _url('/api/me'),
           headers: {...await _authHeader(), 'Content-Type': 'application/json'},
           // Null means "leave it alone"; the backend COALESCEs on its side.
-          body: jsonEncode({'name': ?name, 'phone': ?phone}),
+          body: jsonEncode({
+            'name': ?name,
+            'phone': ?phone,
+            'password': ?password,
+          }),
         )
         .timeout(_timeout);
     if (res.statusCode != 200) throw http.ClientException(_reason(res));

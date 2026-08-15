@@ -31,8 +31,11 @@ class _LocationScreenState extends State<LocationScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _line = TextEditingController();
-  final _city = TextEditingController();
-  final _pin = TextEditingController();
+  // We deliver to one campus, so the city is chosen rather than typed: a
+  // field whose only right answer is already known is a field that can only
+  // be got wrong. The pincode went with it — nothing uses it, and a porter
+  // walking to a hostel block has never needed one.
+  final _city = TextEditingController(text: serviceableCities.first);
   AddressLabel _label = AddressLabel.home;
   bool _checked = false;
 
@@ -42,7 +45,6 @@ class _LocationScreenState extends State<LocationScreen> {
     _phone.dispose();
     _line.dispose();
     _city.dispose();
-    _pin.dispose();
     super.dispose();
   }
 
@@ -54,8 +56,7 @@ class _LocationScreenState extends State<LocationScreen> {
       _name.text.trim().isNotEmpty &&
       _phone.text.trim().length >= 10 &&
       _line.text.trim().isNotEmpty &&
-      _city.text.trim().isNotEmpty &&
-      _pin.text.trim().length >= 5;
+      _city.text.trim().isNotEmpty;
 
   void _save() {
     final a = Address(
@@ -64,7 +65,9 @@ class _LocationScreenState extends State<LocationScreen> {
       label: _label,
       line: _line.text.trim(),
       city: _city.text.trim(),
-      pincode: _pin.text.trim(),
+      // Nothing asks for one any more; the column stays for the rows that
+      // already have it.
+      pincode: '',
       name: _name.text.trim(),
       phone: _phone.text.trim(),
     );
@@ -143,23 +146,8 @@ class _LocationScreenState extends State<LocationScreen> {
                     const SizedBox(height: 12),
                     _Field(
                       controller: _line,
-                      hint: 'House / Flat, street, area',
+                      hint: 'Hostel and room, or block and shop',
                       icon: LucideIcons.house,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    _Field(
-                      controller: _city,
-                      hint: 'City',
-                      icon: LucideIcons.building2,
-                      onChanged: (_) => setState(() => _checked = false),
-                    ),
-                    const SizedBox(height: 12),
-                    _Field(
-                      controller: _pin,
-                      hint: 'Pincode',
-                      icon: LucideIcons.mapPin,
-                      keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 20),

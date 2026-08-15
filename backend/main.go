@@ -33,6 +33,12 @@ func main() {
 		log.Print("ADMIN_USER/ADMIN_PASSWORD unset: no admin can sign in")
 	}
 
+	// The demo shopper, so there is always one account that signs in with a
+	// password and needs no inbox.
+	if err := db.seedDemoUser(context.Background()); err != nil {
+		log.Fatalf("demo user: %v", err)
+	}
+
 	mail := mailerFromEnv()
 	if mail == nil {
 		log.Print("RESEND_API_KEY/EMAIL_SEND unset: sign-in codes go to this log")
@@ -126,6 +132,7 @@ func routes(s *API) http.Handler {
 	// Accounts
 	mux.HandleFunc("POST /api/login", s.handleLogin)
 	mux.HandleFunc("POST /api/login/verify", s.handleVerifyCode)
+	mux.HandleFunc("POST /api/login/password", s.handlePasswordLogin)
 	mux.HandleFunc("POST /api/login/refresh", s.handleRefresh)
 
 	// Account: who is signed in, and where they want things delivered.

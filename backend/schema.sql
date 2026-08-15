@@ -497,3 +497,10 @@ ALTER TABLE inventory_items
 
 CREATE INDEX IF NOT EXISTS idx_items_compare_group
     ON inventory_items (compare_group) WHERE compare_group <> '';
+
+-- A password on the shopper's account. Optional: most people sign in with an
+-- emailed code and never set one, and an empty hash means "this address has
+-- no password", not "any password will do" — the check is on the hash being
+-- non-empty before it is ever compared.
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS pass_hash TEXT NOT NULL DEFAULT '';

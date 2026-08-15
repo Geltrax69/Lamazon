@@ -43,6 +43,13 @@ class Session extends ChangeNotifier {
       (_user?['roles'] as List<dynamic>? ?? const ['buyer']).cast<String>();
   bool get isSeller => roles.contains('seller');
 
+  /// Whether we have what an order needs: a name, a number, and somewhere to
+  /// deliver. The server decides — it can see the address book — and false
+  /// sends a new arrival to the details screen instead of into a shop that
+  /// cannot deliver to them.
+  bool get ready => _user?['ready'] == true;
+  bool get hasPassword => _user?['hasPassword'] == true;
+
   /// True once the user has either logged in or chosen to browse as a guest,
   /// so the login screen is not shown again.
   bool get onboarded => loggedIn || _skipped;

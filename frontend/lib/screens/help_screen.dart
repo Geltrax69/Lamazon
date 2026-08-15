@@ -4,6 +4,7 @@ import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../widgets/screen_header.dart';
+import 'policy_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -150,6 +151,18 @@ class HelpScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 22),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 10),
+                      child: Text(
+                        'Policies',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const PolicyLinks(),
                     const SizedBox(height: 22),
                     const Center(
                       child: Text(
