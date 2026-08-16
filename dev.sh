@@ -92,10 +92,23 @@ SKIP_LOGIN_CODE="${SKIP_LOGIN_CODE:-1}"
 # Unset it to get the samples again on an empty database.
 SKIP_SEED="${SKIP_SEED:-1}"
 
+# One shopper who can always sign in, for demos and for testing an order
+# without waiting on an inbox. Credentials come from the environment, never
+# from the repository — this one is public. Set them in .env or export them;
+# with SEED_USER unset, nothing is seeded.
+SEED_USER="${SEED_USER:-}"
+SEED_USER_PASSWORD="${SEED_USER_PASSWORD:-}"
+SEED_USER_NAME="${SEED_USER_NAME:-}"
+SEED_USER_PHONE="${SEED_USER_PHONE:-}"
+SEED_USER_ADDRESS="${SEED_USER_ADDRESS:-}"
+
 echo "==> starting API on $PORT"
 [ "$SKIP_LOGIN_CODE" = "1" ] && echo "==> sign-in code is OFF (local only)"
 DATABASE_URL="$DB_URL" PORT="$PORT" SKIP_LOGIN_CODE="$SKIP_LOGIN_CODE" \
-  SKIP_SEED="$SKIP_SEED" "$BIN" &
+  SKIP_SEED="$SKIP_SEED" \
+  SEED_USER="$SEED_USER" SEED_USER_PASSWORD="$SEED_USER_PASSWORD" \
+  SEED_USER_NAME="$SEED_USER_NAME" SEED_USER_PHONE="$SEED_USER_PHONE" \
+  SEED_USER_ADDRESS="$SEED_USER_ADDRESS" "$BIN" &
 API_PID=$!
 # INT and TERM as well as EXIT: Ctrl-C is how this normally ends, and bash does
 # not always reach the EXIT trap on an untrapped signal.

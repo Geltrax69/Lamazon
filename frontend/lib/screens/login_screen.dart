@@ -425,7 +425,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Color(0xFF9A9A9A),
                         ),
                       ),
-                      _PolicyLink(policy: Policy.terms),
+                      _PolicyLink(slug: 'terms', label: 'Terms and Conditions'),
                       const Text(
                         ' & ',
                         style: TextStyle(
@@ -433,7 +433,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Color(0xFF9A9A9A),
                         ),
                       ),
-                      _PolicyLink(policy: Policy.privacy),
+                      _PolicyLink(slug: 'privacy', label: 'Privacy Policy'),
                     ],
                   ),
                 ),
@@ -456,18 +456,19 @@ const _fallback = [
 
 /// One underlined policy name in the sign-in footer.
 class _PolicyLink extends StatelessWidget {
-  final Policy policy;
-  const _PolicyLink({required this.policy});
+  final String slug;
+  final String label;
+  const _PolicyLink({required this.slug, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => PolicyScreen(policy: policy)),
+        MaterialPageRoute(builder: (_) => PolicyScreen(slug: slug)),
       ),
       child: Text(
-        policy.title,
+        label,
         style: const TextStyle(
           fontSize: 11,
           color: Color(0xFF6B6B6B),

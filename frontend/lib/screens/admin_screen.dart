@@ -11,6 +11,8 @@ import '../data/staff.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
+import '../widgets/screen_header.dart';
+import 'policy_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _muted = Color(0xFF6B6B6B);
@@ -159,6 +161,9 @@ class _AdminHomeState extends State<_AdminHome> {
   /// Which department the Categories tab is showing the inside of. Null is
   /// the grid of them all.
   String? _openDept;
+
+  /// The written documents, loaded with everything else.
+  List<PolicyDoc> _policies = const [];
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
@@ -174,7 +179,16 @@ class _AdminHomeState extends State<_AdminHome> {
     try {
       // Five independent reads. In series this was five round trips of
       // waiting before anything drew.
-      final (overview, insights, stores, riders, orders, groups, _) = await (
+      final (
+        overview,
+        insights,
+        stores,
+        riders,
+        orders,
+        groups,
+        _,
+        policies,
+      ) = await (
         Api.instance.adminOverview(),
         Api.instance.adminInsights(),
         Api.instance.adminStores(),
@@ -184,11 +198,15 @@ class _AdminHomeState extends State<_AdminHome> {
         // Refreshes the global list the shop draws its tabs from, so adding a
         // department shows up here without a reload.
         loadDepartments(),
+        // refresh: the admin is the one editing these, so a cached copy is
+        // exactly the wrong thing to put in front of them.
+        loadPolicies(refresh: true),
       ).wait;
       if (!mounted) return;
       setState(() {
         _overview = overview;
         _insights = insights;
+        _policies = policies;
         _stores = stores;
         _riders = riders;
         _orders = orders;
@@ -412,6 +430,16 @@ class _AdminHomeState extends State<_AdminHome> {
     } catch (e) {
       _say(e.toString().replaceFirst('ClientException: ', ''));
     }
+  }
+
+  /// Rewrites one policy. The whole document at once, because that is how
+  /// anybody edits a policy — not field by field.
+  Future<void> _editPolicy(PolicyDoc doc) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => _PolicyEditor(doc: doc)),
+    );
+    if (saved == true) await _load();
   }
 
   /// Which departments a store sells in. Order matters and is kept: the first
@@ -1097,6 +1125,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.orders: _orders.length,
     _Tab.insights: (_insights?['topStores'] as List?)?.length ?? 0,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
+    _Tab.policies: _policies.length,
     _Tab.compare: _groups.length,
     _Tab.delivery: _riders.length,
     _Tab.people: (_overview?['people'] as List?)?.length ?? 0,
@@ -1331,6 +1360,20 @@ class _AdminHomeState extends State<_AdminHome> {
                 ],
               ),
             ),
+        ];
+
+      case _Tab.policies:
+        return [
+          const _Note(
+            'The written pages, as shoppers read them. Saving publishes '
+            'straight away — there is no draft. A line starting with "## " '
+            'is a heading; everything else is a paragraph.',
+          ),
+          if (_policies.isEmpty)
+            const _Empty('No policies yet.')
+          else
+            for (final doc in _policies)
+              _PolicyRow(doc: doc, onEdit: () => _editPolicy(doc)),
         ];
 
       case _Tab.compare:
@@ -2070,6 +2113,7 @@ enum _Tab {
   insights('Insights'),
   categories('Categories'),
   compare('Compare'),
+  policies('Policies'),
   delivery('Delivery'),
   people('People');
 
@@ -2588,4 +2632,225 @@ class _Field extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One policy in the admin list: what it is, and how long it is.
+class _PolicyRow extends StatelessWidget {
+  final PolicyDoc doc;
+  final VoidCallback onEdit;
+  const _PolicyRow({required this.doc, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final words = doc.body.trim().split(RegExp(r'\s+')).length;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(doc.icon, size: 18, color: _ink),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  doc.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  // The blanks are the point: an admin should be able to see
+                  // at a glance which pages still say [Company Name].
+                  '$words words'
+                  '${doc.body.contains('[') ? ' · has blanks to fill in' : ''}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: doc.body.contains('[') ? _amber : _muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(LucideIcons.pencil, size: 15),
+            label: const Text('Edit'),
+            style: TextButton.styleFrom(foregroundColor: _ink),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The whole document in one box, with a preview of how it will read.
+class _PolicyEditor extends StatefulWidget {
+  final PolicyDoc doc;
+  const _PolicyEditor({required this.doc});
+
+  @override
+  State<_PolicyEditor> createState() => _PolicyEditorState();
+}
+
+class _PolicyEditorState extends State<_PolicyEditor> {
+  late final _title = TextEditingController(text: widget.doc.title);
+  late final _body = TextEditingController(text: widget.doc.body);
+  bool _preview = false;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await Api.instance.savePolicy(
+        widget.doc.slug,
+        _title.text.trim(),
+        _body.text,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('ClientException: ', '');
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F1EF),
+      body: ReadableBody(
+        maxWidth: 760,
+        child: SafeArea(
+          child: Column(
+            children: [
+              ScreenHeader(
+                title: widget.doc.title,
+                action: IconButton(
+                  tooltip: _preview ? 'Back to editing' : 'Preview',
+                  onPressed: () => setState(() => _preview = !_preview),
+                  icon: Icon(
+                    _preview ? LucideIcons.pencil : LucideIcons.eye,
+                    size: 17,
+                    color: _ink,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  children: [
+                    if (_preview)
+                      // Exactly the widget the shopper sees, so the preview
+                      // cannot disagree with the page.
+                      PolicyBody(text: _body.text)
+                    else ...[
+                      const Text(
+                        'Title',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _muted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _title,
+                        decoration: _boxed(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Text',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _muted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _body,
+                        maxLines: null,
+                        minLines: 18,
+                        keyboardType: TextInputType.multiline,
+                        onChanged: (_) => setState(() {}),
+                        decoration: _boxed(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(fontSize: 12.5, color: _red),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ink,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                    ),
+                    onPressed: _busy || _body.text.trim().isEmpty
+                        ? null
+                        : _save,
+                    child: Text(
+                      _busy ? 'Publishing…' : 'Publish',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _boxed() => InputDecoration(
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.all(14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+  );
 }

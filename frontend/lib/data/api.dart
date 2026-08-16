@@ -93,6 +93,17 @@ class Api {
     '/api/admin/compare-groups/${Uri.encodeComponent(name)}',
   );
 
+  /// The written policies, newest text first from the server.
+  Future<List<dynamic>> policies() => _getList('/api/policies');
+
+  Future<void> savePolicy(String slug, String title, String body) =>
+      _staffCall(
+        StaffSession.admin,
+        'PUT',
+        '/api/admin/policies/${Uri.encodeComponent(slug)}',
+        {'title': title, 'body': body},
+      );
+
   /// The shop's navigation: departments, each with its categories nested.
   Future<List<dynamic>> categories() => _getList('/api/categories');
 
@@ -533,6 +544,7 @@ class Api {
     final res = await switch (method) {
       'POST' => http.post(url, headers: headers, body: payload),
       'PATCH' => http.patch(url, headers: headers, body: payload),
+      'PUT' => http.put(url, headers: headers, body: payload),
       'DELETE' => http.delete(url, headers: headers),
       // Anything unrecognised would otherwise be sent as a GET, which the
       // server answers with a 404 that reads like the route is missing.

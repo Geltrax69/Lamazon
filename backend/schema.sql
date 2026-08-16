@@ -504,3 +504,17 @@ CREATE INDEX IF NOT EXISTS idx_items_compare_group
 -- non-empty before it is ever compared.
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS pass_hash TEXT NOT NULL DEFAULT '';
+
+-- The written policies. In the database rather than the binary because an
+-- admin has to be able to change them without a deploy — a refund policy that
+-- needs an engineer is a refund policy that stays wrong.
+--
+-- One text blob per document, not a table of sections: the admin edits the
+-- whole thing in one box, and "## " at the start of a line is a heading. That
+-- is the entire format, and it survives being pasted in from anywhere.
+CREATE TABLE IF NOT EXISTS policies (
+    slug       TEXT PRIMARY KEY,
+    title      TEXT        NOT NULL,
+    body       TEXT        NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

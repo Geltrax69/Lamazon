@@ -282,51 +282,6 @@ func (a *API) handleDeleteAddress(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// The demonstration account. It exists so the shop can be shown without
-// waiting on an inbox, and it is seeded on every boot so a wiped database
-// still has it.
-//
-// Its password is in the source, which means anyone who reads this repository
-// can sign in as it. That is the point of it — it owns nothing, sells nothing
-// and can be emptied without consequence — but it is a real account on a real
-// API, so keep it that way: no store, no admin, nothing worth taking.
-const (
-	demoEmail    = "lalit@lamazon.in"
-	demoPassword = "Lamazon.2113"
-	demoName     = "Lalit Test 1"
-	demoPhone    = "123456789"
-	demoAddress  = "Test 1"
-)
-
-// seedDemoUser creates it, and resets the password if it has drifted. Details
-// are only filled in when blank, so poking at the account from the app is not
-// undone by the next restart.
-func (d *DB) seedDemoUser(ctx context.Context) error {
-	hash, err := hashPassword(demoPassword)
-	if err != nil {
-		return err
-	}
-	if _, err := d.sql.ExecContext(ctx, `
-		INSERT INTO users (email, name, phone, pass_hash)
-		VALUES ($1,$2,$3,$4)
-		ON CONFLICT (email) DO UPDATE SET
-			pass_hash = EXCLUDED.pass_hash,
-			name = CASE WHEN users.name = '' THEN EXCLUDED.name ELSE users.name END,
-			phone = CASE WHEN users.phone = '' THEN EXCLUDED.phone ELSE users.phone END`,
-		demoEmail, demoName, demoPhone, hash); err != nil {
-		return err
-	}
-
-	// One address, so the account is ready to order rather than landing on
-	// the details screen every time.
-	_, err = d.sql.ExecContext(ctx, `
-		INSERT INTO addresses (email, label, line, city, name, phone, is_default)
-		SELECT $1, 'Home', $2, $3, $4, $5, true
-		WHERE NOT EXISTS (SELECT 1 FROM addresses WHERE email = $1)`,
-		demoEmail, demoAddress, ServiceableCities[0], demoName, demoPhone)
-	return err
-}
-
 // seedUser creates or updates one shopper account from the environment, so
 // there is always an address that can sign in with a password rather than
 // waiting on an emailed code — the account a demo, a test run or a locked-out
@@ -349,9 +304,31 @@ func (d *DB) seedUser(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	name := strings.TrimSpace(os.Getenv("SEED_USER_NAME"))
+	phone := strings.TrimSpace(os.Getenv("SEED_USER_PHONE"))
+	if _, err := d.sql.ExecContext(ctx, `
+		INSERT INTO users (email, pass_hash, name, phone) VALUES ($1,$2,$3,$4)
+		ON CONFLICT (email) DO UPDATE SET
+			pass_hash = EXCLUDED.pass_hash,
+			-- Only when blank. What this person typed for themselves is
+			-- theirs, and a restart is not a reason to overwrite it.
+			name = CASE WHEN users.name = '' THEN EXCLUDED.name ELSE users.name END,
+			phone = CASE WHEN users.phone = '' THEN EXCLUDED.phone
+			             ELSE users.phone END`,
+		email, hash, name, phone); err != nil {
+		return err
+	}
+
+	// An address too, so the account lands in the shop rather than on the
+	// details form. Only if they have none — the first one they save is real.
+	line := strings.TrimSpace(os.Getenv("SEED_USER_ADDRESS"))
+	if line == "" {
+		return nil
+	}
 	_, err = d.sql.ExecContext(ctx, `
-		INSERT INTO users (email, pass_hash) VALUES ($1,$2)
-		ON CONFLICT (email) DO UPDATE SET pass_hash = EXCLUDED.pass_hash`,
-		email, hash)
+		INSERT INTO addresses (email, label, line, city, name, phone, is_default)
+		SELECT $1, 'Home', $2, $3, $4, $5, true
+		WHERE NOT EXISTS (SELECT 1 FROM addresses WHERE email = $1)`,
+		email, line, ServiceableCities[0], name, phone)
 	return err
 }

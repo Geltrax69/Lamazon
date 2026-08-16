@@ -39,10 +39,10 @@ func main() {
 		log.Fatalf("seed user: %v", err)
 	}
 
-	// The demo shopper, so there is always one account that signs in with a
-	// password and needs no inbox.
-	if err := db.seedDemoUser(context.Background()); err != nil {
-		log.Fatalf("demo user: %v", err)
+	// Each policy fills in only if it has no row, so an admin's edits survive
+	// every restart and a document added later still arrives written.
+	if err := db.seedPolicies(context.Background()); err != nil {
+		log.Fatalf("policies: %v", err)
 	}
 
 	mail := mailerFromEnv()
@@ -123,6 +123,7 @@ func routes(s *API) http.Handler {
 	})
 
 	// Catalog
+	mux.HandleFunc("GET /api/policies", s.handlePolicies)
 	mux.HandleFunc("GET /api/categories", s.handleCategories)
 	mux.HandleFunc("GET /api/compare-groups", s.handleCompareGroups)
 	mux.HandleFunc("GET /api/compare", s.handleCompare)
@@ -184,6 +185,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
+	mux.HandleFunc("PUT /api/admin/policies/{slug}", s.handleSavePolicy)
 	mux.HandleFunc("POST /api/admin/categories", s.handleAddCategory)
 	mux.HandleFunc("POST /api/admin/compare-groups", s.handleSaveCompareGroup)
 	mux.HandleFunc("DELETE /api/admin/compare-groups/{name}", s.handleDeleteCompareGroup)
