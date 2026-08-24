@@ -9,6 +9,7 @@ import '../data/categories.dart';
 import '../models/product.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
+import 'admin_photos_screen.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
@@ -2250,6 +2251,13 @@ class _StoreCard extends StatelessWidget {
                   child: const Text('Reject', style: TextStyle(color: _red)),
                 ),
               const Spacer(),
+              // Photos are the other thing an admin gets asked to fix, and
+              // asking the seller to re-upload is a slower answer than doing
+              // it.
+              StorePhotosButton(
+                owner: store['owner'] as String? ?? '',
+                storeName: store['name'] as String? ?? '',
+              ),
               // A shop that opened as Electronics and grew into Books had no
               // way to say so — the list was set once at onboarding.
               if (onEditCategories != null)

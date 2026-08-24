@@ -74,7 +74,7 @@ class PolicyScreen extends StatefulWidget {
 }
 
 class _PolicyScreenState extends State<PolicyScreen> {
-  late Future<List<PolicyDoc>> _future = loadPolicies();
+  late final Future<List<PolicyDoc>> _future = loadPolicies();
 
   @override
   Widget build(BuildContext context) {

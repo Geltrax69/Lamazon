@@ -1217,3 +1217,23 @@ func (a *API) explainFailedDelivery(w http.ResponseWriter, r *http.Request, id, 
 			"wrong code — ask the customer to read it out again")
 	}
 }
+
+// GET /api/admin/items?owner= — one store's stock, so an admin can fix a
+// listing's photos without asking the seller to do it.
+//
+// Scoped to a store rather than listing everything: the reason to open this is
+// always "that shop's pictures are wrong", and a catalogue-wide list would be
+// thousands of rows nobody scrolls.
+func (a *API) handleAdminItems(w http.ResponseWriter, r *http.Request) {
+	owner := strings.TrimSpace(r.URL.Query().Get("owner"))
+	if owner == "" {
+		writeError(w, http.StatusBadRequest, "owner is required")
+		return
+	}
+	items, err := a.db.items(r.Context(), owner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}

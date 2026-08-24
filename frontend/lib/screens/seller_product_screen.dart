@@ -9,8 +9,7 @@ import '../data/api.dart';
 import '../data/categories.dart';
 import '../models/product.dart';
 import '../data/seller.dart';
-import '../widgets/photo_picker.dart';
-import '../widgets/product_card.dart';
+import '../widgets/photo_manager.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 
@@ -42,7 +41,22 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   late final _stock = TextEditingController(
     text: widget.existing?.stock.toString(),
   );
-  late List<Uint8List> _photos = [...?widget.existing?.photos];
+
+  /// Uploaded photos and just-picked ones in one list, because reordering has
+  /// to work across the join — a photo added today can be dragged in front of
+  /// one added last week.
+  late List<Shot> _shots = [
+    for (final url in widget.existing?.imageUrls ?? const <String>[])
+      Shot.remote(url),
+    for (final bytes in widget.existing?.photos ?? const <Uint8List>[])
+      Shot.local(bytes),
+  ];
+  bool _savingPhotos = false;
+
+  List<Uint8List> get _newPhotos => [
+    for (final s in _shots)
+      if (s.isNew) s.bytes!,
+  ];
   late final List<ItemOption> _options = [...?widget.existing?.options];
   late String _group = widget.existing?.compareGroup ?? '';
   late final Map<String, String> _attrs = {...?widget.existing?.attributes};
@@ -124,9 +138,61 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   /// screen only holds bytes for pictures picked in this session. Counting
   /// only those made "Add at least one photo" block every edit of an item
   /// that already had photos, which is to say every edit.
-  List<String> get _savedPhotos => widget.existing?.imageUrls ?? const [];
+  bool get _hasPhotos => _shots.isNotEmpty;
 
-  bool get _hasPhotos => _photos.isNotEmpty || _savedPhotos.isNotEmpty;
+  /// On a listing that already exists, a photo change is saved when it is
+  /// made rather than waiting for Save — an upload takes seconds and holding
+  /// the whole form hostage to it is how a seller loses their typing.
+  ///
+  /// A new listing has nothing to upload to yet, so its photos ride along
+  /// with the form.
+  Future<void> _onPhotos(List<Shot> next) async {
+    final id = widget.existing?.serverId;
+    if (id == null) {
+      setState(() => _shots = next);
+      return;
+    }
+    setState(() {
+      _shots = next;
+      _savingPhotos = true;
+    });
+    try {
+      // Upload the new ones first, so the order can then be sent as a single
+      // list of URLs that the server already knows about.
+      var urls = [
+        for (final s in next)
+          if (!s.isNew) s.url!,
+      ];
+      final fresh = [
+        for (final s in next)
+          if (s.isNew) s.bytes!,
+      ];
+      if (fresh.isNotEmpty) {
+        final after = await Api.instance.addItemPhotos(id, fresh);
+        // The server appends, so whatever is new to it is what we just sent,
+        // in the order we sent it.
+        urls = [...urls, ...after.where((u) => !urls.contains(u))];
+      }
+      final saved = await Api.instance.setItemPhotos(id, urls);
+      widget.existing!.imageUrls = saved;
+      if (mounted) {
+        setState(() => _shots = [for (final u in saved) Shot.remote(u)]);
+      }
+    } catch (e) {
+      logApiFailure('item photos', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceFirst('ClientException: ', '')),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    }
+    if (mounted) setState(() => _savingPhotos = false);
+  }
 
   String? get _blocker {
     if (!_hasPhotos) return 'Add at least one photo';
@@ -211,7 +277,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           compareGroup: _group,
           attributes: attrs,
           stock: _stockValue!,
-          photos: _photos,
+          photos: _newPhotos,
         ),
       );
     } else {
@@ -225,7 +291,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         ..compareGroup = _group
         ..attributes = attrs
         ..stock = _stockValue!
-        ..photos = _photos;
+        ..photos = _newPhotos;
       Seller.instance.itemChanged(item);
     }
     Navigator.pop(context);
@@ -249,33 +315,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
                     SellerSection(
-                      title: 'Photos (${_photos.length + _savedPhotos.length})',
-                      hint: 'Add as many as you like — the first is the cover',
+                      title: 'Photos (${_shots.length})',
+                      hint: 'Drag to reorder — the first one is the cover',
                     ),
-                    // The ones already live, so an edit screen does not look
-                    // like a listing that lost its pictures. Anything picked
-                    // below is added to these, not swapped for them.
-                    if (_savedPhotos.isNotEmpty) ...[
-                      SizedBox(
-                        height: 74,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _savedPhotos.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 8),
-                          itemBuilder: (_, i) => ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: SizedBox(
-                              width: 74,
-                              child: NetImage(url: _savedPhotos[i]),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    PhotoStrip(
-                      photos: _photos,
-                      onChanged: (list) => setState(() => _photos = list),
+                    PhotoManager(
+                      shots: _shots,
+                      busy: _savingPhotos,
+                      onChanged: _onPhotos,
                     ),
                     const SizedBox(height: 22),
                     const SellerSection(title: 'Title'),

@@ -96,13 +96,12 @@ class Api {
   /// The written policies, newest text first from the server.
   Future<List<dynamic>> policies() => _getList('/api/policies');
 
-  Future<void> savePolicy(String slug, String title, String body) =>
-      _staffCall(
-        StaffSession.admin,
-        'PUT',
-        '/api/admin/policies/${Uri.encodeComponent(slug)}',
-        {'title': title, 'body': body},
-      );
+  Future<void> savePolicy(String slug, String title, String body) => _staffCall(
+    StaffSession.admin,
+    'PUT',
+    '/api/admin/policies/${Uri.encodeComponent(slug)}',
+    {'title': title, 'body': body},
+  );
 
   /// The shop's navigation: departments, each with its categories nested.
   Future<List<dynamic>> categories() => _getList('/api/categories');
@@ -795,11 +794,73 @@ class Api {
     );
   }
 
+  /// The whole ordered list of photos an item already has, which is how one
+  /// call covers both reordering and removing. Admin passes [asAdmin] to work
+  /// on somebody else's listing.
+  Future<List<String>> setItemPhotos(
+    String itemId,
+    List<String> imageUrls, {
+    bool asAdmin = false,
+  }) async {
+    final path = asAdmin
+        ? '/api/admin/items/$itemId/photos'
+        : '/api/seller/items/$itemId/photos';
+    final res = await http
+        .put(
+          _url(path),
+          headers: {
+            ...asAdmin ? _staffHeader(StaffSession.admin) : await _authHeader(),
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'imageUrls': imageUrls}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return ((jsonDecode(res.body) as Map<String, dynamic>)['imageUrls']
+            as List<dynamic>)
+        .cast<String>();
+  }
+
+  /// One store's stock, for an admin fixing its pictures.
+  Future<List<InventoryItem>> adminItems(String owner) async {
+    final body = await _staffCall(
+      StaffSession.admin,
+      'GET',
+      '/api/admin/items?owner=${Uri.encodeComponent(owner)}',
+    );
+    return (body['items'] as List<dynamic>? ?? const [])
+        .map((r) => _inventoryItem(r as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Extra photos for an item that already exists — the edit screen's path.
   Future<List<String>> addItemPhotos(
     String itemId,
-    List<Uint8List> photos,
-  ) async {
+    List<Uint8List> photos, {
+    bool asAdmin = false,
+  }) async {
+    if (asAdmin) {
+      final req = http.MultipartRequest(
+        'POST',
+        _url('/api/admin/items/$itemId/photos'),
+      )..headers.addAll(_staffHeader(StaffSession.admin));
+      for (var i = 0; i < photos.length; i++) {
+        req.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            photos[i],
+            filename: 'photo_${i + 1}.jpg',
+          ),
+        );
+      }
+      final res = await http.Response.fromStream(
+        await req.send().timeout(_uploadTimeout),
+      );
+      if (res.statusCode != 201) throw http.ClientException(_reason(res));
+      return ((jsonDecode(res.body) as Map<String, dynamic>)['imageUrls']
+              as List<dynamic>)
+          .cast<String>();
+    }
     final body = await _send(
       '/api/seller/items/$itemId/photos',
       const {},

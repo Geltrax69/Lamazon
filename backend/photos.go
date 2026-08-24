@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -70,10 +71,23 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "photo storage is not configured")
 		return
 	}
-	if _, ok := a.requireApprovedStore(w, r); !ok {
-		return
+	// A seller has to have an approved store; an admin is already past the
+	// admin token check and is not adding to a store of their own.
+	if !strings.HasPrefix(r.URL.Path, "/api/admin/") {
+		if _, ok := a.requireApprovedStore(w, r); !ok {
+			return
+		}
 	}
 	id := r.PathValue("id")
+	owner, err := a.itemOwner(r, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	// The folder comes from the store, the name from the item, so both have
 	// to exist before anything is uploaded — and the item has to be this
@@ -81,10 +95,10 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 	// their listing.
 	var storeName, title string
 	var existing int
-	err := a.db.sql.QueryRowContext(r.Context(), `
+	err = a.db.sql.QueryRowContext(r.Context(), `
 		SELECT s.name, i.title, cardinality(i.image_urls)
 		FROM inventory_items i JOIN seller_stores s ON s.owner = i.owner
-		WHERE i.id = $1 AND i.owner = $2`, id, a.owner(r)).
+		WHERE i.id = $1 AND i.owner = $2`, id, owner).
 		Scan(&storeName, &title, &existing)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
@@ -118,7 +132,7 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 	if err := a.db.sql.QueryRowContext(r.Context(), `
 		UPDATE inventory_items SET image_urls = image_urls || $2::text[]
 		WHERE id = $1 AND owner = $3
-		RETURNING array_to_string(image_urls, E'\n')`, id, urls, a.owner(r)).
+		RETURNING array_to_string(image_urls, E'\n')`, id, urls, owner).
 		Scan(&saved); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -126,4 +140,105 @@ func (a *API) handleItemPhotos(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"imageUrls": strings.Split(saved, "\n"),
 	})
+}
+
+// itemOwner resolves whose listing this is, and whether the caller may touch
+// it. A seller may only reach their own; an admin reaches any.
+//
+// The two routes differ by prefix, not by a flag in the body — a request
+// cannot claim to be an admin one, it either arrived on /api/admin/ behind
+// the admin token check or it did not.
+func (a *API) itemOwner(r *http.Request, id string) (string, error) {
+	if strings.HasPrefix(r.URL.Path, "/api/admin/") {
+		var owner string
+		err := a.db.sql.QueryRowContext(r.Context(),
+			`SELECT owner FROM inventory_items WHERE id = $1`, id).Scan(&owner)
+		return owner, err
+	}
+	return a.owner(r), nil
+}
+
+// orderPhotos works out the new list from the one the item has and the one the
+// client asked for.
+//
+// Only URLs already on the item survive. Without that check the body could
+// point a listing at any image on the internet, which is a defacement waiting
+// to happen and not something reordering needs. Duplicates are dropped too —
+// the same photo twice gives the gallery two identical pages with no way to
+// tell them apart.
+func orderPhotos(current, requested []string) ([]string, error) {
+	have := map[string]bool{}
+	for _, u := range current {
+		have[u] = true
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(requested))
+	for _, u := range requested {
+		u = strings.TrimSpace(u)
+		if !have[u] {
+			return nil, errors.New("that photo is not on this item")
+		}
+		if seen[u] {
+			continue
+		}
+		seen[u] = true
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+// PUT /api/seller/items/{id}/photos and the admin twin — the whole ordered
+// list, which is how one call covers reordering and removing at once.
+//
+// Only URLs the item already has are accepted. Without that check the body
+// could point a listing at any image on the internet, which is a defacement
+// waiting to happen and not something reordering needs.
+func (a *API) handleReorderItemPhotos(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ImageURLs []string `json:"imageUrls"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	id := r.PathValue("id")
+	owner, err := a.itemOwner(r, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var current string
+	err = a.db.sql.QueryRowContext(r.Context(), `
+		SELECT array_to_string(image_urls, E'\n') FROM inventory_items
+		WHERE id = $1 AND owner = $2`, id, owner).Scan(&current)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	out, err := orderPhotos(splitURLs(current), in.ImageURLs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var saved string
+	if err := a.db.sql.QueryRowContext(r.Context(), `
+		UPDATE inventory_items SET image_urls = $2::text[]
+		WHERE id = $1 AND owner = $3
+		RETURNING array_to_string(image_urls, E'\n')`, id, out, owner).
+		Scan(&saved); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"imageUrls": splitURLs(saved)})
 }
