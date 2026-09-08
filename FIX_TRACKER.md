@@ -45,7 +45,7 @@ successful deployment.
 ### Batch 1 — `3c3a51a`
 
 Pushed to `origin/web`. GitHub Actions **Deploy API succeeded** (run
-34276373488). Frontend hosting status has not yet been verified.
+34276373488). Vercel also reports a successful deployment for the later `9760655` batch.
 
 ### Batch 2 — `9760655` — authentication
 
@@ -61,7 +61,10 @@ Behind a reverse proxy, its 100-attempt budget is shared by that proxy's users.
 Per-account limits remain independent; trusted-proxy configuration needs a later
 infrastructure review. No existing rider PINs were rotated automatically.
 
-### Batch 3 — checkout accounting (review branch)
+### Batch 3 — `03c25f4` — checkout accounting
+
+Draft pull request: [#1](https://github.com/Geltrax69/Lamazon/pull/1),
+branch `codex/functionality-checkout`, targeting `web`.
 
 - New authenticated `POST /api/orders/checkout` submits all basket lines in one
   PostgreSQL transaction. Item locks use a stable order to avoid deadlocks.
@@ -73,13 +76,19 @@ infrastructure review. No existing rider PINs were rotated automatically.
 - Cart removal uses submitted item IDs and quantities, not product-name prefixes.
   Failed baskets remain intact; successful removal is persisted even after leaving
   the screen.
-- Verified: full Go race suite, all 60 Flutter tests, release web compilation.
+- Verified: full Go race suite, all 60 Flutter tests, release web compilation
+  and Android APK compilation. No new static-analysis findings.
   New integration tests check buyer/seller/rider totals, one delivery fee, missing
   items, stock shortages, duplicate lines, invalid quantities and stale prices.
 - **Rollout requirement:** old single-line clients lack a confirmed total and
   receive an update/reload message. Deploy the new mobile and web builds alongside
   this API change. This batch is kept off the live deployment branch until that
   rollout is ready; earlier batches are already on `web`.
+- Android build output: `frontend/build/app/outputs/flutter-apk/app-release.apk`.
+  The existing Gradle release configuration uses debug signing. This is a local
+  validation build, not a published app release; iOS build was not exercised.
+- Published batches cover API/web deployment. Existing installed apps do not
+  automatically receive these source changes through a push to `web`.
 - Follow-up: request idempotency for lost checkout responses, cross-device cart
   sync, grouped order presentation, and existing historic amount reconciliation
   remain open. No production orders or catalogue records were changed by tests.
