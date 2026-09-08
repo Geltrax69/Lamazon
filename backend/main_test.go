@@ -36,7 +36,7 @@ func testDB(t *testing.T) *DB {
 	if _, err := db.sql.Exec(
 		`TRUNCATE orders, inventory_items, seller_stores, login_codes,
 		  auth_sessions, push_subscriptions, addresses, users,
-		  admins, riders, staff_sessions CASCADE`); err != nil {
+		  admins, riders, staff_sessions, password_attempts CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	lastTestDB = db

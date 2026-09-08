@@ -341,7 +341,7 @@ func TestChangingARidersNumberTakesTheirWorkWithThem(t *testing.T) {
 		t.Fatalf("change number: want 200, got %d (%v)", code, moved["error"])
 	}
 	newPIN, _ := moved["pin"].(string)
-	if len(newPIN) != 4 || newPIN == oldPIN {
+	if len(newPIN) != 6 || newPIN == oldPIN {
 		t.Fatalf("a moved number should come with a fresh PIN, got %q", moved["pin"])
 	}
 
@@ -370,7 +370,7 @@ func TestChangingARidersNumberTakesTheirWorkWithThem(t *testing.T) {
 	_, reset := callAs(t, h, admin, http.MethodPost,
 		"/api/admin/riders/9333333333/pin", nil)
 	resetPIN, _ := reset["pin"].(string)
-	if resetPIN == newPIN || len(resetPIN) != 4 {
+	if resetPIN == newPIN || len(resetPIN) != 6 {
 		t.Fatal("a reset must issue a different PIN")
 	}
 	if code, _ := callAs(t, h, newToken, http.MethodGet, "/api/delivery/orders", nil); code != http.StatusUnauthorized {

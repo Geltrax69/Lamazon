@@ -137,6 +137,9 @@ func (a *API) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := strings.ToLower(strings.TrimSpace(in.Username))
+	if !a.allowPasswordAttempt(w, r, "admin", username) {
+		return
+	}
 
 	var hash string
 	err := a.db.sql.QueryRowContext(r.Context(),
@@ -151,6 +154,7 @@ func (a *API) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "wrong username or password")
 		return
 	}
+	a.clearPasswordAttempts(r.Context(), "admin", username)
 	token, err := a.db.newStaffSession(r.Context(), "admin", username)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -174,6 +178,9 @@ func (a *API) handleRiderLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	phone := normalisePhone(in.Phone)
+	if !a.allowPasswordAttempt(w, r, "rider", phone) {
+		return
+	}
 
 	var hash, name string
 	var active bool
@@ -193,6 +200,7 @@ func (a *API) handleRiderLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "this delivery account is switched off")
 		return
 	}
+	a.clearPasswordAttempts(r.Context(), "rider", phone)
 	token, err := a.db.newStaffSession(r.Context(), "rider", phone)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -730,7 +738,7 @@ func (a *API) handleChangeRiderNumber(w http.ResponseWriter, r *http.Request) {
 
 // newPIN is the four digits and the hash that outlives them.
 func newPIN() (pin, hash string, err error) {
-	pin, err = fourDigits()
+	pin, err = sixDigits()
 	if err != nil {
 		return "", "", err
 	}

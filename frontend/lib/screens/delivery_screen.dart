@@ -106,7 +106,7 @@ class _RiderLoginState extends State<_RiderLogin> {
                     keyboardType: TextInputType.number,
                     obscureText: true,
                     onSubmitted: (_) => _signIn(),
-                    decoration: _boxed('4-digit PIN'),
+                    decoration: _boxed('PIN from your admin'),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),

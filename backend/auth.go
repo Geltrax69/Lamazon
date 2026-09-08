@@ -306,6 +306,9 @@ func (a *API) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Email))
+	if !a.allowPasswordAttempt(w, r, "shopper", email) {
+		return
+	}
 
 	var stored string
 	err := a.db.sql.QueryRowContext(r.Context(),
@@ -317,6 +320,7 @@ func (a *API) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "wrong email or password")
 		return
 	}
+	a.clearPasswordAttempts(r.Context(), "shopper", email)
 	a.issueSession(w, r, email)
 }
 

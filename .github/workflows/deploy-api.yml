@@ -17,7 +17,22 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lamazon
+          POSTGRES_PASSWORD: lamazon
+          POSTGRES_DB: lamazon_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U lamazon -d lamazon_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
+      LAMAZON_TEST_URL: postgres://lamazon:lamazon@localhost:5433/lamazon_test?sslmode=disable
       HOST: root@46.62.157.163
       BIN: /var/www/Lamazon/bin/lamazon-api
       SVC: lamazon-api

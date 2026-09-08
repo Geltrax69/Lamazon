@@ -518,3 +518,11 @@ CREATE TABLE IF NOT EXISTS policies (
     body       TEXT        NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Password/PIN brute-force limits, shared by every API process.
+CREATE TABLE IF NOT EXISTS password_attempts (
+    key_hash TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL CHECK (attempts > 0),
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS password_attempts_expiry ON password_attempts(expires_at);
