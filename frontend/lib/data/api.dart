@@ -469,23 +469,27 @@ class Api {
 
   // ---- Buying ------------------------------------------------------------
 
-  /// Places one order against one stock line. [addressId] empty means the
-  /// default address; the backend copies it onto the order.
-  Future<MyOrder> placeOrder({
-    required String itemId,
-    int units = 1,
-    String addressId = '',
+  /// Atomic basket checkout. The server calculates prices and one delivery fee.
+  Future<List<MyOrder>> checkout({
+    required List<({String itemId, int qty})> lines,
+    required double expectedTotal,
+    required String addressId,
   }) async {
     final body = await _post(
-      '/api/orders',
+      '/api/orders/checkout',
       body: {
-        'itemId': itemId,
-        'units': units,
-        if (addressId.isNotEmpty) 'addressId': addressId,
+        'lines': [
+          for (final line in lines) {'itemId': line.itemId, 'units': line.qty},
+        ],
+        'addressId': addressId,
+        'expectedTotal': expectedTotal,
       },
       expect: 201,
     );
-    return MyOrder.fromJson(body);
+    return [
+      for (final row in body['orders'] as List)
+        MyOrder.fromJson(Map<String, dynamic>.from(row as Map)),
+    ];
   }
 
   /// The buyer's own orders, including the delivery code while one is live.

@@ -116,33 +116,19 @@ class MyOrders extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Places one order per line and returns what failed, so the cart can name
-  /// the item that could not be ordered instead of saying "something broke".
-  Future<List<String>> place(
-    List<({String itemId, String title, int qty})> lines, {
-    String addressId = '',
+  /// Commit the basket atomically. Failures propagate so the cart stays intact.
+  Future<void> place(
+    List<({String itemId, int qty})> lines, {
+    required String addressId,
+    required double expectedTotal,
   }) async {
-    final failed = <String>[];
-    for (final line in lines) {
-      try {
-        await Api.instance.placeOrder(
-          itemId: line.itemId,
-          units: line.qty,
-          addressId: addressId,
-        );
-      } catch (e) {
-        logApiFailure('place order', e);
-        failed.add('${line.title} — ${_reasonOf(e)}');
-      }
-    }
+    await Api.instance.checkout(
+      lines: lines,
+      addressId: addressId,
+      expectedTotal: expectedTotal,
+    );
     await load();
-    return failed;
   }
-
-  // ClientException prefixes its message; the server's sentence is the part
-  // worth showing.
-  String _reasonOf(Object e) =>
-      e.toString().replaceFirst('ClientException: ', '');
 
   void clear() {
     _orders.clear();

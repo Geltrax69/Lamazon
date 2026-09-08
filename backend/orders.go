@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -26,116 +28,161 @@ import (
 
 // orderColumns is the shape every handler here scans, in one place so the
 // column list and the Scan cannot drift apart.
-const orderColumns = `id, item_id, item_title, units, amount, stage, placed_at,
+const orderColumns = `id, item_id, item_title, units, amount, delivery_fee, stage, placed_at,
 	store_owner, store_name, receiver_name, receiver_phone, receiver_address,
 	reject_reason, rider_phone, assigned_to`
 
 func scanOrder(row interface{ Scan(...any) error }) (Order, error) {
 	var o Order
-	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName,
 		&o.ReceiverPhone, &o.ReceiverAddress, &o.RejectReason, &o.RiderPhone,
 		&o.AssignedTo)
 	return o, err
 }
 
-// POST /api/orders — a buyer orders against a stock line.
+const checkoutDeliveryFee = 15.0
+
+type checkoutLine struct {
+	ItemID string `json:"itemId"`
+	Units  int    `json:"units"`
+}
+
+// A legacy single-line request is still an order and includes its delivery fee.
 func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ItemID    string `json:"itemId"`
-		Units     int    `json:"units"`
-		AddressID string `json:"addressId"`
+		ItemID        string   `json:"itemId"`
+		Units         int      `json:"units"`
+		AddressID     string   `json:"addressId"`
+		ExpectedTotal *float64 `json:"expectedTotal"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		writeError(w, 400, "invalid JSON body")
 		return
 	}
-	if in.Units <= 0 {
+	if in.Units == 0 {
 		in.Units = 1
 	}
-	buyer := a.owner(r)
-
-	// Where it goes is settled before anything is written, and copied onto
-	// the order: the rider reads this, not the address book, so editing an
-	// address later cannot redirect a bag that is already out.
-	receiver, err := a.deliveryTarget(r.Context(), buyer, in.AddressID)
-	if err != nil {
-		writeError(w, http.StatusBadRequest,
-			"add a delivery address before ordering")
+	if in.ExpectedTotal == nil {
+		writeError(w, http.StatusConflict, "please update Lamazon or reload the website before ordering")
 		return
 	}
+	a.placeBasket(w, r, []checkoutLine{{in.ItemID, in.Units}}, in.AddressID, in.ExpectedTotal, true)
+}
 
-	// Check and insert inside one transaction, holding the item row. FOR
-	// UPDATE makes concurrent orders for the same item queue up, and because
-	// each statement takes a fresh snapshot, the reserved sum below sees
-	// whatever the previous holder committed. A single statement would not:
-	// its CTEs would all read the snapshot from before the lock was granted.
+// POST /api/orders/checkout commits every line or none, with one fee per basket.
+func (a *API) handleCheckout(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Lines         []checkoutLine `json:"lines"`
+		AddressID     string         `json:"addressId"`
+		ExpectedTotal *float64       `json:"expectedTotal"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, 400, "invalid JSON body")
+		return
+	}
+	if in.ExpectedTotal == nil {
+		writeError(w, 400, "expectedTotal is required")
+		return
+	}
+	a.placeBasket(w, r, in.Lines, in.AddressID, in.ExpectedTotal, false)
+}
+
+func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checkoutLine, addressID string, expected *float64, single bool) {
+	if len(lines) == 0 || len(lines) > 100 {
+		writeError(w, 400, "order between 1 and 100 items")
+		return
+	}
+	seen := map[string]bool{}
+	for _, line := range lines {
+		if line.ItemID == "" || line.Units < 1 || line.Units > 10000 || seen[line.ItemID] {
+			writeError(w, 400, "each item must appear once with a quantity between 1 and 10000")
+			return
+		}
+		seen[line.ItemID] = true
+	}
+	buyer := a.owner(r)
+	receiver, err := a.deliveryTarget(r.Context(), buyer, addressID)
+	if err != nil {
+		writeError(w, 400, "add a delivery address before ordering")
+		return
+	}
 	tx, err := a.db.sql.BeginTx(r.Context(), nil)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, 500, "could not place order")
 		return
 	}
-	defer tx.Rollback() //nolint:errcheck // no-op once committed
-
-	var title, storeOwner, storeName, status string
-	var price float64
-	var stock int
-	err = tx.QueryRowContext(r.Context(), `
-		SELECT i.title, i.price, i.stock, s.owner, s.name, s.status
-		FROM inventory_items i JOIN seller_stores s ON s.owner = i.owner
-		WHERE i.id = $1 FOR UPDATE OF i`, in.ItemID).
-		Scan(&title, &price, &stock, &storeOwner, &storeName, &status)
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "no item with id "+in.ItemID)
+	defer tx.Rollback()
+	// Deterministic locks prevent baskets with reversed item order deadlocking.
+	sort.Slice(lines, func(i, j int) bool { return lines[i].ItemID < lines[j].ItemID })
+	out := make([]Order, 0, len(lines))
+	total := 0.0
+	for i, line := range lines {
+		var title, storeOwner, storeName, status string
+		var price float64
+		var stock, reserved int
+		err = tx.QueryRowContext(r.Context(), `SELECT i.title,i.price,i.stock,s.owner,s.name,s.status
+   FROM inventory_items i JOIN seller_stores s ON s.owner=i.owner
+   WHERE i.id=$1 FOR UPDATE OF i`, line.ItemID).Scan(&title, &price, &stock, &storeOwner, &storeName, &status)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, 404, "an item is no longer available")
+			return
+		}
+		if err != nil {
+			writeError(w, 500, "could not check item availability")
+			return
+		}
+		if status != "approved" {
+			writeError(w, 409, "that store is not taking orders")
+			return
+		}
+		if err = tx.QueryRowContext(r.Context(), `SELECT COALESCE(sum(units),0) FROM orders
+   WHERE item_id=$1 AND stage NOT IN ('delivered','rejected')`, line.ItemID).Scan(&reserved); err != nil {
+			writeError(w, 500, "could not check stock")
+			return
+		}
+		if stock-reserved < line.Units {
+			writeError(w, 409, "not enough stock for "+title)
+			return
+		}
+		// Keep the fee in one fulfilment record so all rider collections add up
+		// exactly to the basket total, even when different riders carry its lines.
+		fee := 0.0
+		if i == 0 {
+			fee = checkoutDeliveryFee
+		}
+		amount := math.Round((price*float64(line.Units)+fee)*100) / 100
+		o, err := scanOrder(tx.QueryRowContext(r.Context(), `INSERT INTO orders
+   (item_id,item_title,units,amount,delivery_fee,stage,buyer_email,store_owner,store_name,
+    receiver_name,receiver_phone,receiver_address)
+   VALUES ($1,$2,$3,$4,$5,'received',$6,$7,$8,$9,$10,$11) RETURNING `+orderColumns,
+			line.ItemID, title, line.Units, amount, fee, buyer, storeOwner, storeName, receiver.Name, receiver.Phone, receiver.Line))
+		if err != nil {
+			log.Printf("checkout insert: %v", err)
+			writeError(w, 500, "could not place order")
+			return
+		}
+		out = append(out, o)
+		total += amount
+	}
+	total = math.Round(total*100) / 100
+	if expected != nil && math.Abs(*expected-total) > 0.005 {
+		writeError(w, 409, "prices have changed — remove and re-add the affected items before ordering")
 		return
 	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	if err = tx.Commit(); err != nil {
+		writeError(w, 500, "could not confirm order — check your orders before retrying")
 		return
 	}
-	if status != "approved" {
-		writeError(w, http.StatusConflict, "that store is not taking orders")
+	for _, o := range out {
+		a.notify(r.Context(), o.StoreOwner, fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
+			fmt.Sprintf("%s just received an order.\n\n%d × %s\nItems ₹%.2f + delivery ₹%.2f = total ₹%.2f\n\nOpen Lamazon to accept it.", o.StoreName, o.Units, o.ItemTitle, o.Amount-o.DeliveryFee, o.DeliveryFee, o.Amount))
+	}
+	if single {
+		writeJSON(w, 201, out[0])
 		return
 	}
-
-	// Orders that are still alive already claim units, so the fifth buyer of
-	// five units is the last one served. A rejected order gives its units back.
-	var reserved int
-	if err := tx.QueryRowContext(r.Context(), `
-		SELECT COALESCE(sum(units), 0) FROM orders
-		WHERE item_id = $1 AND stage NOT IN ('delivered', 'rejected')`,
-		in.ItemID).Scan(&reserved); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if stock-reserved < in.Units {
-		writeError(w, http.StatusConflict, "not enough stock")
-		return
-	}
-
-	o, err := scanOrder(tx.QueryRowContext(r.Context(), `
-		INSERT INTO orders (item_id, item_title, units, amount, stage, buyer_email,
-			store_owner, store_name, receiver_name, receiver_phone, receiver_address)
-		VALUES ($1,$2,$3,$4,'received',$5,$6,$7,$8,$9,$10)
-		RETURNING `+orderColumns,
-		in.ItemID, title, in.Units, price*float64(in.Units), buyer,
-		storeOwner, storeName, receiver.Name, receiver.Phone, receiver.Line))
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// The seller hears about it only once the order is committed, and a
-	// notification that fails never undoes a real order.
-	a.notify(r.Context(), storeOwner,
-		fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
-		fmt.Sprintf("%s just received an order.\n\n%d × %s\nTotal ₹%.0f\n\n"+
-			"Open Lamazon to accept it.", storeName, o.Units, o.ItemTitle, o.Amount))
-	writeJSON(w, http.StatusCreated, o)
+	writeJSON(w, 201, map[string]any{"orders": out, "amount": total, "deliveryFee": checkoutDeliveryFee})
 }
 
 // deliveryTarget picks the address this order is for: the one asked for, or
@@ -185,7 +232,7 @@ func (a *API) handleMyOrders(w http.ResponseWriter, r *http.Request) {
 	out := make([]Order, 0)
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount,
+		if err := rows.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee,
 			&o.Stage, &o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName,
 			&o.ReceiverPhone, &o.ReceiverAddress, &o.RejectReason, &o.RiderPhone,
 			&o.AssignedTo, &o.DeliveryCode); err != nil {
@@ -250,7 +297,7 @@ func (a *API) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
 		id, a.owner(r), code, rider)
 
 	var o Order
-	err = row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+	err = row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
 		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &o.AssignedTo, &buyer)
 	if !a.orderMoved(w, r, id, err) {
@@ -283,7 +330,7 @@ func (a *API) handleRejectOrder(w http.ResponseWriter, r *http.Request) {
 		RETURNING `+orderColumns+`, buyer_email`, id, a.owner(r), reason)
 
 	var o Order
-	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+	err := row.Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 		&o.PlacedAt, &o.StoreOwner, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
 		&o.ReceiverAddress, &o.RejectReason, &o.RiderPhone, &o.AssignedTo, &buyer)
 	if !a.orderMoved(w, r, id, err) {

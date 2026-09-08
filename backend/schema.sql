@@ -526,3 +526,6 @@ CREATE TABLE IF NOT EXISTS password_attempts (
     expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS password_attempts_expiry ON password_attempts(expires_at);
+
+-- Historical orders retain their recorded total; never invent old charges.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (delivery_fee >= 0);

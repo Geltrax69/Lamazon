@@ -367,15 +367,15 @@ func TestSellerLifecycle(t *testing.T) {
 
 	// Ordering more than exists is refused.
 	if code, _ := call(t, h, http.MethodPost, "/api/seller/orders",
-		map[string]any{"itemId": id, "units": 99}); code != http.StatusConflict {
+		map[string]any{"itemId": id, "units": 99, "expectedTotal": 5955}); code != http.StatusConflict {
 		t.Fatalf("oversized order: want 409, got %d", code)
 	}
 
 	_, order := call(t, h, http.MethodPost, "/api/seller/orders",
-		map[string]any{"itemId": id, "units": 2})
+		map[string]any{"itemId": id, "units": 2, "expectedTotal": 135})
 	orderID := order["id"].(string)
-	if order["amount"].(float64) != 120 {
-		t.Fatalf("2 x 60 should be 120, got %v", order["amount"])
+	if order["amount"].(float64) != 135 {
+		t.Fatalf("2 x 60 plus delivery should be 135, got %v", order["amount"])
 	}
 
 	// Accepting reserves; delivering is what removes the units.
@@ -442,7 +442,7 @@ func TestConcurrentOrdersCannotOversell(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			code, _ := call(t, h, http.MethodPost, "/api/seller/orders",
-				map[string]any{"itemId": id, "units": 1})
+				map[string]any{"itemId": id, "units": 1, "expectedTotal": 35})
 			created <- code == http.StatusCreated
 		}()
 	}

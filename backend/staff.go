@@ -877,7 +877,7 @@ func (d *DB) pickRider(ctx context.Context) (string, error) {
 func (a *API) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
 	rows, err := a.db.sql.QueryContext(r.Context(), `
-		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		SELECT o.id, o.item_title, o.units, o.amount, o.delivery_fee, o.stage, o.placed_at,
 		       o.store_name, o.receiver_name, o.receiver_phone,
 		       o.receiver_address, o.rider_phone, o.assigned_to, o.buyer_email
 		FROM orders o
@@ -892,7 +892,7 @@ func (a *API) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	out := make([]Order, 0)
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 			&o.PlacedAt, &o.StoreName, &o.ReceiverName, &o.ReceiverPhone,
 			&o.ReceiverAddress, &o.RiderPhone, &o.AssignedTo, &o.BuyerEmail); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -972,7 +972,7 @@ func (a *API) handleAssignOrder(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 	phone := a.staffOf(r)
 	rows, err := a.db.sql.QueryContext(r.Context(), `
-		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		SELECT o.id, o.item_title, o.units, o.amount, o.delivery_fee, o.stage, o.placed_at,
 		       o.store_name,
 		       -- LEFT JOIN: a store deleted out from under an order in flight
 		       -- still leaves a rider holding it, and a card with no pickup
@@ -997,7 +997,7 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 	out := make([]Order, 0)
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 			&o.PlacedAt, &o.StoreName, &o.StoreAddress, &o.ReceiverName,
 			&o.ReceiverPhone, &o.ReceiverAddress, &o.RiderPhone,
 			&o.AssignedTo); err != nil {
@@ -1026,7 +1026,7 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleRiderHistory(w http.ResponseWriter, r *http.Request) {
 	phone := a.staffOf(r)
 	rows, err := a.db.sql.QueryContext(r.Context(), `
-		SELECT o.id, o.item_title, o.units, o.amount, o.stage, o.placed_at,
+		SELECT o.id, o.item_title, o.units, o.amount, o.delivery_fee, o.stage, o.placed_at,
 		       o.store_name,
 		       trim(both ', ' FROM concat_ws(', ', s.location, s.city)),
 		       o.receiver_name, o.receiver_phone, o.receiver_address,
@@ -1048,7 +1048,7 @@ func (a *API) handleRiderHistory(w http.ResponseWriter, r *http.Request) {
 	var earned float64
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+		if err := rows.Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 			&o.PlacedAt, &o.StoreName, &o.StoreAddress, &o.ReceiverName,
 			&o.ReceiverPhone, &o.ReceiverAddress, &o.DeliveredAt); err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -1089,11 +1089,11 @@ func (a *API) handleRiderPick(w http.ResponseWriter, r *http.Request) {
 		UPDATE orders SET stage = 'picked', rider_phone = $2, picked_at = now()
 		WHERE id = $1 AND stage = 'accepted' AND rider_phone = ''
 		  AND (assigned_to = '' OR assigned_to = $2)
-		RETURNING id, item_title, units, amount, stage, placed_at, store_name,
+		RETURNING id, item_title, units, amount, delivery_fee, stage, placed_at, store_name,
 		          receiver_name, receiver_phone, receiver_address, buyer_email,
 		          assigned_to`,
 		id, phone).
-		Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage, &o.PlacedAt,
+		Scan(&o.ID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage, &o.PlacedAt,
 			&o.StoreName, &o.ReceiverName, &o.ReceiverPhone, &o.ReceiverAddress,
 			&o.BuyerEmail, &o.AssignedTo)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -1161,10 +1161,10 @@ func (a *API) handleRiderDeliver(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRowContext(r.Context(), `
 		UPDATE orders SET stage = 'delivered', delivered_at = now()
 		WHERE id = $1 AND stage = 'picked' AND rider_phone = $2 AND delivery_code = $3
-		RETURNING id, item_id, item_title, units, amount, stage, placed_at,
+		RETURNING id, item_id, item_title, units, amount, delivery_fee, stage, placed_at,
 		          store_name, store_owner, buyer_email`,
 		id, phone, strings.TrimSpace(in.Code)).
-		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.Stage,
+		Scan(&o.ID, &o.ItemID, &o.ItemTitle, &o.Units, &o.Amount, &o.DeliveryFee, &o.Stage,
 			&o.PlacedAt, &o.StoreName, &o.StoreOwner, &o.BuyerEmail)
 	if errors.Is(err, sql.ErrNoRows) {
 		a.explainFailedDelivery(w, r, id, phone)

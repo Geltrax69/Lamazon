@@ -1,0 +1,87 @@
+package main
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestBasketCheckoutOneFeeAndMatchingViews(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{"name": "Basket Store", "location": "Block 32", "city": "LPU", "categories": []string{"Food"}})
+	somewhereToDeliver(t, h)
+	_, first := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})
+	_, second := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Drink", "price": 30, "stock": 10})
+	code, body := call(t, h, http.MethodPost, "/api/orders/checkout", map[string]any{
+		"lines": []map[string]any{{"itemId": first["id"], "units": 1}, {"itemId": second["id"], "units": 2}}, "expectedTotal": 144,
+	})
+	if code != 201 {
+		t.Fatalf("checkout: %d %v", code, body)
+	}
+	if body["amount"] != float64(144) || body["deliveryFee"] != float64(15) {
+		t.Fatalf("incorrect totals: %v", body)
+	}
+	checkTotals := func(rows []any) {
+		t.Helper()
+		var amount, fee float64
+		for _, row := range rows {
+			o := row.(map[string]any)
+			amount += o["amount"].(float64)
+			fee += o["deliveryFee"].(float64)
+		}
+		if len(rows) != 2 || amount != 144 || fee != 15 {
+			t.Fatalf("inconsistent view: count=%d amount=%v fee=%v", len(rows), amount, fee)
+		}
+	}
+	checkTotals(body["orders"].([]any))
+	_, mine := call(t, h, http.MethodGet, "/api/orders", nil)
+	checkTotals(mine["orders"].([]any))
+	_, seller := call(t, h, http.MethodGet, "/api/seller/orders", nil)
+	checkTotals(seller["orders"].([]any))
+	admin := adminSignIn(t, h)
+	pin := addRider(t, h, admin, "9876543210")
+	_, login := callAs(t, h, "", http.MethodPost, "/api/delivery/login", map[string]string{"phone": "9876543210", "pin": pin})
+	for _, row := range body["orders"].([]any) {
+		id := row.(map[string]any)["id"].(string)
+		if code, body := call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil); code != 200 {
+			t.Fatalf("accept: %d %v", code, body)
+		}
+	}
+	rider := callAs2(t, h, login["token"].(string), "/api/delivery/orders")
+	checkTotals(rider["orders"].([]any))
+}
+
+func TestBasketCheckoutRollsBackEveryLine(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"}})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})
+	for _, tc := range []struct {
+		name   string
+		lines  []map[string]any
+		total  float64
+		status int
+	}{
+		{"missing line", []map[string]any{{"itemId": item["id"], "units": 1}, {"itemId": "zz-missing", "units": 1}}, 84, 404},
+		{"price mismatch", []map[string]any{{"itemId": item["id"], "units": 1}}, 69, 409},
+		{"oversell", []map[string]any{{"itemId": item["id"], "units": 11}}, 774, 409},
+		{"duplicate", []map[string]any{{"itemId": item["id"], "units": 1}, {"itemId": item["id"], "units": 1}}, 153, 400},
+		{"invalid quantity", []map[string]any{{"itemId": item["id"], "units": -1}}, 84, 400},
+		{"empty", []map[string]any{}, 15, 400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, body := call(t, h, http.MethodPost, "/api/orders/checkout", map[string]any{"lines": tc.lines, "expectedTotal": tc.total})
+			if code != tc.status {
+				t.Fatalf("got %d %v", code, body)
+			}
+			_, mine := call(t, h, http.MethodGet, "/api/orders", nil)
+			if len(mine["orders"].([]any)) != 0 {
+				t.Fatal("failed basket created a partial order")
+			}
+		})
+	}
+	// Old builds cannot silently accumulate a fee on every basket line.
+	code, _ := call(t, h, http.MethodPost, "/api/orders", map[string]any{"itemId": item["id"], "units": 1})
+	if code != 409 {
+		t.Fatalf("unconfirmed legacy checkout: %d", code)
+	}
+}

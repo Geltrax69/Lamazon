@@ -111,13 +111,14 @@ const (
 // the address book — editing an address later must not redirect a bag that is
 // already out.
 type Order struct {
-	ID        string     `json:"id"`
-	ItemID    string     `json:"itemId"`
-	ItemTitle string     `json:"itemTitle"`
-	Units     int        `json:"units"`
-	Amount    float64    `json:"amount"`
-	Stage     OrderStage `json:"stage"`
-	PlacedAt  time.Time  `json:"placedAt"`
+	ID          string     `json:"id"`
+	ItemID      string     `json:"itemId"`
+	ItemTitle   string     `json:"itemTitle"`
+	Units       int        `json:"units"`
+	Amount      float64    `json:"amount"`
+	DeliveryFee float64    `json:"deliveryFee"`
+	Stage       OrderStage `json:"stage"`
+	PlacedAt    time.Time  `json:"placedAt"`
 
 	StoreOwner string `json:"storeOwner,omitempty"`
 	StoreName  string `json:"storeName,omitempty"`

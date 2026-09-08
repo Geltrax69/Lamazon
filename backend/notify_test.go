@@ -108,7 +108,7 @@ func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 	}
 
 	if code, _ := call(t, h, http.MethodPost, "/api/seller/orders",
-		map[string]any{"itemId": item["id"], "units": 2}); code != http.StatusCreated {
+		map[string]any{"itemId": item["id"], "units": 2, "expectedTotal": item["price"].(float64)*2 + 15}); code != http.StatusCreated {
 		t.Fatalf("place order: want 201, got %d", code)
 	}
 
@@ -143,7 +143,7 @@ func TestEmailStillSendsWithoutPush(t *testing.T) {
 	sent.count = 0 // the sign-in code and the approval notice do not count here
 
 	call(t, h, http.MethodPost, "/api/seller/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	if sent.count != 1 {
 		t.Fatalf("email should still go out with push off, got %d", sent.count)
 	}

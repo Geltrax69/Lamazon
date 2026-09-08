@@ -128,7 +128,7 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 		map[string]any{"title": "Cold Coffee", "category": "Food", "price": 60, "stock": 10})
 
 	code, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 2})
+		map[string]any{"itemId": item["id"], "units": 2, "expectedTotal": item["price"].(float64)*2 + 15})
 	if code != http.StatusCreated {
 		t.Fatalf("place order: want 201, got %d (%v)", code, order["error"])
 	}
@@ -246,7 +246,7 @@ func TestARiderCanBeSwitchedOffAndBackOnOrRemoved(t *testing.T) {
 		t.Fatalf("a switched-off rider should not sign in, got %d", code)
 	}
 	_, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	id := order["id"].(string)
 	_, accepted := call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
 	if accepted["assignedTo"] != nil {
@@ -276,7 +276,7 @@ func TestARiderCanBeSwitchedOffAndBackOnOrRemoved(t *testing.T) {
 
 	// Hands empty, and an order merely assigned goes back to the pool.
 	_, second := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	secondID := second["id"].(string)
 	call(t, h, http.MethodPost, "/api/seller/orders/"+secondID+"/accept", nil)
 	callAs(t, h, token, http.MethodPost, "/api/delivery/orders/"+id+"/deliver",
@@ -321,7 +321,7 @@ func TestChangingARidersNumberTakesTheirWorkWithThem(t *testing.T) {
 	oldToken := login["token"].(string)
 
 	_, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	id := order["id"].(string)
 	call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
 	callAs(t, h, oldToken, http.MethodPost, "/api/delivery/orders/"+id+"/pick", nil)
@@ -408,7 +408,7 @@ func TestAcceptingAnOrderHandsItToARider(t *testing.T) {
 	seen := map[string]int{}
 	for range 6 {
 		_, order := call(t, h, http.MethodPost, "/api/orders",
-			map[string]any{"itemId": item["id"], "units": 1})
+			map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 		id := order["id"].(string)
 		_, accepted := call(t, h, http.MethodPost,
 			"/api/seller/orders/"+id+"/accept", nil)
@@ -452,7 +452,7 @@ func TestAssignedOrdersGoToThatRiderOnly(t *testing.T) {
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 10})
 	_, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	id := order["id"].(string)
 
 	admin := adminSignIn(t, h)
@@ -513,10 +513,10 @@ func TestRejectingAnOrderFreesTheStock(t *testing.T) {
 		map[string]any{"title": "Samosa", "price": 20, "stock": 1})
 
 	_, first := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	// The one unit is spoken for.
 	if code, _ := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1}); code != http.StatusConflict {
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15}); code != http.StatusConflict {
 		t.Fatalf("second order on one unit: want 409, got %d", code)
 	}
 
@@ -528,7 +528,7 @@ func TestRejectingAnOrderFreesTheStock(t *testing.T) {
 		map[string]string{"reason": "Kitchen closed"})
 
 	if code, body := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1}); code != http.StatusCreated {
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15}); code != http.StatusCreated {
 		t.Fatalf("a rejected order should free its unit: got %d (%v)", code, body["error"])
 	}
 	for _, o := range callAs2(t, h, testToken, "/api/orders")["orders"].([]any) {
@@ -550,7 +550,7 @@ func TestOneSellerCannotMoveAnothersOrder(t *testing.T) {
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Coffee", "price": 60, "stock": 5})
 	_, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1})
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 
 	// A second, unrelated seller.
 	intruder := signIn(t, lastTestDB, "someone.else@lpu.in")

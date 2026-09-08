@@ -358,37 +358,40 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       return;
     }
 
+    // Snapshot the submitted quantities: edits while the request is running
+    // must neither place extra items nor remove newly added quantities.
+    final lines = [
+      for (final line in cart.items) (itemId: line.product.id, qty: line.qty),
+    ];
+    final expectedTotal = cart.total;
+    if (lines.isEmpty) return;
     setState(() => _placing = true);
-    final failures = await MyOrders.instance.place([
-      for (final line in cart.items)
-        (itemId: line.product.id, title: line.product.name, qty: line.qty),
-    ], addressId: address.id);
-    if (!mounted) return;
-    setState(() => _placing = false);
-
-    // Whatever went through is a real order and the cart must not keep it.
-    final placed = cart.items.length - failures.length;
-    if (placed > 0) {
-      for (final line in [...cart.items]) {
-        if (!failures.any((f) => f.startsWith(line.product.name))) {
-          cart.remove(line.product.id);
+    try {
+      await MyOrders.instance.place(
+        lines,
+        addressId: address.id,
+        expectedTotal: expectedTotal,
+      );
+      for (final line in lines) {
+        final remaining = cart.items
+            .where((item) => item.product.id == line.itemId)
+            .firstOrNull;
+        if (remaining != null) {
+          cart.setQty(line.itemId, remaining.qty - line.qty);
         }
       }
-    }
-    if (failures.isEmpty) {
+      await cart.savedToStorage;
+      if (!mounted) return;
       _say('Order placed. The shop will accept it in a moment.');
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const OrdersScreen()),
       );
-      return;
+    } catch (e) {
+      if (mounted) _say(e.toString().replaceFirst('ClientException: ', ''));
+    } finally {
+      if (mounted) setState(() => _placing = false);
     }
-    _say(
-      failures.length == 1
-          ? failures.first
-          : '${failures.length} items could not be ordered: '
-                '${failures.join('; ')}',
-    );
   }
 
   void _say(String message) {
