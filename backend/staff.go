@@ -1213,7 +1213,7 @@ func (a *API) explainFailedDelivery(w http.ResponseWriter, r *http.Request, id, 
 		writeError(w, http.StatusConflict, "pick the order up first")
 	default:
 		log.Printf("order %s: wrong delivery code from rider %s", id, phone)
-		writeError(w, http.StatusUnauthorized,
+		writeError(w, http.StatusBadRequest,
 			"wrong code — ask the customer to read it out again")
 	}
 }

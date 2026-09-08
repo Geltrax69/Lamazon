@@ -40,6 +40,51 @@ class Product {
     this.attributes = const {},
   });
 
+  /// Local basket snapshot. Checkout still uses authoritative server prices.
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'category': category,
+    'tab': tab,
+    'price': price,
+    'mrp': mrp,
+    'imageUrl': imageUrl,
+    'store': store,
+    'description': description,
+    'sizes': sizes,
+    'extraImages': extraImages,
+    'offers': [
+      for (final o in offers) {'store': o.store, 'price': o.price},
+    ],
+    'options': [for (final o in options) o.toJson()],
+    'compareGroup': compareGroup,
+    'attributes': attributes,
+  };
+
+  factory Product.fromJson(Map<String, dynamic> r) => Product(
+    id: r['id'] as String,
+    name: r['name'] as String,
+    category: r['category'] as String,
+    tab: r['tab'] as String,
+    price: (r['price'] as num).toDouble(),
+    mrp: (r['mrp'] as num).toDouble(),
+    imageUrl: r['imageUrl'] as String,
+    store: r['store'] as String,
+    description: r['description'] as String,
+    sizes: (r['sizes'] as List).cast<String>(),
+    extraImages: (r['extraImages'] as List).cast<String>(),
+    offers: [
+      for (final o in r['offers'] as List)
+        ShopOffer(o['store'] as String, (o['price'] as num).toDouble()),
+    ],
+    options: [
+      for (final o in r['options'] as List)
+        ItemOption.fromJson(Map<String, dynamic>.from(o as Map)),
+    ],
+    compareGroup: r['compareGroup'] as String,
+    attributes: Map<String, String>.from(r['attributes'] as Map),
+  );
+
   /// True only when there is a real saving to show. An MRP equal to the price
   /// is a sale the seller has ended, not a 0% one worth a badge.
   bool get discounted => mrp > price;

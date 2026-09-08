@@ -1,3 +1,4 @@
+import 'policy_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -121,12 +122,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _Link(
                           icon: LucideIcons.shield,
                           title: 'Privacy policy',
-                          onTap: () => _soon(context, 'Privacy policy'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const PolicyScreen(slug: 'privacy'),
+                            ),
+                          ),
                         ),
                         _Link(
                           icon: LucideIcons.fileText,
                           title: 'Terms of service',
-                          onTap: () => _soon(context, 'Terms of service'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => const PolicyScreen(slug: 'terms'),
+                            ),
+                          ),
                         ),
                         const _Link(
                           icon: LucideIcons.info,

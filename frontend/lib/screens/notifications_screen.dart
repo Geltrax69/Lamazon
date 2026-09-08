@@ -26,48 +26,9 @@ class AppNotification {
   });
 }
 
-// ponytail: top-level list so read state survives navigation. Swap for a
-// server feed later; only this list changes.
-final notifications = [
-  AppNotification(
-    icon: LucideIcons.truck,
-    color: const Color(0xFF43A047),
-    title: 'Order out for delivery',
-    body: 'Your order #LMZ-2481 arrives in about 12 mins.',
-    time: '2m ago',
-  ),
-  AppNotification(
-    icon: LucideIcons.tag,
-    color: const Color(0xFFEF6C00),
-    title: '40% off at Velora Store',
-    body: 'Trending fashion picks are discounted till midnight.',
-    time: '1h ago',
-  ),
-  AppNotification(
-    icon: LucideIcons.wallet,
-    color: const Color(0xFF1E88E5),
-    title: 'Payment successful',
-    body: '₹1,299 paid for order #LMZ-2475.',
-    time: '5h ago',
-    read: true,
-  ),
-  AppNotification(
-    icon: LucideIcons.heart,
-    color: const Color(0xFFD81B60),
-    title: 'Back in stock',
-    body: 'An item on your wishlist is available again.',
-    time: 'Yesterday',
-    read: true,
-  ),
-  AppNotification(
-    icon: LucideIcons.star,
-    color: const Color(0xFFA6D544),
-    title: 'Rate your last order',
-    body: 'Tell us how Spice Kitchen did.',
-    time: '2d ago',
-    read: true,
-  ),
-];
+// No notification history is stored by the API yet. Never invent order or
+// payment events; use the existing empty state until a real feed is available.
+final notifications = <AppNotification>[];
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});

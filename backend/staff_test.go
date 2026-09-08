@@ -200,8 +200,8 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 		wrong = "1111"
 	}
 	if code, _ := callAs(t, h, riderToken, http.MethodPost,
-		"/api/delivery/orders/"+id+"/deliver", map[string]string{"code": wrong}); code != http.StatusUnauthorized {
-		t.Fatalf("wrong code: want 401, got %d", code)
+		"/api/delivery/orders/"+id+"/deliver", map[string]string{"code": wrong}); code != http.StatusBadRequest {
+		t.Fatalf("wrong code: want 400, got %d", code)
 	}
 	_, stock := call(t, h, http.MethodGet, "/api/seller/items", nil)
 	if got := stock["items"].([]any)[0].(map[string]any)["stock"].(float64); got != 10 {
