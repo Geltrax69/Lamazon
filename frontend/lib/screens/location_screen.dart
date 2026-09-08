@@ -15,7 +15,8 @@ class LocationScreen extends StatefulWidget {
   /// Pre-filled when we arrive from a confirmed device location: the city is
   /// already known, so only the parts GPS cannot tell us are left to type.
   final String? city;
-  const LocationScreen({super.key, this.city});
+  final Address? address;
+  const LocationScreen({super.key, this.city, this.address});
 
   @override
   State<LocationScreen> createState() => _LocationScreenState();
@@ -25,6 +26,15 @@ class _LocationScreenState extends State<LocationScreen> {
   @override
   void initState() {
     super.initState();
+    final address = widget.address;
+    if (address != null) {
+      _name.text = address.name;
+      _phone.text = address.phone;
+      _line.text = address.line;
+      _city.text = address.city;
+      _label = address.label;
+      _checked = true;
+    }
     if (widget.city != null) _city.text = widget.city!;
   }
 
@@ -38,6 +48,7 @@ class _LocationScreenState extends State<LocationScreen> {
   final _city = TextEditingController(text: serviceableCities.first);
   AddressLabel _label = AddressLabel.home;
   bool _checked = false;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -54,14 +65,16 @@ class _LocationScreenState extends State<LocationScreen> {
   /// two are required rather than optional extras.
   bool get _complete =>
       _name.text.trim().isNotEmpty &&
-      _phone.text.trim().length >= 10 &&
+      RegExp(r'^(?:\+91[ -]?)?[6-9][0-9]{9}$').hasMatch(_phone.text.trim()) &&
       _line.text.trim().isNotEmpty &&
       _city.text.trim().isNotEmpty;
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
     final a = Address(
       // A placeholder only until the server answers with the real one.
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.address?.id ?? '',
       label: _label,
       line: _line.text.trim(),
       city: _city.text.trim(),
@@ -71,9 +84,27 @@ class _LocationScreenState extends State<LocationScreen> {
       name: _name.text.trim(),
       phone: _phone.text.trim(),
     );
-    AddressBook.instance.add(a);
+    try {
+      if (widget.address == null) {
+        await AddressBook.instance.add(a);
+      } else {
+        await AddressBook.instance.edit(a);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('ClientException: ', '')),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
-    ScaffoldMessenger.of(context)
+    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
@@ -238,7 +269,7 @@ class _LocationScreenState extends State<LocationScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: GestureDetector(
-                  onTap: !_complete
+                  onTap: _saving || !_complete
                       ? null
                       : _checked && _serviceable
                       ? _save

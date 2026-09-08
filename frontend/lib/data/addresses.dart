@@ -21,6 +21,7 @@ class Address {
   final String city;
   final String pincode;
   final String name; // who the delivery is for
+  final bool isDefault;
   final String phone; // and how the porter reaches them
 
   const Address({
@@ -31,6 +32,7 @@ class Address {
     required this.pincode,
     this.name = '',
     this.phone = '',
+    this.isDefault = false,
   });
 
   factory Address.fromJson(Map<String, dynamic> r) => Address(
@@ -45,6 +47,7 @@ class Address {
     pincode: r['pincode'] as String? ?? '',
     name: r['name'] as String? ?? '',
     phone: r['phone'] as String? ?? '',
+    isDefault: r['isDefault'] == true,
   );
 
   String get full => '$line, $city $pincode';
@@ -99,10 +102,10 @@ class AddressBook extends ChangeNotifier {
       _addresses
         ..clear()
         ..addAll(list);
-      if (_addresses.isNotEmpty &&
-          !_addresses.any((a) => a.id == _selectedId)) {
-        _selectedId = _addresses.first.id;
-      }
+      _selectedId =
+          list.where((a) => a.isDefault).firstOrNull?.id ??
+          list.firstOrNull?.id ??
+          '';
       notifyListeners();
     } catch (e) {
       logApiFailure('addresses', e);
@@ -132,34 +135,33 @@ class AddressBook extends ChangeNotifier {
   Address? get selected =>
       _addresses.where((a) => a.id == _selectedId).firstOrNull;
 
-  /// Saves to the server and keeps the id it hands back, so the address is
-  /// the same row on every device. Falls back to local-only when offline.
+  /// Do not create a local address when the server refuses it.
   Future<void> add(Address a) async {
-    try {
-      final saved = await Api.instance.addAddress(a);
-      _addresses.add(saved);
-      _selectedId = saved.id;
-    } catch (e) {
-      logApiFailure('save address', e);
-      _addresses.add(a);
-      _selectedId = a.id;
-    }
+    final saved = await Api.instance.addAddress(a);
+    _addresses.add(saved);
+    _selectedId = saved.id;
+    notifyListeners();
+    await load();
+  }
+
+  Future<void> edit(Address a) async {
+    final saved = await Api.instance.editAddress(a);
+    final index = _addresses.indexWhere((row) => row.id == a.id);
+    if (index >= 0) _addresses[index] = saved;
     notifyListeners();
   }
 
-  void select(String id) {
+  Future<void> select(String id) async {
+    await Api.instance.selectAddress(id);
     _selectedId = id;
     notifyListeners();
   }
 
-  void remove(String id) {
-    Api.instance
-        .deleteAddress(id)
-        .catchError((e) => logApiFailure('delete address', e));
+  Future<void> remove(String id) async {
+    await Api.instance.deleteAddress(id);
     _addresses.removeWhere((a) => a.id == id);
-    if (_selectedId == id && _addresses.isNotEmpty) {
-      _selectedId = _addresses.first.id;
-    }
+    if (_selectedId == id) _selectedId = _addresses.firstOrNull?.id ?? '';
     notifyListeners();
+    await load();
   }
 }

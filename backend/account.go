@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -92,6 +94,21 @@ func (a *API) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
+	}
+	if in.Name != nil {
+		*in.Name = strings.TrimSpace(*in.Name)
+		if err := textLimit(*in.Name, "name", 100, true); err != nil {
+			writeError(w, 400, err.Error())
+			return
+		}
+	}
+	if in.Phone != nil {
+		*in.Phone = strings.TrimSpace(*in.Phone)
+		if !indianPhone.MatchString(*in.Phone) {
+			writeError(w, 400, "enter a valid 10-digit Indian mobile number")
+			return
+		}
+		*in.Phone = normalisePhone(*in.Phone)
 	}
 	email := a.owner(r)
 	if _, err := a.db.upsertUser(r.Context(), email); err != nil {
@@ -183,6 +200,10 @@ func (a *API) handleAddAddress(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	if err := validateAddress(&in); err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
 	in.Line = strings.TrimSpace(in.Line)
 	in.Name = strings.TrimSpace(in.Name)
 	in.Phone = strings.TrimSpace(in.Phone)
@@ -201,6 +222,20 @@ func (a *API) handleAddAddress(w http.ResponseWriter, r *http.Request) {
 		in.Label = "Home"
 	}
 
+	if id := r.PathValue("id"); id != "" {
+		err := a.db.sql.QueryRowContext(r.Context(), `UPDATE addresses SET label=$3,line=$4,city=$5,pincode=$6,name=$7,phone=$8
+   WHERE id=$1 AND email=$2 RETURNING id,is_default`, id, a.owner(r), in.Label, in.Line, in.City, in.Pincode, in.Name, in.Phone).Scan(&in.ID, &in.Default)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, 404, "address not found")
+			return
+		}
+		if err != nil {
+			writeError(w, 500, "could not save address")
+			return
+		}
+		writeJSON(w, 200, in)
+		return
+	}
 	email := a.owner(r)
 	if _, err := a.db.upsertUser(r.Context(), email); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -214,6 +249,11 @@ func (a *API) handleAddAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
+	// Serialize every address mutation for this owner, including the first save.
+	if _, err := tx.ExecContext(r.Context(), `SELECT 1 FROM users WHERE email=$1 FOR UPDATE`, email); err != nil {
+		writeError(w, 500, "could not save address")
+		return
+	}
 	// Exactly one default: promoting this one demotes the rest in the same
 	// transaction, so a reader never sees two or none.
 	var makeDefault bool
@@ -261,24 +301,54 @@ func (a *API) handleAddAddress(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/addresses/{id} — scoped to the owner, so an id from someone
 // else's book matches nothing.
 func (a *API) handleDeleteAddress(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	res, err := a.db.sql.ExecContext(r.Context(),
-		`DELETE FROM addresses WHERE id = $1 AND email = $2`, id, a.owner(r))
+	a.mutateAddress(w, r, true)
+}
+
+// PATCH /api/addresses/{id}/default — the selected destination is shared across devices.
+func (a *API) handleDefaultAddress(w http.ResponseWriter, r *http.Request) {
+	a.mutateAddress(w, r, false)
+}
+
+func (a *API) mutateAddress(w http.ResponseWriter, r *http.Request, remove bool) {
+	email, id := a.owner(r), r.PathValue("id")
+	tx, err := a.db.sql.BeginTx(r.Context(), nil)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, 500, "could not update address")
 		return
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		writeError(w, http.StatusNotFound, "no address with id "+id)
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(r.Context(), `SELECT 1 FROM users WHERE email=$1 FOR UPDATE`, email); err != nil {
+		writeError(w, 500, "could not update address")
 		return
 	}
-	// Losing the default leaves the book without one; the oldest takes over.
-	a.db.sql.ExecContext(r.Context(), `
-		UPDATE addresses SET is_default = true
-		WHERE id = (SELECT id FROM addresses WHERE email = $1
-		            AND NOT EXISTS (SELECT 1 FROM addresses
-		                            WHERE email = $1 AND is_default)
-		            ORDER BY created_at LIMIT 1)`, a.owner(r))
+	var found string
+	if err = tx.QueryRowContext(r.Context(), `SELECT id FROM addresses WHERE id=$1 AND email=$2`, id, email).Scan(&found); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, 404, "address not found")
+		} else {
+			writeError(w, 500, "could not read address")
+		}
+		return
+	}
+	if remove {
+		_, err = tx.ExecContext(r.Context(), `DELETE FROM addresses WHERE id=$1 AND email=$2`, id, email)
+	} else {
+		_, err = tx.ExecContext(r.Context(), `UPDATE addresses SET is_default=(id=$2) WHERE email=$1`, email, id)
+	}
+	if err != nil {
+		writeError(w, 500, "could not update address")
+		return
+	}
+	if _, err = tx.ExecContext(r.Context(), `UPDATE addresses SET is_default=true WHERE id=(
+  SELECT id FROM addresses WHERE email=$1 AND NOT EXISTS(SELECT 1 FROM addresses WHERE email=$1 AND is_default)
+  ORDER BY created_at,id LIMIT 1)`, email); err != nil {
+		writeError(w, 500, "could not select delivery address")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeError(w, 500, "could not confirm address change")
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

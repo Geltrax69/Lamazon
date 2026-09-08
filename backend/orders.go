@@ -175,7 +175,7 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 		return
 	}
 	for _, o := range out {
-		a.notify(r.Context(), o.StoreOwner, fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
+		a.notifyOrder(r.Context(), o.StoreOwner, fmt.Sprintf("New order: %d × %s", o.Units, o.ItemTitle),
 			fmt.Sprintf("%s just received an order.\n\n%d × %s\nItems ₹%.2f + delivery ₹%.2f = total ₹%.2f\n\nOpen Lamazon to accept it.", o.StoreName, o.Units, o.ItemTitle, o.Amount-o.DeliveryFee, o.DeliveryFee, o.Amount))
 	}
 	if single {
@@ -303,7 +303,7 @@ func (a *API) handleAcceptOrder(w http.ResponseWriter, r *http.Request) {
 	if !a.orderMoved(w, r, id, err) {
 		return
 	}
-	a.notify(r.Context(), buyer, "Order "+o.ID+" is confirmed",
+	a.notifyOrder(r.Context(), buyer, "Order "+o.ID+" is confirmed",
 		fmt.Sprintf("%s accepted your order of %d × %s.\n\n"+
 			"Your delivery code is %s. Read it out to the rider when they hand "+
 			"the order over — it is what closes the delivery.",
@@ -336,7 +336,7 @@ func (a *API) handleRejectOrder(w http.ResponseWriter, r *http.Request) {
 	if !a.orderMoved(w, r, id, err) {
 		return
 	}
-	a.notify(r.Context(), buyer, "Order "+o.ID+" could not be accepted",
+	a.notifyOrder(r.Context(), buyer, "Order "+o.ID+" could not be accepted",
 		fmt.Sprintf("%s could not take your order of %d × %s.\n\nReason: %s",
 			o.StoreName, o.Units, o.ItemTitle, reason))
 	writeJSON(w, http.StatusOK, o)

@@ -66,7 +66,7 @@ func (a *API) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 		RETURNING status, reject_reason`,
 		in.Owner, in.Name, in.Location, in.City, in.Categories, in.PhotoURL).
 		Scan(&in.Status, &in.RejectReason); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	if in.Status == "pending" {
@@ -85,7 +85,7 @@ func (a *API) handleGetStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	writeJSON(w, http.StatusOK, store)
@@ -101,7 +101,7 @@ func (a *API) requireApprovedStore(w http.ResponseWriter, r *http.Request) (Sell
 		return store, false
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return store, false
 	}
 	switch store.Status {
@@ -121,7 +121,7 @@ func (a *API) requireApprovedStore(w http.ResponseWriter, r *http.Request) (Sell
 func (a *API) handleItems(w http.ResponseWriter, r *http.Request) {
 	items, err := a.db.items(r.Context(), a.owner(r))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	var units, needsRestock int
@@ -153,6 +153,10 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	in, photos, err := decodeItem(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.validateItem(r.Context(), &in); err != nil {
+		writeError(w, 400, err.Error())
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
@@ -210,7 +214,7 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	in.Status = stockStatus(in.Stock)
@@ -264,11 +268,11 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	if err := json.Unmarshal(options, &it.Options); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	it.Status = stockStatus(it.Stock)
@@ -286,6 +290,10 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 	var in InventoryItem
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := a.validateItem(r.Context(), &in); err != nil {
+		writeError(w, 400, err.Error())
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
@@ -330,15 +338,15 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	if err := json.Unmarshal(options, &it.Options); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	if err := json.Unmarshal(attributes, &it.Attributes); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	it.Status = stockStatus(it.Stock)
@@ -379,7 +387,7 @@ func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	res, err := a.db.sql.ExecContext(r.Context(),
 		`DELETE FROM inventory_items WHERE id = $1 AND owner = $2`, id, a.owner(r))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {

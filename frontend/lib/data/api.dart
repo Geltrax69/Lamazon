@@ -300,6 +300,7 @@ class Api {
           _url('/api/addresses'),
           headers: {...await _authHeader(), 'Content-Type': 'application/json'},
           body: jsonEncode({
+            'isDefault': true,
             'label': a.label.title,
             'line': a.line,
             'city': a.city,
@@ -313,11 +314,57 @@ class Api {
     return Address.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  Future<Address> editAddress(Address a) async {
+    final res = await http
+        .patch(
+          _url('/api/addresses/${a.id}'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'label': a.label.title,
+            'line': a.line,
+            'city': a.city,
+            'pincode': a.pincode,
+            'name': a.name,
+            'phone': a.phone,
+          }),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return Address.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  Future<void> selectAddress(String id) async {
+    final res = await http
+        .patch(_url('/api/addresses/$id/default'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 204) throw http.ClientException(_reason(res));
+  }
+
   Future<void> deleteAddress(String id) async {
     final res = await http
         .delete(_url('/api/addresses/$id'), headers: await _authHeader())
         .timeout(_timeout);
     if (res.statusCode != 204) throw http.ClientException(_reason(res));
+  }
+
+  Future<Map<String, dynamic>> preferences([Map<String, bool>? changes]) async {
+    final headers = {
+      ...await _authHeader(),
+      'Content-Type': 'application/json',
+    };
+    final res = changes == null
+        ? await http
+              .get(_url('/api/preferences'), headers: headers)
+              .timeout(_timeout)
+        : await http
+              .patch(
+                _url('/api/preferences'),
+                headers: headers,
+                body: jsonEncode(changes),
+              )
+              .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   // ---- Notifications ----------------------------------------------------

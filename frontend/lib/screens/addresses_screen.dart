@@ -94,7 +94,10 @@ class AddressesScreen extends StatelessWidget {
                               final a = list[i];
                               final isSelected = a.id == selected?.id;
                               return GestureDetector(
-                                onTap: () => AddressBook.instance.select(a.id),
+                                onTap: () => _change(
+                                  context,
+                                  () => AddressBook.instance.select(a.id),
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
@@ -166,7 +169,9 @@ class AddressesScreen extends StatelessWidget {
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
-                                              a.full,
+                                              [a.name, a.phone, a.full]
+                                                  .where((v) => v.isNotEmpty)
+                                                  .join(' · '),
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 height: 1.4,
@@ -176,9 +181,22 @@ class AddressesScreen extends StatelessWidget {
                                           ],
                                         ),
                                       ),
+                                      IconButton(
+                                        tooltip: 'Edit address',
+                                        icon: const Icon(
+                                          LucideIcons.pencil,
+                                          size: 16,
+                                        ),
+                                        onPressed: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                LocationScreen(address: a),
+                                          ),
+                                        ),
+                                      ),
                                       GestureDetector(
-                                        onTap: () =>
-                                            AddressBook.instance.remove(a.id),
+                                        onTap: () => _delete(context, a),
                                         child: const Padding(
                                           padding: EdgeInsets.only(left: 8),
                                           child: Icon(
@@ -240,5 +258,45 @@ class AddressesScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Future<void> _change(
+  BuildContext context,
+  Future<void> Function() action,
+) async {
+  try {
+    await action();
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('ClientException: ', '')),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _delete(BuildContext context, Address address) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Delete address?'),
+      content: Text(address.full),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialog, false),
+          child: const Text('Keep'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialog, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    await _change(context, () => AddressBook.instance.remove(address.id));
   }
 }

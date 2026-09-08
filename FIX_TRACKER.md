@@ -92,3 +92,35 @@ branch `codex/functionality-checkout`, targeting `web`.
 - Follow-up: request idempotency for lost checkout responses, cross-device cart
   sync, grouped order presentation, and existing historic amount reconciliation
   remain open. No production orders or catalogue records were changed by tests.
+
+### Batch 4 — address integrity, validation and preferences
+
+Implemented and verified on `codex/functionality-checkout` (PR #1):
+
+- **B23/B24:** validate recipient/profile names, phone numbers, address lengths and
+  optional pincodes on the API. Indian mobile numbers are normalized only after
+  validation. Markup in plain-text fields and oversized values are rejected.
+- **B29:** selected addresses now become the server default. Owner-scoped default
+  selection, creation and deletion serialize against the user row, preventing
+  concurrent saves from leaving multiple defaults.
+- **B37:** address editing, recipient details and deletion confirmation. Failed
+  saves/deletes no longer fabricate successful local changes. Form data remains
+  available when the server refuses a save.
+- **B25 (partial)/B26:** bounded product title/description, real category checks,
+  price/MRP ceilings and currency precision, stock bounds, and generic server
+  errors in seller handlers. Photo requirements remain open.
+- **B10:** server-persisted notification preferences, partial updates without
+  overwriting other flags, disabled controls until loaded, save errors and retry.
+  Order-event emails/push and push delivery honor these flags. Marketing consent
+  is saved separately; there is no active marketing sender. Removed the fake GPS
+  toggle; location remains manual. Unsupported preferences are read-only.
+
+Validation: 61 Flutter tests pass, including server-backed address/preferences
+and failed-write regression coverage. Full PostgreSQL Go suite passes with race
+checking, including concurrent defaults, ownership, edit, validation and actual
+notification suppression. Two old smoke assertions were updated because they
+expected the broken local-only settings/address behavior.
+
+These changes are pushed for review with the checkout batch; they are not yet
+on the production `web` branch. Business/support information has been requested
+from the owner and remains needed for B4/B12.

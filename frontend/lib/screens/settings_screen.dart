@@ -1,3 +1,4 @@
+import '../data/api.dart';
 import 'policy_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -19,12 +20,42 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // ponytail: in-memory only. Persist with shared_preferences the day a
-  // setting has to survive a restart.
   bool _push = true;
   bool _email = false;
   bool _orderUpdates = true;
-  bool _location = true;
+  bool _busy = true;
+  bool _loaded = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _save();
+  }
+
+  Future<void> _save([Map<String, bool>? changes]) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final preferences = await Api.instance.preferences(changes);
+      if (!mounted) return;
+      setState(() {
+        _push = preferences['push'] == true;
+        _email = preferences['emailOffers'] == true;
+        _orderUpdates = preferences['orderUpdates'] == true;
+        _loaded = true;
+      });
+    } catch (e) {
+      if (mounted)
+        setState(
+          () => _error = e.toString().replaceFirst('ClientException: ', ''),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +71,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
+                    if (_busy) const LinearProgressIndicator(),
+                    if (_error != null)
+                      ListTile(
+                        title: Text(_error!),
+                        trailing: TextButton(
+                          onPressed: _busy ? null : () => _save(),
+                          child: const Text('Retry'),
+                        ),
+                      ),
                     const _SectionLabel('Notifications'),
                     _Card(
                       children: [
@@ -47,19 +87,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: LucideIcons.bell,
                           title: 'Push notifications',
                           value: _push,
-                          onChanged: (v) => setState(() => _push = v),
+                          onChanged: _busy || !_loaded
+                              ? null
+                              : (v) => _save({'push': v}),
                         ),
                         _Toggle(
                           icon: LucideIcons.mail,
                           title: 'Email offers',
                           value: _email,
-                          onChanged: (v) => setState(() => _email = v),
+                          onChanged: _busy || !_loaded
+                              ? null
+                              : (v) => _save({'emailOffers': v}),
                         ),
                         _Toggle(
                           icon: LucideIcons.truck,
                           title: 'Order updates',
                           value: _orderUpdates,
-                          onChanged: (v) => setState(() => _orderUpdates = v),
+                          onChanged: _busy || !_loaded
+                              ? null
+                              : (v) => _save({'orderUpdates': v}),
                         ),
                         _Link(
                           icon: LucideIcons.inbox,
@@ -86,16 +132,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                         ),
-                        _Toggle(
-                          icon: LucideIcons.navigation,
-                          title: 'Use my location',
-                          value: _location,
-                          onChanged: (v) => setState(() => _location = v),
-                        ),
                         _Link(
                           icon: LucideIcons.wallet,
-                          title: 'Payment methods',
-                          onTap: () => _soon(context, 'Payment methods'),
+                          title: 'Online payments',
+                          value: 'Not available',
                         ),
                       ],
                     ),
@@ -106,13 +146,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: LucideIcons.languages,
                           title: 'Language',
                           value: 'English',
-                          onTap: () => _soon(context, 'Language'),
                         ),
                         _Link(
                           icon: LucideIcons.indianRupee,
                           title: 'Currency',
                           value: 'INR (₹)',
-                          onTap: () => _soon(context, 'Currency'),
                         ),
                       ],
                     ),
@@ -156,18 +194,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-}
-
-void _soon(BuildContext context, String what) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text('$what — coming soon'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
-    );
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -218,7 +244,7 @@ class _Toggle extends StatelessWidget {
   final IconData icon;
   final String title;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
   const _Toggle({
     required this.icon,
     required this.title,

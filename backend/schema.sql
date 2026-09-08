@@ -529,3 +529,5 @@ CREATE INDEX IF NOT EXISTS password_attempts_expiry ON password_attempts(expires
 
 -- Historical orders retain their recorded total; never invent old charges.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (delivery_fee >= 0);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}';

@@ -161,12 +161,26 @@ func (a *API) handlePushTest(w http.ResponseWriter, r *http.Request) {
 // Nothing here is fatal. A failed notification must never fail the order that
 // triggered it, so problems are logged and the caller carries on.
 func (a *API) notify(ctx context.Context, email, title, body string) {
+	a.notifyEvent(ctx, email, title, body, "account")
+}
+func (a *API) notifyOrder(ctx context.Context, email, title, body string) {
+	a.notifyEvent(ctx, email, title, body, "order")
+}
+func (a *API) notifyEvent(ctx context.Context, email, title, body, kind string) {
+	prefs, err := a.preferences(ctx, email)
+	if err != nil {
+		log.Printf("notification preferences: %v", err)
+		return
+	}
+	if kind == "order" && !prefs.OrderUpdates || kind == "offer" && !prefs.EmailOffers {
+		return
+	}
 	if a.mail != nil {
 		if err := a.mail.send(ctx, email, title, body, notifyHTML(title, body)); err != nil {
 			log.Printf("notify %s by email: %v", email, err)
 		}
 	}
-	if a.push == nil {
+	if a.push == nil || !prefs.Push {
 		return
 	}
 

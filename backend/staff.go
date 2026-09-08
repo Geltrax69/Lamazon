@@ -1104,7 +1104,7 @@ func (a *API) handleRiderPick(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	a.notify(r.Context(), o.BuyerEmail, "Order "+o.ID+" is on its way",
+	a.notifyOrder(r.Context(), o.BuyerEmail, "Order "+o.ID+" is on its way",
 		fmt.Sprintf("A rider picked up your %s from %s.\n\n"+
 			"Have your 4-digit delivery code ready — they need it to close the order.",
 			o.ItemTitle, o.StoreName))
@@ -1193,9 +1193,9 @@ func (a *API) handleRiderDeliver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.notify(r.Context(), o.BuyerEmail, "Delivered: "+o.ItemTitle,
+	a.notifyOrder(r.Context(), o.BuyerEmail, "Delivered: "+o.ItemTitle,
 		fmt.Sprintf("Order %s from %s has been delivered. Enjoy.", o.ID, o.StoreName))
-	a.notify(r.Context(), o.StoreOwner, "Order "+o.ID+" was delivered",
+	a.notifyOrder(r.Context(), o.StoreOwner, "Order "+o.ID+" was delivered",
 		fmt.Sprintf("%d × %s reached the customer. ₹%.0f.",
 			o.Units, o.ItemTitle, o.Amount))
 	o.BuyerEmail, o.StoreOwner = "", ""

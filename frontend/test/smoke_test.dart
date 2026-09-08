@@ -377,37 +377,20 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
       expect(find.text('Settings'), findsOneWidget);
       final toggle = find.byType(Switch).first;
-      final before = tester.widget<Switch>(toggle).value;
-      await tester.tap(toggle);
       await tester.pump();
-      expect(tester.widget<Switch>(find.byType(Switch).first).value,
-          isNot(before));
+      expect(tester.widget<Switch>(toggle).onChanged, isNull,
+          reason: 'preferences cannot be changed before the server confirms them');
     });
   });
 
-  testWidgets('a saved address means no location prompt', (tester) async {
-    await mockNetworkImagesFor(() async {
-      // The book has arrived and it is not empty: asking again would be
-      // asking a question we already have the answer to.
-      AddressBook.instance.markLoaded();
-      await AddressBook.instance.add(const Address(
-        id: 'saved-1',
-        label: AddressLabel.home,
-        line: 'Block 34',
-        city: 'Lovely Professional University',
-        pincode: '144411',
-        name: 'Lalit',
-        phone: '9876543210',
-      ));
-
-      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
-
-      expect(find.text('Enable device location'), findsNothing);
-      expect(find.text('Use my current location'), findsNothing);
-      expect(find.text('Enter it manually'), findsNothing);
-    });
+  test('a failed address save does not fabricate a local address', () async {
+    AddressBook.instance.clear();
+    await expectLater(AddressBook.instance.add(const Address(
+      id: 'unsaved', label: AddressLabel.home, line: 'Block 34',
+      city: 'Lovely Professional University', pincode: '144411',
+      name: 'Lalit', phone: '9876543210',
+    )), throwsException);
+    expect(AddressBook.instance.addresses, isEmpty);
   });
 
   testWidgets('every See all opens something', (tester) async {
