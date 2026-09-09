@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'design_system.dart';
 import 'product_card.dart';
 
 /// One row of widgets drifting sideways forever, looping seamlessly.
@@ -120,8 +121,10 @@ class _Tile extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF4FB),
-        borderRadius: BorderRadius.circular(18),
+        // What shows through until the photo arrives. A cool blue read as a
+        // hole in the warm canvas behind it.
+        color: LamazonTheme.track,
+        borderRadius: BorderRadius.circular(LamazonTheme.featuredRadius),
       ),
       clipBehavior: Clip.antiAlias,
       child: NetImage(url: url),

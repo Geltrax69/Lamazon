@@ -7,14 +7,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../data/catalog.dart';
 import '../data/session.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/design_system.dart';
 import '../widgets/image_marquee.dart';
 import 'home_screen.dart';
 import 'policy_screen.dart';
 import 'profile_setup_screen.dart';
-
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _yellow = Color(0xFFFFC220); // the logo's yellow
 
 /// Opening screen: drifting product tiles, the Lamazon mark, and an email
 /// sign-in that can be skipped.
@@ -171,6 +168,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// What the person has typed into the field this step is asking about.
+  String get _typed => switch (_step) {
+    _Step.email => _email.text,
+    _Step.code => _code.text,
+    _Step.password => _password.text,
+  }.trim();
+
   @override
   Widget build(BuildContext context) {
     // The categories the app sells, drifting past behind the sign-in card.
@@ -183,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
             .map((p) => thumb(p.imageUrl, 200)),
     ];
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: LamazonTheme.canvas,
       body: Stack(
         children: [
           Positioned(
@@ -213,33 +217,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(0, 8, 16, 0),
-                    child: Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => _enter(skip: true),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 11,
-                          ),
-                          child: Text(
-                            'Skip login',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _ink,
-                            ),
-                          ),
-                        ),
-                      ),
+                    child: ActionButton(
+                      label: 'Skip login',
+                      primary: false,
+                      onPressed: () => _enter(skip: true),
                     ),
                   ),
                 ),
                 const Spacer(),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(
+                    LamazonTheme.featuredRadius,
+                  ),
                   child: Image.asset(
                     'assets/logo.png',
                     width: 96,
@@ -248,13 +237,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Local choice. Global experience.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: _ink,
+                  style: LamazonTheme.titleText.copyWith(
+                    fontSize: 26,
+                    height: 31 / 26,
+                    letterSpacing: -0.9,
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -262,169 +251,122 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: ReadableBody(
                     maxWidth: 440,
-                    child: Container(
+                    child: ElevatedSurface(
+                      radius: LamazonTheme.featuredRadius,
+                      prominent: true,
                       padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 22,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
                       child: Column(
                         children: [
+                          // Says the two things are one flow, which is what
+                          // stops somebody without an account hunting for a
+                          // sign-up link that does not exist.
                           const Text(
                             'Log in or sign up',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                            style: LamazonTheme.sectionText,
+                          ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: switch (_step) {
+                              _Step.email => _email,
+                              _Step.code => _code,
+                              _Step.password => _password,
+                            },
+                            keyboardType: switch (_step) {
+                              _Step.email => TextInputType.emailAddress,
+                              _Step.code => TextInputType.number,
+                              _Step.password => TextInputType.text,
+                            },
+                            obscureText: _step == _Step.password,
+                            autocorrect: false,
+                            onChanged: (_) => setState(() {}),
+                            onSubmitted: (_) {
+                              if (_valid && !_busy) _submit();
+                            },
+                            decoration: InputDecoration(
+                              // The card is already `surface`, so the field
+                              // sits a shade back from it to read as inset.
+                              fillColor: LamazonTheme.canvas,
+                              prefixIcon: Icon(
+                                switch (_step) {
+                                  _Step.email => LucideIcons.mail,
+                                  _Step.code => LucideIcons.keyRound,
+                                  _Step.password => LucideIcons.lock,
+                                },
+                                size: 18,
+                                color: LamazonTheme.muted,
+                              ),
+                              labelText: switch (_step) {
+                                _Step.email => 'Email address',
+                                _Step.code => 'Verification code',
+                                _Step.password => 'Password',
+                              },
+                              hintText: switch (_step) {
+                                _Step.email => 'Enter email address',
+                                _Step.code => 'Enter the 6-digit code',
+                                _Step.password => 'Enter password',
+                              },
+                            ),
+                            style: const TextStyle(
+                              fontFamily: 'InterTight',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 14),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF4F5F7),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    0,
-                                    12,
-                                    0,
-                                  ),
-                                  child: Icon(
-                                    switch (_step) {
-                                      _Step.email => LucideIcons.mail,
-                                      _Step.code => LucideIcons.keyRound,
-                                      _Step.password => LucideIcons.lock,
-                                    },
-                                    size: 18,
-                                    color: _muted,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: TextField(
-                                    controller: switch (_step) {
-                                      _Step.email => _email,
-                                      _Step.code => _code,
-                                      _Step.password => _password,
-                                    },
-                                    keyboardType: switch (_step) {
-                                      _Step.email => TextInputType.emailAddress,
-                                      _Step.code => TextInputType.number,
-                                      _Step.password => TextInputType.text,
-                                    },
-                                    obscureText: _step == _Step.password,
-                                    autocorrect: false,
-                                    onChanged: (_) => setState(() {}),
-                                    onSubmitted: (_) {
-                                      if (_valid && !_busy) _submit();
-                                    },
-                                    decoration: InputDecoration(
-                                      filled: false,
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: const UnderlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Color(0xFF1D4A3C),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      labelText: switch (_step) {
-                                        _Step.email => 'Email address',
-                                        _Step.code => 'Verification code',
-                                        _Step.password => 'Password',
-                                      },
-                                      hintText: switch (_step) {
-                                        _Step.email => 'Enter email address',
-                                        _Step.code => 'Enter the 6-digit code',
-                                        _Step.password => 'Enter password',
-                                      },
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                    ),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: _valid ? _ink : _yellow,
-                                foregroundColor: _valid ? Colors.white : _ink,
-                                disabledBackgroundColor: const Color(
-                                  0xFFE6E8EC,
-                                ),
-                                disabledForegroundColor: _muted,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 15,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              onPressed: _valid && !_busy ? _submit : null,
-                              child: Text(
-                                _busy
-                                    ? 'Please wait…'
-                                    : switch (_step) {
-                                        _Step.email => 'Continue',
-                                        _Step.code => 'Verify code',
-                                        _Step.password => 'Sign in',
-                                      },
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                          ActionButton(
+                            expand: true,
+                            label: _busy
+                                ? 'Please wait…'
+                                : switch (_step) {
+                                    _Step.email => 'Continue',
+                                    _Step.code => 'Verify code',
+                                    _Step.password => 'Sign in',
+                                  },
+                            onPressed: _valid && !_busy ? _submit : null,
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            _error ??
-                                (!_valid
-                                    ? switch (_step) {
-                                        _Step.email =>
-                                          'Enter a valid email address to continue.',
-                                        _Step.code =>
-                                          'Enter the six digits from your email.',
-                                        _Step.password =>
-                                          'Enter your password to sign in.',
-                                      }
-                                    : null) ??
-                                switch (_step) {
-                                  _Step.email =>
-                                    'We only use your email for order updates '
-                                        'and receipts.',
-                                  _Step.code =>
-                                    'We sent a code to ${_email.text.trim()}. '
-                                        'It expires in 10 minutes.',
-                                  _Step.password =>
-                                    'Signing in as ${_email.text.trim()}.',
-                                },
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: _error == null
-                                  ? _muted
-                                  : const Color(0xFFD03A3A),
+                          // One line, three jobs: the failure, the reason the
+                          // button is inert, or why the address is wanted.
+                          // The middle one waits until something has been
+                          // typed — telling somebody their empty field is
+                          // invalid reads as an error before they have done
+                          // anything wrong.
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              _error ??
+                                  (_typed.isNotEmpty && !_valid
+                                      ? switch (_step) {
+                                          _Step.email =>
+                                            'That is not an email address yet.',
+                                          _Step.code =>
+                                            'Enter the six digits from your '
+                                                'email.',
+                                          _Step.password =>
+                                            'Enter your password to sign in.',
+                                        }
+                                      : null) ??
+                                  switch (_step) {
+                                    _Step.email =>
+                                      'We only use your email for order '
+                                          'updates and receipts.',
+                                    _Step.code =>
+                                      'We sent a code to '
+                                          '${_email.text.trim()}. It expires '
+                                          'in 10 minutes.',
+                                    _Step.password =>
+                                      'Signing in as ${_email.text.trim()}.',
+                                  },
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'InterTight',
+                                fontSize: 13,
+                                height: 17 / 13,
+                                letterSpacing: 0.2,
+                                color: _error == null
+                                    ? LamazonTheme.muted
+                                    : LamazonTheme.danger,
+                              ),
                             ),
                           ),
                         ],
@@ -432,35 +374,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 // Named and reachable. Agreeing to two documents you cannot
-                // open is not agreeing to anything.
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text(
-                        'By continuing, you agree to our ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF62645E),
-                        ),
-                      ),
-                      _PolicyLink(slug: 'terms', label: 'Terms and Conditions'),
-                      const Text(
-                        ' & ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF62645E),
-                        ),
-                      ),
-                      _PolicyLink(slug: 'privacy', label: 'Privacy Policy'),
-                    ],
+                // open is not agreeing to anything — and these used to be bare
+                // GestureDetectors, which a keyboard could not reach and a
+                // screen reader announced as ordinary text.
+                const Text(
+                  'By continuing, you agree to our',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'InterTight',
+                    fontSize: 12.5,
+                    letterSpacing: 0.2,
+                    color: LamazonTheme.muted,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _PolicyLink(slug: 'terms', label: 'Terms and Conditions'),
+                    Text('·', style: TextStyle(color: LamazonTheme.muted)),
+                    _PolicyLink(slug: 'privacy', label: 'Privacy Policy'),
+                  ],
+                ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -477,7 +414,8 @@ const _fallback = [
   'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300',
 ];
 
-/// One underlined policy name in the sign-in footer.
+/// One policy name in the sign-in footer. A real button, so it takes keyboard
+/// focus, announces itself as a control and carries a 44px target.
 class _PolicyLink extends StatelessWidget {
   final String slug;
   final String label;
@@ -485,19 +423,23 @@ class _PolicyLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
+    return TextButton(
+      onPressed: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => PolicyScreen(slug: slug)),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        foregroundColor: LamazonTheme.strong,
       ),
       child: Text(
         label,
         style: const TextStyle(
-          fontSize: 11,
-          color: Color(0xFF6B6B6B),
-          fontWeight: FontWeight.w700,
+          fontFamily: 'InterTight',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
           decoration: TextDecoration.underline,
-          decorationColor: Color(0xFF62645E),
         ),
       ),
     );

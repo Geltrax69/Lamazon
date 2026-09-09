@@ -56,3 +56,84 @@ against the titles above them.
 The brief given on 2026-09-10 03:49 specifies `-0.6px`, superseding an earlier
 instruction that read `0.6px`. Recorded here because the value was implemented
 faithfully to the original brief and changed deliberately, not by accident.
+
+### The first screen joins the design system
+
+**Area:** `LoginScreen` — the screen every new user sees before anything else
+
+**Decision:** REPLACE (presentation only; no auth logic touched)
+
+**Problem**
+The redesign stopped at the shopping surfaces. Login still ran on its own
+palette — six hard-coded colours including a cool blue-grey canvas `#F7F9FC`
+against the app's warm ivory `#F7F6F0` — its own hand-rolled input, its own
+flat button, and typography set by hand with no tracking.
+
+**Why it mattered**
+This is the first impression, and the colour temperature visibly jumps the
+moment a shopper enters the shop. A product whose entrance belongs to a
+different design than its interior does not read as premium; it reads as
+half-finished. It also meant the screen could not inherit any later
+improvement to the system.
+
+**Before**
+Cool blue-grey screen, white card, grey inset field with an underline focus
+ring inside a rounded box, a flat near-black button, 11.5px helper text, and
+policy links that were bare `GestureDetector`s.
+
+**Decision**
+Rebuilt the presentation on tokens and shared components. Every auth code
+path — `_start`, `_verifyCode`, `_verifyPassword`, `_go` — is untouched.
+
+**Reasoning**
+Four things were solved by deletion rather than restyling:
+
+- The input was ~40 lines re-implementing what `inputDecorationTheme` already
+  provides. Replaced with a themed `TextField` and a `prefixIcon`. The
+  underline focus ring inside a rounded container was incoherent anyway; the
+  system's forest ring is one shape.
+- The submit button read `backgroundColor: _valid ? _ink : _yellow`, but the
+  button is disabled whenever `!_valid`, so `disabledBackgroundColor` always
+  won and the yellow branch could never render. Dead styling, and the last
+  thing keeping the logo-yellow constant alive. Both removed.
+- The card was a hand-rolled `Container` with its own shadow. It is an
+  `ElevatedSurface` now, so it tracks the system's elevation.
+- The helper line showed "Enter a valid email address to continue." before the
+  user had typed a single character — telling somebody they are wrong before
+  they have done anything. It now waits until the field is non-empty, and
+  shows the reassurance line until then.
+
+**Change**
+Tokens throughout; `sectionText` for the card heading; title scale with `-0.9`
+tracking for the tagline; themed input; `ActionButton` for both actions;
+`danger` for errors; helper text 11.5px → 13px; marquee tile placeholder from
+cool blue `#EAF4FB` to `track`.
+
+**Files**
+- `frontend/lib/screens/login_screen.dart`
+- `frontend/lib/widgets/image_marquee.dart`
+
+**Verification**
+- [x] Visual — profile web build at 375×812
+- [x] Responsive — `ReadableBody(maxWidth: 440)` retained
+- [x] Functional — all three sign-in paths and Skip login unchanged
+- [x] Accessibility — see Result
+- [x] Regression — analyze clean, 70 tests pass
+
+**Result**
+The entrance and the shop are now one product; the colour temperature no
+longer jumps. Accessibility improved in three places: the policy links are
+real buttons, so they take keyboard focus, announce themselves as controls and
+carry a 44px target instead of a ~14px text hitbox on legally-significant
+links; the helper line is a live region, so a screen reader announces failures
+instead of leaving them silent; and error text went from 11.5px to 13px.
+
+**Remaining**
+- The disabled primary button is the system's `Opacity(.5)`, which puts white
+  text on a washed forest at roughly 2.3:1. WCAG 1.4.3 exempts inactive
+  controls, and the treatment is shared app-wide, so changing it is a
+  system-level decision rather than a login one.
+- The marquee animates continuously and is the screen's largest element. It
+  honours reduced motion, but its value is worth testing against its cost.
+- `settings_screen`, `shop_screen` and `seller_dashboard_screen` are still off
+  the system; two of them hard-code `fontFamily: 'Georgia'`.
