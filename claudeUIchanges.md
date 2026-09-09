@@ -191,3 +191,85 @@ Roughly 200 hard-coded hex colours remain across ~20 screens, concentrated in
 `compare_screen`, `admin_screen`, `seller_dashboard_screen`, `profile_screen`
 and `location_screen`. That is a migration, not a fix, and is best done a
 screen at a time behind visual checks rather than by find-and-replace.
+
+### A card stops swallowing everything inside it
+
+**Area:** design system — `ElevatedSurface`, `ActionButton`, `TactileIconButton`
+(23 call sites; every card and every action in the app)
+
+**Decision:** IMPROVE (root cause, found by reading the accessibility tree
+rather than the screenshot)
+
+**Problem**
+Two separate defects, both invisible on screen:
+
+1. `ElevatedSurface` wrapped its child in `Semantics(button: onTap != null,
+   label: semanticLabel)` unconditionally. `button: false` is still an
+   annotation, so a passive card collapsed its whole subtree into one node.
+2. `ActionButton` carried no semantics of its own. Its button role came from
+   `InkWell`, and an `InkWell` with `onTap: null` has none — so a disabled
+   action vanished from the tree as ordinary text.
+
+**Why it mattered**
+On the sign-in card, the first defect produced a single node reading
+`textbox "Log in or sign up Email address Continue We only use your email for
+order updates and receipts."` — a screen reader announced the heading, the
+field, the button and the helper text as one text field, and the Continue
+button was not a button. The second meant that once Continue *was* separated
+out, it still disappeared whenever it was disabled: a blind user could not
+tell there was an action waiting for valid input. `EmptyState` and the home
+screen's "Nothing here" panel had the first defect too — both are passive
+cards containing a real button.
+
+**Before**
+The sign-in card was one text field to assistive technology. Disabled actions
+were invisible as controls.
+
+**Decision**
+A card that is only a card annotates nothing. A button says it is a button and
+whether it is enabled.
+
+**Reasoning**
+Fixed in the two shared components rather than at any call site. The bug was
+not on the login screen, it was in what the login screen used — and it was
+already affecting `EmptyState`, `_NothingHere` and every disabled quick-add
+button. `ProductCard` deliberately passes both `onTap` and `semanticLabel`, so
+it still merges into one "product name, button" node, which is what a card
+that behaves as a single control should do.
+
+**Change**
+- `ElevatedSurface` returns its unannotated surface when it has no `onTap` and
+  no `semanticLabel`.
+- `ActionButton` wraps in `Semantics(button: true, enabled: onPressed != null)`.
+- `TactileIconButton` gained the same `enabled` flag.
+
+**Files**
+- `frontend/lib/widgets/design_system.dart`
+
+**Verification**
+- [x] Visual — no pixel change; verified the card renders identically
+- [x] Responsive — no layout involvement
+- [x] Functional — 70 tests pass
+- [x] Accessibility — accessibility tree read before and after, see Result
+- [x] Regression — analyze clean
+
+**Result**
+Before: `textbox "Log in or sign up Email address Continue We only use your
+email for order updates and receipts."`
+
+After:
+```
+button   "Skip login"
+generic  "Log in or sign up"
+textbox  "Email address"
+button   "Continue"
+generic  "We only use your email for order updates and receipts."
+button   "Terms and Conditions"
+button   "Privacy Policy"
+```
+
+**Remaining**
+`generic` is the tree's rendering of an unroled text node. "Log in or sign up"
+would be better exposed as a heading; Flutter's web semantics does not emit
+heading levels from `Semantics(header: true)` in a way this reader surfaces,
+so it is left as-is rather than faked.

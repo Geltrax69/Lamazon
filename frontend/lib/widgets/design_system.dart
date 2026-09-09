@@ -295,30 +295,37 @@ class ElevatedSurface extends StatelessWidget {
     final content = padding == null
         ? child
         : Padding(padding: padding!, child: child);
+    final surface = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: prominent
+            ? LamazonTheme.raisedShadows
+            : LamazonTheme.surfaceShadows,
+      ),
+      child: Material(
+        color: color,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: onTap == null
+            ? content
+            : InkWell(
+                onTap: onTap,
+                customBorder: shape,
+                focusColor: LamazonTheme.lime.withValues(alpha: .36),
+                child: content,
+              ),
+      ),
+    );
+    // A card that is only a card says nothing about itself. Annotating
+    // unconditionally — `button: false` counts as an annotation — collapsed
+    // everything inside into one node, so a sign-in card announced its
+    // heading, field, button and helper text as a single text field and the
+    // button stopped being a button.
+    if (onTap == null && semanticLabel == null) return surface;
     return Semantics(
       button: onTap != null,
       label: semanticLabel,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(radius),
-          boxShadow: prominent
-              ? LamazonTheme.raisedShadows
-              : LamazonTheme.surfaceShadows,
-        ),
-        child: Material(
-          color: color,
-          shape: shape,
-          clipBehavior: Clip.antiAlias,
-          child: onTap == null
-              ? content
-              : InkWell(
-                  onTap: onTap,
-                  customBorder: shape,
-                  focusColor: LamazonTheme.lime.withValues(alpha: .36),
-                  child: content,
-                ),
-        ),
-      ),
+      child: surface,
     );
   }
 }
@@ -350,6 +357,7 @@ class TactileIconButton extends StatelessWidget {
     final color = foreground ?? LamazonTheme.strong;
     return Semantics(
       button: true,
+      enabled: onPressed != null,
       label: label,
       selected: selected,
       child: SizedBox(
@@ -432,40 +440,45 @@ class ActionButton extends StatelessWidget {
         ],
       ],
     );
-    return Opacity(
-      opacity: onPressed == null ? .5 : 1,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(23),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.alphaBlend(
-                Colors.white.withValues(alpha: primary ? .14 : .60),
-                base,
-              ),
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      child: Opacity(
+        opacity: onPressed == null ? .5 : 1,
+        child: _material(body, base),
+      ),
+    );
+  }
+
+  Widget _material(Widget body, Color base) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(
+              Colors.white.withValues(alpha: primary ? .14 : .60),
               base,
-            ],
-          ),
-          boxShadow: LamazonTheme.tactileShadows,
+            ),
+            base,
+          ],
         ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(23),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onPressed,
-            focusColor: LamazonTheme.lime.withValues(alpha: .4),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 46, minWidth: 46),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
-                ),
-                child: body,
-              ),
+        boxShadow: LamazonTheme.tactileShadows,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(23),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          focusColor: LamazonTheme.lime.withValues(alpha: .4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 46, minWidth: 46),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              child: body,
             ),
           ),
         ),
