@@ -339,6 +339,7 @@ func TestSellerLifecycle(t *testing.T) {
 		"/api/admin/stores/"+DefaultOwner+"/approve", nil); code != http.StatusOK {
 		t.Fatalf("approve: want 200, got %d (%v)", code, body["error"])
 	}
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 
 	// Reading the store back must round-trip the categories array.
@@ -436,6 +437,7 @@ func TestConcurrentOrdersCannotOversell(t *testing.T) {
 	openApprovedStore(t, h, map[string]any{
 		"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Samosa", "price": 20, "stock": 5})

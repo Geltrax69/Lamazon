@@ -116,6 +116,7 @@ func TestProductLimitsReturnValidationErrors(t *testing.T) {
 func TestOrderNotificationHonorsPreferences(t *testing.T) {
 	h, sent, push := notifyAPI(t)
 	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Food", "price": 20, "stock": 10})
 	call(t, h, "POST", "/api/push/subscribe", map[string]string{"token": "device-token"})
@@ -136,6 +137,7 @@ func TestOrderNotificationHonorsPreferences(t *testing.T) {
 
 func TestCancellationBeforeAcceptanceAndOwnership(t *testing.T) {
 	h := testAPI(t)
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Food", "price": 20, "stock": 1})
@@ -167,6 +169,11 @@ func TestCheckoutUnavailableWithoutRiders(t *testing.T) {
 	code, _ := call(t, h, "POST", "/api/orders/checkout", map[string]any{"lines": []map[string]any{{"itemId": "any", "units": 1}}, "requestId": "test-basket-123456", "expectedTotal": 35})
 	if code != 503 {
 		t.Fatalf("no rider: %d", code)
+	}
+	for _, path := range []string{"/api/orders", "/api/seller/orders"} {
+		if code, _ := call(t, h, "POST", path, map[string]any{"itemId": "any", "units": 1, "expectedTotal": 35}); code != 503 {
+			t.Fatalf("legacy route bypassed availability: %s %d", path, code)
+		}
 	}
 }
 

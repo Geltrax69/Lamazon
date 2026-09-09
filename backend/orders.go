@@ -148,7 +148,7 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 			return
 		}
 	}
-	if !single {
+	{
 		var available bool
 		if err = tx.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM riders WHERE active)`).Scan(&available); err != nil {
 			writeError(w, 503, "could not check delivery availability")

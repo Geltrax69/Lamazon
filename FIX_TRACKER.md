@@ -18,7 +18,7 @@ are deployed; later batches need coordinated API, web and mobile rollout.
 |---|---|---|
 | B1 | Fixed; rollout pending | Atomic basket checkout, one delivery fee, matching totals and durable retry IDs. |
 | B2 | Fixed locally | Cart and wishlist survive restart. Cross-device synchronization remains open. |
-| B3 | Partial | Atomic checkout refuses orders without active riders. Legacy single-line endpoint still needs the same availability guard; actual rider staffing is operational work. |
+| B3 | Code fixed; staffing pending | All checkout routes refuse new orders without active riders. Actual rider staffing is operational work. |
 | B4 | Code fixed; owner content needed | Unfinished policy templates cannot be published or shown publicly. Real business/legal documents remain a launch requirement. |
 | B5 | Fixed | Fabricated notifications removed; real notification history remains unimplemented. |
 | B6 | Fixed | Persistent password/PIN rate limits with concurrent-request coverage. Proxy-aware network limiting needs infrastructure review. |
@@ -39,8 +39,8 @@ are deployed; later batches need coordinated API, web and mobile rollout.
 
 ## Remaining functionality queue
 
-- Close the legacy single-line checkout availability gap and coordinate rollout
-  for older installed clients. Historical order accounting is not rewritten.
+- Coordinate rollout for older installed clients. Historical order accounting
+  is not rewritten.
 - Real support/policy content, existing rider PIN resets and delivery staffing.
 - Payment processing, receipts, reviews, notification history and promotions.
   These features are not implemented merely by removing their misleading controls.
@@ -217,3 +217,20 @@ all 66 Flutter tests pass, `flutter analyze` reports no issues, and release web
 and Android APK builds succeed. Android output is a local validation APK using
 the repository's existing signing configuration; no app-store release or iOS
 verification is claimed. Batch is pushed on the PR branch, not deployed to `web`.
+
+### Batch 7 — delivery availability on every checkout route
+
+The shared checkout transaction now checks rider availability for both the atomic
+basket endpoint and legacy buyer/seller single-line routes. A confirmed total no
+longer lets an older client bypass the no-rider guard. Existing committed basket
+retries still recover their confirmation when riders have since switched off.
+
+Tests cover all three entry points with zero active riders. Existing fulfilment
+fixtures now explicitly onboard riders before checkout; the switch-off test places
+an order while a rider is active, then verifies acceptance after that rider goes
+inactive does not assign them work. Delivery, notifications and ownership behavior
+remain covered by the complete PostgreSQL race suite.
+
+Verified: full Go suite passes with `-race -count=1` against isolated PostgreSQL
+(22.5 seconds). This backend-only follow-up does not change the frontend source
+used for batch 6's passing tests, analysis and release builds.

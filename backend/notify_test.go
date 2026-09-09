@@ -96,6 +96,7 @@ func TestOrderNotifiesSellerByEmailAndPush(t *testing.T) {
 		"name": "Farm", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Grocery"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Straubery", "price": 120, "stock": 25})
@@ -138,6 +139,7 @@ func TestEmailStillSendsWithoutPush(t *testing.T) {
 	openApprovedStore(t, h, map[string]any{
 		"name": "Farm", "location": "L", "city": "LPU", "categories": []string{"Grocery"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Straubery", "price": 120, "stock": 5})

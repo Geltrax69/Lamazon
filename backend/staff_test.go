@@ -123,6 +123,7 @@ func TestOrderTravelsFromShopToDoor(t *testing.T) {
 		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Food"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Cold Coffee", "category": "Food", "price": 60, "stock": 10})
@@ -238,6 +239,10 @@ func TestARiderCanBeSwitchedOffAndBackOnOrRemoved(t *testing.T) {
 	admin := adminSignIn(t, h)
 	pin := addRider(t, h, admin, "9111111111")
 
+	_, order := call(t, h, http.MethodPost, "/api/orders",
+		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
+	id := order["id"].(string)
+
 	// Off: signed out, and no longer handed anything.
 	callAs(t, h, admin, http.MethodDelete, "/api/admin/riders/9111111111", nil)
 	// 403 rather than 401: the number and PIN are right, the shift is not.
@@ -245,9 +250,6 @@ func TestARiderCanBeSwitchedOffAndBackOnOrRemoved(t *testing.T) {
 		map[string]string{"phone": "9111111111", "pin": pin}); code != http.StatusForbidden {
 		t.Fatalf("a switched-off rider should not sign in, got %d", code)
 	}
-	_, order := call(t, h, http.MethodPost, "/api/orders",
-		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
-	id := order["id"].(string)
 	_, accepted := call(t, h, http.MethodPost, "/api/seller/orders/"+id+"/accept", nil)
 	if accepted["assignedTo"] != nil {
 		t.Fatalf("a switched-off rider should not be handed work: %v", accepted["assignedTo"])
@@ -451,13 +453,14 @@ func TestAssignedOrdersGoToThatRiderOnly(t *testing.T) {
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Cold Coffee", "price": 60, "stock": 10})
+	admin := adminSignIn(t, h)
+	minePIN := addRider(t, h, admin, "9111111111")
+	otherPIN := addRider(t, h, admin, "9222222222")
+
 	_, order := call(t, h, http.MethodPost, "/api/orders",
 		map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": item["price"].(float64)*1 + 15})
 	id := order["id"].(string)
 
-	admin := adminSignIn(t, h)
-	minePIN := addRider(t, h, admin, "9111111111")
-	otherPIN := addRider(t, h, admin, "9222222222")
 	_, mineLogin := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
 		map[string]string{"phone": "9111111111", "pin": minePIN})
 	_, otherLogin := callAs(t, h, "", http.MethodPost, "/api/delivery/login",
@@ -508,6 +511,7 @@ func TestRejectingAnOrderFreesTheStock(t *testing.T) {
 		"name": "Campus Snacks", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Food"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Samosa", "price": 20, "stock": 1})
@@ -546,6 +550,7 @@ func TestOneSellerCannotMoveAnothersOrder(t *testing.T) {
 		"name": "Mine", "location": "Block 32", "city": "LPU",
 		"categories": []string{"Food"},
 	})
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items",
 		map[string]any{"title": "Coffee", "price": 60, "stock": 5})
