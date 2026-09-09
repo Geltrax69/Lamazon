@@ -85,7 +85,9 @@ abstract final class LamazonTheme {
     fontSize: 19,
     height: 24 / 19,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.6,
+    // Negative, like every other heading. Positive tracking on a 19px
+    // semi-bold loosens it into looking like a label rather than a heading.
+    letterSpacing: -0.6,
     color: text,
   );
   static const bodyText = TextStyle(
