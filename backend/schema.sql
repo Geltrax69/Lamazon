@@ -541,3 +541,36 @@ CREATE TABLE IF NOT EXISTS checkout_attempts (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  PRIMARY KEY (buyer_email, request_id)
 );
+
+-- Correct only the specific catalogue spelling errors documented in QA B33.
+-- Product IDs, prices, inventory and historical order snapshots are preserved.
+UPDATE inventory_items SET title=replace(replace(title,'Chesse','Cheese'),'TIkki','Tikki')
+WHERE title LIKE '%Chesse%' OR title LIKE '%TIkki%';
+UPDATE products SET name=replace(replace(name,'Chesse','Cheese'),'TIkki','Tikki')
+WHERE name LIKE '%Chesse%' OR name LIKE '%TIkki%';
+
+
+-- Staff-managed storefront artwork. Empty category means the whole catalogue;
+-- empty department shows the campaign on Home and every department.
+CREATE TABLE IF NOT EXISTS storefront_campaigns (
+ id TEXT PRIMARY KEY,
+ title TEXT NOT NULL,
+ subtitle TEXT NOT NULL DEFAULT '',
+ cta TEXT NOT NULL,
+ category TEXT NOT NULL DEFAULT '',
+ department TEXT NOT NULL DEFAULT '',
+ image_url TEXT NOT NULL DEFAULT '',
+ colour TEXT NOT NULL DEFAULT '#F2E8CE',
+ enabled BOOLEAN NOT NULL DEFAULT true,
+ position INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS storefront_migrations (id TEXT PRIMARY KEY);
+-- Seed once, so deleting or hiding the initial campaign survives a restart.
+WITH first_run AS (
+ INSERT INTO storefront_migrations(id) VALUES ('campaigns-v1')
+ ON CONFLICT DO NOTHING RETURNING id
+)
+INSERT INTO storefront_campaigns(id,title,subtitle,cta,colour)
+SELECT 'everyday', 'Little joys. Everyday.',
+ 'Your local favourites, all in one place.', 'Explore the collection', '#F2E8CE'
+FROM first_run ON CONFLICT DO NOTHING;

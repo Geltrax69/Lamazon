@@ -4,11 +4,12 @@ import "time"
 
 // Product is one listing in the catalog.
 type Product struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Category string  `json:"category"`
-	Tab      string  `json:"tab"`
-	Price    float64 `json:"price"`
+	AvailableStock *int    `json:"availableStock,omitempty"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Category       string  `json:"category"`
+	Tab            string  `json:"tab"`
+	Price          float64 `json:"price"`
 	// What it cost before the discount. Zero means there is no discount to
 	// show — not a free item — so the badge and the struck-through line are
 	// both driven off "is this above price", never off "is this set".

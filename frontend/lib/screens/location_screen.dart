@@ -347,7 +347,7 @@ class _Field extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF9A9A9A)),
+          Icon(icon, size: 18, color: const Color(0xFF62645E)),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
@@ -355,12 +355,18 @@ class _Field extends StatelessWidget {
               keyboardType: keyboardType,
               onChanged: onChanged,
               decoration: InputDecoration(
+                labelText: hint,
                 hintText: hint,
                 hintStyle: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF9A9A9A),
+                  color: Color(0xFF62645E),
                 ),
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF1D4A3C), width: 2),
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),

@@ -202,7 +202,7 @@ class AddressesScreen extends StatelessWidget {
                                           child: Icon(
                                             LucideIcons.trash2,
                                             size: 16,
-                                            color: Color(0xFF9A9A9A),
+                                            color: Color(0xFF62645E),
                                           ),
                                         ),
                                       ),

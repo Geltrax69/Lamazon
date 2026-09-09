@@ -104,7 +104,7 @@ class HelpScreen extends StatelessWidget {
                                   ),
                                 ),
                                 iconColor: _ink,
-                                collapsedIconColor: const Color(0xFF9A9A9A),
+                                collapsedIconColor: const Color(0xFF62645E),
                                 childrenPadding: const EdgeInsets.fromLTRB(
                                   20,
                                   0,
@@ -147,7 +147,7 @@ class HelpScreen extends StatelessWidget {
                         'Lamazon · ${AppInfo.version}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF9A9A9A),
+                          color: Color(0xFF62645E),
                         ),
                       ),
                     ),
@@ -187,7 +187,7 @@ class _ContactTile extends StatelessWidget {
       trailing: const Icon(
         LucideIcons.chevronRight,
         size: 16,
-        color: Color(0xFF9A9A9A),
+        color: Color(0xFF62645E),
       ),
       onTap: () => Navigator.push(
         context,

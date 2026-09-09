@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
 import 'addresses.dart';
+import 'campaigns.dart';
 import 'orders.dart';
 import 'seller.dart';
 import 'session.dart';
@@ -109,6 +110,47 @@ class Api {
     '/api/admin/policies/${Uri.encodeComponent(slug)}',
     {'title': title, 'body': body},
   );
+
+  Future<List<Campaign>> campaigns({bool admin = false}) async {
+    final rows = admin
+        ? (await _staffCall(
+                StaffSession.admin,
+                'GET',
+                '/api/admin/campaigns',
+              ))['campaigns']
+              as List<dynamic>
+        : await _getList('/api/campaigns');
+    return [for (final r in rows) Campaign.fromJson(r as Map<String, dynamic>)];
+  }
+
+  Future<void> saveCampaign(Campaign campaign) => _staffCall(
+    StaffSession.admin,
+    'PUT',
+    '/api/admin/campaigns/${Uri.encodeComponent(campaign.id)}',
+    campaign.toJson(),
+  );
+  Future<void> deleteCampaign(String id) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/campaigns/${Uri.encodeComponent(id)}',
+  );
+  Future<String> uploadCampaignPhoto(Uint8List photo) async {
+    final req =
+        http.MultipartRequest('POST', _url('/api/admin/campaign-photos'))
+          ..headers.addAll(_staffHeader(StaffSession.admin))
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              photo,
+              filename: 'campaign.jpg',
+            ),
+          );
+    final res = await http.Response.fromStream(
+      await req.send().timeout(_uploadTimeout),
+    );
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return (jsonDecode(res.body) as Map<String, dynamic>)['imageUrl'] as String;
+  }
 
   /// The shop's navigation: departments, each with its categories nested.
   Future<List<dynamic>> categories() => _getList('/api/categories');
@@ -982,6 +1024,7 @@ class Api {
     category: r['category'] as String? ?? '',
     tab: r['tab'] as String? ?? 'All',
     price: (r['price'] as num).toDouble(),
+    availableStock: (r['availableStock'] as num?)?.toInt(),
     mrp: (r['mrp'] as num?)?.toDouble() ?? 0,
     imageUrl: r['imageUrl'] as String? ?? '',
     store: r['store'] as String? ?? '',

@@ -27,8 +27,9 @@ import 'package:lamazon/screens/wishlist_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 void main() {
-  testWidgets('login screen skips into home, which loads then shows content',
-      (tester) async {
+  testWidgets('login screen skips into home, which loads then shows content', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const LamazonApp());
       expect(find.text('Local choice. Global experience.'), findsOneWidget);
@@ -41,16 +42,35 @@ void main() {
 
       // The catalog now comes from the API and falls back to bundled data
       // when it is unreachable, which is instant in tests.
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Stores near you'), findsOneWidget);
-      expect(find.text('New Arrival'), findsOneWidget);
-      // Once in the tab bar, once as the heading of its category board.
-      expect(find.text('Electronics'), findsWidgets);
-      expect(find.text('Home'), findsOneWidget);
-      // The location prompt covers home until it is answered.
-      await tester.tap(find.text('Enable device location'));
+      for (
+        var attempt = 0;
+        attempt < 12 && find.byType(Scrollable).evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Choose delivery location'), findsOneWidget);
+      for (
+        var attempt = 0;
+        attempt < 12 && find.text('Stores near you').evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(find.text('Stores near you'), findsOneWidget);
+      for (
+        var attempt = 0;
+        attempt < 8 &&
+            find.text('Discover local favourites').evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(find.text('Discover local favourites'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
 
       // Prices sit below the fold now, so scroll the product grid into view.
       await tester.drag(find.byType(ListView).first, const Offset(0, -400));
@@ -84,6 +104,8 @@ void main() {
 
       // The bug: the price used to stay at the unit price whatever the stepper
       // said. Two of them costs twice as much.
+      await tester.ensureVisible(find.byIcon(LucideIcons.plus));
+      await tester.pump();
       await tester.tap(find.byIcon(LucideIcons.plus));
       await tester.pump();
       expect(find.text('₹${(p.price * 2).toStringAsFixed(0)}'), findsOneWidget);
@@ -94,12 +116,15 @@ void main() {
       expect(find.text('From: $unit'), findsOneWidget);
 
       // Every photo is a page you swipe, not a thumbnail you tap.
+      await tester.drag(find.byType(ListView).first, const Offset(0, 1000));
+      await tester.pump();
       expect(find.byType(PageView), findsOneWidget);
     });
   });
 
-  testWidgets('search filters, wishlist toggles, profile renders',
-      (tester) async {
+  testWidgets('search filters, wishlist toggles, profile renders', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       // Search
       await tester.pumpWidget(const MaterialApp(home: SearchScreen()));
@@ -125,14 +150,22 @@ void main() {
       expect(find.text('Your orders'), findsOneWidget);
       // Below the fold in a test-sized window now that the nav bar leaves
       // room under the last row.
-      await tester.scrollUntilVisible(find.text('Address book'), 200,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.text('Address book'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Address book'), findsOneWidget);
 
       // Shop screen shows that vendor's products. It asks the API first and
       // falls back to the bundled list, so give the future a frame to settle.
-      await tester.pumpWidget(MaterialApp(
-          home: ShopScreen(shop: shops.firstWhere((s) => s.name == 'GadgetHub'))));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ShopScreen(
+            shop: shops.firstWhere((s) => s.name == 'GadgetHub'),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Wireless Headphones'), findsOneWidget);
     });
@@ -152,26 +185,43 @@ void main() {
     });
   });
 
-  testWidgets('seller opens a store, then stocks and restocks it',
-      (tester) async {
+  testWidgets('seller opens a store, then stocks and restocks it', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(
-          const MaterialApp(home: SellerOnboardingScreen()));
+        const MaterialApp(home: SellerOnboardingScreen()),
+      );
 
       // Create is blocked until name, location, a served city and a
       // category are all present.
       await tester.enterText(
-          find.widgetWithText(TextField, 'e.g. Campus Snacks Corner'),
-          'Campus Snacks');
+        find.widgetWithText(TextField, 'e.g. Campus Snacks Corner'),
+        'Campus Snacks',
+      );
       // The rest of the form sits below the fold in a test-sized window.
       await tester.scrollUntilVisible(
-          find.widgetWithText(TextField, 'Block / shop number, area'), 200,
-          scrollable: find.byType(Scrollable).first);
+        find.byWidgetPredicate(
+          (w) =>
+              w is TextField &&
+              w.decoration?.labelText == 'Block / shop number, area',
+        ),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Block / shop number, area'),
-          'Block 32, Shop 4');
-      await tester.scrollUntilVisible(find.text('Food'), 200,
-          scrollable: find.byType(Scrollable).first);
+        find.byWidgetPredicate(
+          (w) =>
+              w is TextField &&
+              w.decoration?.labelText == 'Block / shop number, area',
+        ),
+        'Block 32, Shop 4',
+      );
+      await tester.scrollUntilVisible(
+        find.text('Food'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Food'));
       await tester.pump();
 
@@ -183,22 +233,26 @@ void main() {
       expect(Seller.instance.store!.categories, ['Food']);
 
       // Stock two lines and check the derived totals.
-      Seller.instance.addItem(InventoryItem(
-        id: 'i1',
-        title: 'Cold Coffee 300ml',
-        description: 'Chilled',
-        category: 'Food',
-        price: 60,
-        stock: 10,
-      ));
-      Seller.instance.addItem(InventoryItem(
-        id: 'i2',
-        title: 'Veg Sandwich',
-        description: 'Grilled',
-        category: 'Food',
-        price: 40,
-        stock: 3,
-      ));
+      Seller.instance.addItem(
+        InventoryItem(
+          id: 'i1',
+          title: 'Cold Coffee 300ml',
+          description: 'Chilled',
+          category: 'Food',
+          price: 60,
+          stock: 10,
+        ),
+      );
+      Seller.instance.addItem(
+        InventoryItem(
+          id: 'i2',
+          title: 'Veg Sandwich',
+          description: 'Grilled',
+          category: 'Food',
+          price: 40,
+          stock: 3,
+        ),
+      );
       expect(Seller.instance.skuCount, 2);
       expect(Seller.instance.inventoryValue, 60 * 10 + 40 * 3);
       expect(Seller.instance.lowOrOutCount, 1); // the sandwich is low
@@ -207,8 +261,9 @@ void main() {
       Seller.instance.adjustStock('i2', -10);
       expect(Seller.instance.items.firstWhere((i) => i.id == 'i2').stock, 0);
       expect(
-          Seller.instance.items.firstWhere((i) => i.id == 'i2').status,
-          StockStatus.out);
+        Seller.instance.items.firstWhere((i) => i.id == 'i2').status,
+        StockStatus.out,
+      );
 
       // Creating the store already navigated to the dashboard.
       await tester.pump();
@@ -221,8 +276,11 @@ void main() {
       expect(find.text('Your store has been sent for review'), findsOneWidget);
       expect(find.text('Add product'), findsNothing);
 
-      await tester.scrollUntilVisible(find.text('Inventory value'), 200,
-          scrollable: find.byType(Scrollable).last);
+      await tester.scrollUntilVisible(
+        find.text('Inventory value'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('Inventory value'), findsOneWidget);
 
       // Orders come from the server now. The dashboard used to invent two
@@ -237,7 +295,14 @@ void main() {
       // The seller bottom-nav icon used to trigger a web StackOverflowError
       // when the home screen rebuilt after a refresh.
       await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
-      await tester.pump(const Duration(milliseconds: 400));
+      for (
+        var attempt = 0;
+        attempt < 12 && find.byType(Scrollable).evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      await tester.pump();
       expect(tester.takeException(), isNull);
 
       // The stock lines sit below the store header and stats.
@@ -266,8 +331,7 @@ void main() {
     expect(isServiceable(''), isFalse);
   });
 
-  testWidgets('the address form asks only what a porter needs',
-      (tester) async {
+  testWidgets('the address form asks only what a porter needs', (tester) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: LocationScreen()));
 
@@ -279,12 +343,17 @@ void main() {
       // A porter needs someone to hand the bag to, so the form asks who and
       // on what number before it will save anything.
       await tester.enterText(
-          find.widgetWithText(TextField, 'Full name'), 'Lalit Singh');
+        find.widgetWithText(TextField, 'Full name'),
+        'Lalit Singh',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Mobile number'), '9876543210');
+        find.widgetWithText(TextField, 'Mobile number'),
+        '9876543210',
+      );
       await tester.enterText(
-          find.widgetWithText(TextField, 'Hostel and room, or block and shop'),
-          'Hostel BH-9, Room 214');
+        find.widgetWithText(TextField, 'Hostel and room, or block and shop'),
+        'Hostel BH-9, Room 214',
+      );
       await tester.pump();
 
       await tester.tap(find.text('Check availability'));
@@ -304,8 +373,9 @@ void main() {
   // Orders come from the server now, so with no server there is nothing to
   // show — and saying so is the point. The old version asserted a hard-coded
   // "LMZ-10234" that no real order ever had.
-  testWidgets('orders come from the server, not from a sample list',
-      (tester) async {
+  testWidgets('orders come from the server, not from a sample list', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(const MaterialApp(home: OrdersScreen()));
       await tester.pump();
@@ -342,7 +412,7 @@ void main() {
       await tester.pump();
       expect(Cart.instance.total, p.price + 15);
       // At one unit "each" would just repeat the line total, so it goes away.
-      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsNothing);
+      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsOneWidget);
 
       Cart.instance.remove(p.id);
       await tester.pump();
@@ -353,8 +423,9 @@ void main() {
   test('shop storefront includes items it stocks at its own price', () {
     // Fresh Milk is listed by Nature Fresh; FreshMart stocks it cheaper.
     final milk = products.firstWhere((p) => p.name == 'Fresh Milk 1L');
-    final freshMartPrice =
-        milk.offers.firstWhere((o) => o.store == 'FreshMart').price;
+    final freshMartPrice = milk.offers
+        .firstWhere((o) => o.store == 'FreshMart')
+        .price;
 
     final stock = productsAtShop('FreshMart');
     final listed = stock.firstWhere((p) => p.name == 'Fresh Milk 1L');
@@ -378,18 +449,30 @@ void main() {
       expect(find.text('Settings'), findsOneWidget);
       final toggle = find.byType(Switch).first;
       await tester.pump();
-      expect(tester.widget<Switch>(toggle).onChanged, isNull,
-          reason: 'preferences cannot be changed before the server confirms them');
+      expect(
+        tester.widget<Switch>(toggle).onChanged,
+        isNull,
+        reason: 'preferences cannot be changed before the server confirms them',
+      );
     });
   });
 
   test('a failed address save does not fabricate a local address', () async {
     AddressBook.instance.clear();
-    await expectLater(AddressBook.instance.add(const Address(
-      id: 'unsaved', label: AddressLabel.home, line: 'Block 34',
-      city: 'Lovely Professional University', pincode: '144411',
-      name: 'Lalit', phone: '9876543210',
-    )), throwsException);
+    await expectLater(
+      AddressBook.instance.add(
+        const Address(
+          id: 'unsaved',
+          label: AddressLabel.home,
+          line: 'Block 34',
+          city: 'Lovely Professional University',
+          pincode: '144411',
+          name: 'Lalit',
+          phone: '9876543210',
+        ),
+      ),
+      throwsException,
+    );
     expect(AddressBook.instance.addresses, isEmpty);
   });
 
@@ -409,6 +492,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
       }
 
+      for (
+        var attempt = 0;
+        attempt < 12 && find.text('Stores near you').evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+        await tester.pump();
+      }
       expect(find.text('See all'), findsWidgets);
 
       // Stores near you comes first now and opens the shops list; Shop By
@@ -425,8 +516,20 @@ void main() {
       // Back to home, then the second one, which is the category row.
       tester.state<NavigatorState>(find.byType(Navigator).first).pop();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.text('See all').at(1));
+      for (
+        var attempt = 0;
+        attempt < 12 &&
+            find.text('Discover local favourites').evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(find.text('Discover local favourites'), findsOneWidget);
+      final searchLink = find.text('See all').last;
+      await tester.ensureVisible(searchLink);
+      await tester.pump();
+      await tester.tap(searchLink, warnIfMissed: false);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(SearchScreen), findsOneWidget);

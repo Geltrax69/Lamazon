@@ -1,3 +1,4 @@
+import '../widgets/design_system.dart';
 import '../data/money.dart';
 import '../data/wishlist.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,6 @@ import '../widgets/status_views.dart';
 import 'cart_screen.dart';
 import 'compare_screen.dart';
 
-const _hero = Color(0xFFF3A952); // warm orange hero, from the design
 const _ink = Color(0xFF1A1A1A);
 
 class DetailsScreen extends StatefulWidget {
@@ -48,167 +48,214 @@ class _DetailsScreenState extends State<DetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    return ScaffoldMessenger(
-      key: _messenger,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF6F5F2),
-        body: ReadableBody(
-          maxWidth: 760,
-          child: Column(
+    final info = Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            p.store,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: LamazonTheme.green,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(p.name, style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _Hero(product: p),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            p.name,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        _QtyStepper(
-                          qty: _qty,
-                          onChanged: (q) => setState(() => _qty = q),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        // The number follows the stepper: two of them costs
-                        // twice as much, with the unit price kept in view so
-                        // the total is never a mystery.
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '₹${(p.price * _qty).moneyText}',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                if (p.discounted) ...[
-                                  const SizedBox(width: 8),
-                                  // Named, not just struck through: a second
-                                  // number with a line through it is only
-                                  // obviously the old price if you already know
-                                  // that is the convention.
-                                  Text(
-                                    'MRP ₹${(p.mrp * _qty).moneyText}',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      color: Color(0xFF8A8A8A),
-                                      decoration: TextDecoration.lineThrough,
-                                      decorationColor: Color(0xFF8A8A8A),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  DiscountBadge(percent: p.discountPercent),
-                                ],
-                              ],
-                            ),
-                            // The saving in rupees as well as percent. The
-                            // rupees follow the stepper, because that is the
-                            // number that changes when you buy two.
-                            if (p.discounted)
-                              Text(
-                                'You save ₹${((p.mrp - p.price) * _qty).moneyText}'
-                                ' (${p.discountPercent}%)',
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1B7F3B),
-                                ),
-                              ),
-                            Text(
-                              _qty == 1
-                                  ? 'From: ₹${p.price.moneyText}'
-                                  : '$_qty × ₹${p.price.moneyText}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF6B6B6B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    // Whatever this shop sells by, in the order it listed them.
-                    // The size row used to be hardcoded and the colour dots were
-                    // decoration — four swatches every product had, none of
-                    // which any shop had chosen.
-                    for (final option in p.choices)
-                      _OptionPicker(
-                        option: option,
-                        selected: _picked[option.name],
-                        onPick: (v) => setState(() => _picked[option.name] = v),
-                      ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Description',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      p.description,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: Color(0xFF6B6B6B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sold by ${p.store}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9A9A9A),
-                      ),
-                    ),
-                    ..._compareSection(context, p),
-                  ],
+              Text(
+                '₹${(p.price * _qty).moneyText}',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (p.discounted)
+                Text(
+                  'MRP ₹${(p.mrp * _qty).moneyText}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: LamazonTheme.muted,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+              if (p.discounted) DiscountBadge(percent: p.discountPercent),
+            ],
+          ),
+          if (p.discounted)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'You save ₹${((p.mrp - p.price) * _qty).moneyText}',
+                style: const TextStyle(
+                  color: LamazonTheme.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Text(
+            _qty == 1
+                ? 'From: ₹${p.price.moneyText}'
+                : '$_qty × ₹${p.price.moneyText}',
+            style: const TextStyle(color: LamazonTheme.muted),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            p.availableStock == null
+                ? 'Availability confirmed at checkout'
+                : p.availableStock == 0
+                ? 'Currently out of stock'
+                : '${p.availableStock} available',
+            style: const TextStyle(
+              color: LamazonTheme.green,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Icon(LucideIcons.star, size: 16, color: LamazonTheme.muted),
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'No ratings yet',
+                  style: TextStyle(color: LamazonTheme.muted, fontSize: 14),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(LucideIcons.truck),
+            title: Text('Local delivery'),
+            subtitle: Text(
+              '₹15 delivery per order. Timing confirmed by the store.',
+            ),
+          ),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(LucideIcons.banknote),
+            title: Text('Cash on delivery'),
+            subtitle: Text('Pay the rider when your order arrives.'),
+          ),
+          const Divider(),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 24,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'Quantity',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              _QtyStepper(
+                qty: _qty,
+                onChanged: (q) => setState(() => _qty = q),
+              ),
+            ],
+          ),
+          for (final option in p.choices)
+            _OptionPicker(
+              option: option,
+              selected: _picked[option.name],
+              onPick: (v) => setState(() => _picked[option.name] = v),
+            ),
+          const SizedBox(height: 28),
+          Text(
+            'About this product',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            p.description.isEmpty
+                ? 'Product details have not been provided by the store.'
+                : p.description,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: LamazonTheme.muted,
+            ),
+          ),
+          ..._compareSection(context, p),
+        ],
+      ),
+    );
+    return ScaffoldMessenger(
+      key: _messenger,
+      child: Scaffold(
+        backgroundColor: LamazonTheme.canvas,
+        body: SafeArea(
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              if (c.maxWidth >= 900) {
+                return SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: _Hero(product: p)),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 5, child: info),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return ListView(
+                children: [
+                  _Hero(product: p),
+                  info,
+                ],
+              );
+            },
+          ),
         ),
-        bottomNavigationBar: ReadableBody(
-          maxWidth: 760,
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: LamazonTheme.line)),
+          ),
           child: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _PillButton(
-                    label: 'Add to Cart',
-                    background: Colors.white,
-                    onTap: _addToCart,
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: ReadableBody(
+              maxWidth: 1100,
+              child: Row(
+                children: [
+                  if (MediaQuery.sizeOf(context).width >= 900)
+                    Expanded(
+                      child: Text(
+                        '₹${(p.price * _qty).moneyText}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: p.availableStock == 0 ? null : _addToCart,
+                      child: const Text('Add to Cart'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _PillButton(
-                    label: 'Buy Now',
-                    background: _hero,
-                    onTap: _buyNow,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: p.availableStock == 0 ? null : _buyNow,
+                      child: const Text('Buy Now'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -261,7 +308,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
     const SizedBox(height: 2),
     Text(
       'Compared with ₹${p.price.moneyText} at ${p.store}',
-      style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A)),
+      style: const TextStyle(fontSize: 12, color: Color(0xFF62645E)),
     ),
     const SizedBox(height: 10),
     for (final o in p.offers)
@@ -297,7 +344,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
                   ),
                   const Text(
                     'Same product',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9A9A9A)),
+                    style: TextStyle(fontSize: 11, color: Color(0xFF62645E)),
                   ),
                 ],
               ),
@@ -333,7 +380,7 @@ Widget _diffBadge(double diff) {
     color = const Color(0xFF2E7D32);
   } else {
     label = 'Same price';
-    color = const Color(0xFF9A9A9A);
+    color = const Color(0xFF62645E);
   }
   return Text(
     label,
@@ -366,7 +413,9 @@ class _HeroState extends State<_Hero> {
     final photos = [widget.product.imageUrl, ...widget.product.extraImages];
 
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.44,
+      height: MediaQuery.sizeOf(context).width >= 900
+          ? 540
+          : (MediaQuery.sizeOf(context).height * .45).clamp(240.0, 420.0),
       child: Stack(
         children: [
           // The photos sit on the page background — no coloured card behind.
@@ -379,8 +428,12 @@ class _HeroState extends State<_Hero> {
                 controller: _pages,
                 itemCount: photos.length,
                 onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (_, i) =>
-                    NetImage(url: photos[i], sourceWidth: 1024),
+                itemBuilder: (_, i) => NetImage(
+                  url: photos[i],
+                  sourceWidth: 1024,
+                  semanticLabel:
+                      '${widget.product.name}, image ${i + 1} of ${photos.length}',
+                ),
               ),
             ),
           ),
@@ -423,25 +476,46 @@ class _HeroState extends State<_Hero> {
           ),
           if (photos.length > 1)
             Positioned(
-              left: 0,
-              right: 0,
+              left: 16,
+              right: 16,
               bottom: 16,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  for (var i = 0; i < photos.length; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _page ? 18 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: i == _page
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
+                  ActionIcon(
+                    icon: LucideIcons.chevronLeft,
+                    label: 'Previous image',
+                    onPressed: _page == 0
+                        ? null
+                        : () => _pages.previousPage(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                          ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
                     ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_page + 1} / ${photos.length}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  ActionIcon(
+                    icon: LucideIcons.chevronRight,
+                    label: 'Next image',
+                    onPressed: _page == photos.length - 1
+                        ? null
+                        : () => _pages.nextPage(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -458,17 +532,14 @@ class _RoundIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 18, color: _ink),
-      ),
+    return ActionIcon(
+      icon: icon,
+      label: icon == LucideIcons.arrowLeft
+          ? 'Back'
+          : icon == LucideIcons.shoppingCart
+          ? 'Open cart'
+          : 'Save product',
+      onPressed: onTap,
     );
   }
 }
@@ -505,52 +576,13 @@ class _QtyStepper extends StatelessWidget {
   }
 
   Widget _step(IconData icon, VoidCallback onTap, {required bool filled}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: filled ? _hero : Colors.white,
-          shape: BoxShape.circle,
-          border: filled ? null : Border.all(color: const Color(0xFFE3E3E0)),
-        ),
-        child: Icon(icon, size: 14, color: _ink),
+    return IconButton.filledTonal(
+      tooltip: filled ? 'Increase quantity' : 'Decrease quantity',
+      onPressed: !filled && qty <= 1 ? null : onTap,
+      style: IconButton.styleFrom(
+        backgroundColor: filled ? LamazonTheme.accent : Colors.white,
       ),
-    );
-  }
-}
-
-class _PillButton extends StatelessWidget {
-  final String label;
-  final Color background;
-  final VoidCallback onTap;
-  const _PillButton({
-    required this.label,
-    required this.background,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 54,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: _ink,
-          ),
-        ),
-      ),
+      icon: Icon(icon, size: 18),
     );
   }
 }
@@ -602,45 +634,19 @@ class _OptionPicker extends StatelessWidget {
             runSpacing: 10,
             children: [
               for (final value in option.values)
-                if (option.isColour)
-                  GestureDetector(
-                    onTap: () => onPick(value),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: _swatchColour(value),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selected == value ? _ink : Colors.black12,
-                          width: selected == value ? 2.5 : 1,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  GestureDetector(
-                    onTap: () => onPick(value),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected == value ? _hero : Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Text(
-                        value,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: selected == value
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
+                ChoiceChip(
+                  label: Text(value),
+                  avatar: option.isColour
+                      ? CircleAvatar(
+                          backgroundColor: _swatchColour(value),
+                          radius: 9,
+                        )
+                      : null,
+                  selected: selected == value,
+                  onSelected: (_) => onPick(value),
+                  selectedColor: LamazonTheme.accent,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                ),
             ],
           ),
         ],

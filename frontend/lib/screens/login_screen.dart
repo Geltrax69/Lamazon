@@ -328,7 +328,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                       if (_valid && !_busy) _submit();
                                     },
                                     decoration: InputDecoration(
+                                      filled: false,
                                       border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: const UnderlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Color(0xFF1D4A3C),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      labelText: switch (_step) {
+                                        _Step.email => 'Email address',
+                                        _Step.code => 'Verification code',
+                                        _Step.password => 'Password',
+                                      },
                                       hintText: switch (_step) {
                                         _Step.email => 'Enter email address',
                                         _Step.code => 'Enter the 6-digit code',
@@ -432,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'By continuing, you agree to our ',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF9A9A9A),
+                          color: Color(0xFF62645E),
                         ),
                       ),
                       _PolicyLink(slug: 'terms', label: 'Terms and Conditions'),
@@ -440,7 +453,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ' & ',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF9A9A9A),
+                          color: Color(0xFF62645E),
                         ),
                       ),
                       _PolicyLink(slug: 'privacy', label: 'Privacy Policy'),
@@ -484,7 +497,7 @@ class _PolicyLink extends StatelessWidget {
           color: Color(0xFF6B6B6B),
           fontWeight: FontWeight.w700,
           decoration: TextDecoration.underline,
-          decorationColor: Color(0xFF9A9A9A),
+          decorationColor: Color(0xFF62645E),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'design_system.dart';
 import '../data/money.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -21,63 +22,89 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: NetImage(url: product.imageUrl),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: WishlistHeart(productId: product.id),
-                ),
-                // Bottom-left, where it sits over the image rather than over
-                // the product: the top corners are the heart's and the part
-                // of a photo people frame their subject in.
-                if (product.discounted)
-                  Positioned(
-                    left: 10,
-                    bottom: 10,
-                    child: DiscountBadge(percent: product.discountPercent),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    Text(
-                      product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: NetImage(
+                          url: product.imageUrl,
+                          semanticLabel: product.name,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    PriceLine(product: product),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: WishlistHeart(productId: product.id),
+                    ),
+                    if (product.discounted)
+                      Positioned(
+                        left: 4,
+                        bottom: 4,
+                        child: DiscountBadge(percent: product.discountPercent),
+                      ),
                   ],
                 ),
               ),
-              if (showAddToCart) CartButton(product: product),
+              const SizedBox(height: 10),
+              Text(
+                product.store,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, color: LamazonTheme.muted),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                product.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.25,
+                ),
+              ),
+              if (product.availableStock != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    product.availableStock == 0
+                        ? 'Out of stock'
+                        : product.availableStock! <= 5
+                        ? 'Only ${product.availableStock} left'
+                        : 'In stock',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: product.availableStock == 0
+                          ? Colors.red.shade800
+                          : LamazonTheme.green,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(child: PriceLine(product: product, fontSize: 17)),
+                  if (showAddToCart) CartButton(product: product),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -155,35 +182,19 @@ class WishlistHeart extends StatelessWidget {
       listenable: Wishlist.instance,
       builder: (context, _) {
         final liked = Wishlist.instance.contains(productId);
-        return GestureDetector(
-          onTap: () => Wishlist.instance.toggle(productId),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            // Small pop each time the heart toggles, in both directions.
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, anim) => ScaleTransition(
-                scale: Tween(begin: 0.6, end: 1.0).animate(
-                  CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-                ),
-                child: child,
-              ),
-              // Lucide is outline-only, so the filled state uses Material's
-              // heart — solid red once the product is wishlisted.
-              child: Icon(
-                liked ? Icons.favorite : LucideIcons.heart,
-                key: ValueKey(liked),
-                size: liked ? 18 : 16,
-                color: liked
-                    ? const Color(0xFFE53935)
-                    : const Color(0xFF1A1A1A),
-              ),
-            ),
+        return IconButton.filledTonal(
+          tooltip: liked ? 'Remove from saved' : 'Save product',
+          onPressed: () => Wishlist.instance.toggle(productId),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: .95),
+            minimumSize: const Size(48, 48),
           ),
+          icon: Icon(
+            liked ? Icons.favorite : LucideIcons.heart,
+            size: 20,
+            color: liked ? const Color(0xFFC62828) : LamazonTheme.ink,
+          ),
+          isSelected: liked,
         );
       },
     );
@@ -203,7 +214,7 @@ class _CartButtonState extends State<CartButton> {
   bool _added = false;
 
   void _add() {
-    if (_added) return;
+    if (_added || widget.product.availableStock == 0) return;
     setState(() => _added = true);
     Cart.instance.add(widget.product);
     showAddedToast(context, widget.product);
@@ -214,33 +225,21 @@ class _CartButtonState extends State<CartButton> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _add,
-      child: AnimatedScale(
-        scale: _added ? 1.18 : 1,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutBack,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: _added ? const Color(0xFF43A047) : const Color(0xFF1A1A1A),
-            shape: BoxShape.circle,
-          ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) =>
-                ScaleTransition(scale: anim, child: child),
-            child: Icon(
-              _added ? LucideIcons.check : LucideIcons.shoppingCart,
-              key: ValueKey(_added),
-              size: 15,
-              color: Colors.white,
-            ),
-          ),
-        ),
+    return IconButton.filled(
+      tooltip: widget.product.availableStock == 0
+          ? 'Out of stock'
+          : _added
+          ? 'Added to cart'
+          : 'Add ${widget.product.name} to cart',
+      onPressed: _added || widget.product.availableStock == 0 ? null : _add,
+      style: IconButton.styleFrom(
+        backgroundColor: LamazonTheme.accent,
+        foregroundColor: LamazonTheme.ink,
+        disabledBackgroundColor: LamazonTheme.green,
+        disabledForegroundColor: Colors.white,
+        minimumSize: const Size(48, 48),
       ),
+      icon: Icon(_added ? LucideIcons.check : LucideIcons.plus, size: 20),
     );
   }
 }
@@ -261,12 +260,14 @@ class NetImage extends StatelessWidget {
   final BoxFit? fit;
   final double? padTo;
   final int? sourceWidth;
+  final String? semanticLabel;
   const NetImage({
     super.key,
     required this.url,
     this.fit,
     this.padTo = 1,
     this.sourceWidth,
+    this.semanticLabel,
   });
 
   @override
@@ -279,9 +280,11 @@ class NetImage extends StatelessWidget {
       padTo == null
           ? optimizedImage(url, sourceWidth ?? 1024)
           : padded(url, padTo!, sourceWidth),
+      semanticLabel: semanticLabel,
+      excludeFromSemantics: semanticLabel == null,
       fit: fit ?? (padTo == null ? BoxFit.cover : BoxFit.contain),
       loadingBuilder: (_, child, progress) =>
-          progress == null ? child : Container(color: const Color(0xFFE8E8E4)),
+          progress == null ? child : const Skeleton(),
       errorBuilder: (_, error, _) {
         debugPrint('NetImage error [$url]: $error');
         return _fallback();

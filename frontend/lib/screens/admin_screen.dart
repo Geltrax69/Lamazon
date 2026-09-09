@@ -1,3 +1,5 @@
+import '../data/csv_export.dart';
+import '../widgets/design_system.dart';
 import '../data/money.dart';
 import 'dart:typed_data';
 
@@ -11,6 +13,7 @@ import '../models/product.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
 import 'admin_photos_screen.dart';
+import 'campaign_manager.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
@@ -169,6 +172,11 @@ class _AdminHomeState extends State<_AdminHome> {
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
+  String _search = '';
+  String _stage = 'All';
+  DateTimeRange? _dates;
+  int _page = 0;
+  static const _pageSize = 25;
 
   @override
   void initState() {
@@ -226,8 +234,36 @@ class _AdminHomeState extends State<_AdminHome> {
   }
 
   Future<void> _approve(String owner) async {
-    await Api.instance.approveStore(owner);
-    await _load();
+    final store = _stores
+        .cast<Map<String, dynamic>>()
+        .where((s) => s['owner'] == owner)
+        .firstOrNull;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Publish this store?'),
+        content: Text(
+          '${store?['name'] ?? owner} will be visible to shoppers and able to list products.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Approve store'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true) return;
+    try {
+      await Api.instance.approveStore(owner);
+      await _load();
+    } catch (_) {
+      if (mounted) _say('Could not approve the store. Try again.');
+    }
   }
 
   Future<void> _reject(String owner) async {
@@ -345,11 +381,20 @@ class _AdminHomeState extends State<_AdminHome> {
                               // answer for brand, colour and flavour.
                               Expanded(
                                 child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   initialValue: f.mode,
                                   isDense: true,
                                   decoration: const InputDecoration(
                                     isDense: true,
+                                    filled: false,
                                     border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: UnderlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Color(0xFF1D4A3C),
+                                        width: 2,
+                                      ),
+                                    ),
                                   ),
                                   style: const TextStyle(
                                     fontSize: 12.5,
@@ -992,7 +1037,7 @@ class _AdminHomeState extends State<_AdminHome> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
-        maxWidth: 820,
+        maxWidth: 1280,
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -1085,26 +1130,51 @@ class _AdminHomeState extends State<_AdminHome> {
                 const SizedBox(height: 22),
                 // One list at a time. Six sections stacked down one page meant
                 // scrolling past everything to reach anything.
-                SizedBox(
-                  height: 38,
-                  child: ListView(
-                    key: const PageStorageKey('admin-tabs'),
-                    scrollDirection: Axis.horizontal,
-                    children: [
+                if (MediaQuery.sizeOf(context).width < 700)
+                  DropdownButtonFormField<_Tab>(
+                    isExpanded: true,
+                    key: ValueKey(_tab),
+                    initialValue: _tab,
+                    decoration: const InputDecoration(
+                      labelText: 'Admin section',
+                    ),
+                    items: [
                       for (final tab in _Tab.values)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _Pill(
-                            label: '${tab.label} (${counts[tab]})',
-                            selected: _tab == tab,
-                            onTap: () => _show(tab),
+                        DropdownMenuItem(
+                          value: tab,
+                          child: Text(
+                            tab == _Tab.banners
+                                ? tab.label
+                                : '${tab.label} (${counts[tab]})',
                           ),
                         ),
                     ],
+                    onChanged: (value) {
+                      if (value != null) _show(value);
+                    },
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final tab in _Tab.values)
+                        ChoiceChip(
+                          label: Text(
+                            tab == _Tab.banners
+                                ? tab.label
+                                : '${tab.label} (${counts[tab]})',
+                          ),
+                          selected: _tab == tab,
+                          onSelected: (_) => _show(tab),
+                          selectedColor: LamazonTheme.accent,
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
+                if (_hasTable) ..._tableControls(),
                 ..._section(),
+                if (_hasTable) _pagination(),
               ],
             ),
           ),
@@ -1113,7 +1183,208 @@ class _AdminHomeState extends State<_AdminHome> {
     );
   }
 
-  void _show(_Tab tab) => setState(() => _tab = tab);
+  void _show(_Tab tab) => setState(() {
+    _tab = tab;
+    _search = '';
+    _stage = 'All';
+    _dates = null;
+    _page = 0;
+  });
+
+  bool get _hasTable => {
+    _Tab.review,
+    _Tab.approved,
+    _Tab.rejected,
+    _Tab.orders,
+    _Tab.delivery,
+    _Tab.people,
+  }.contains(_tab);
+  List<Map<String, dynamic>> get _activeRows => switch (_tab) {
+    _Tab.review => _storesWith('pending'),
+    _Tab.approved => _storesWith('approved'),
+    _Tab.rejected => _storesWith('rejected'),
+    _Tab.orders => _orders.cast<Map<String, dynamic>>(),
+    _Tab.delivery => _riders.cast<Map<String, dynamic>>(),
+    _Tab.people =>
+      (_overview?['people'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>(),
+    _ => [],
+  };
+  List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> rows) =>
+      rows.where((row) {
+        if (_search.isNotEmpty &&
+            !row.values
+                .join(' ')
+                .toLowerCase()
+                .contains(_search.toLowerCase())) {
+          return false;
+        }
+        if (_tab == _Tab.orders && _stage != 'All' && row['stage'] != _stage) {
+          return false;
+        }
+        if (_dates != null && _tab == _Tab.orders) {
+          final date = DateTime.tryParse(
+            row['placedAt']?.toString() ?? '',
+          )?.toLocal();
+          if (date == null ||
+              date.isBefore(_dates!.start) ||
+              !date.isBefore(_dates!.end.add(const Duration(days: 1)))) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+  List<Map<String, dynamic>> _visible(List<Map<String, dynamic>> rows) {
+    final filtered = _filtered(rows);
+    final page = _page.clamp(
+      0,
+      filtered.isEmpty ? 0 : (filtered.length - 1) ~/ _pageSize,
+    );
+    return filtered.skip(page * _pageSize).take(_pageSize).toList();
+  }
+
+  List<Widget> _tableControls() => [
+    TextField(
+      key: ValueKey('search-$_tab'),
+      decoration: InputDecoration(
+        labelText: 'Search ${_tab.label.toLowerCase()}',
+        prefixIcon: const Icon(LucideIcons.search),
+      ),
+      onChanged: (value) => setState(() {
+        _search = value.trim();
+        _page = 0;
+      }),
+    ),
+    const SizedBox(height: 12),
+    Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (_tab == _Tab.orders)
+          SizedBox(
+            width: 190,
+            child: DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _stage,
+              decoration: const InputDecoration(labelText: 'Order status'),
+              items: [
+                for (final status in [
+                  'All',
+                  'received',
+                  'accepted',
+                  'picked',
+                  'delivered',
+                  'rejected',
+                ])
+                  DropdownMenuItem(
+                    value: status,
+                    child: Text(status == 'All' ? 'All statuses' : status),
+                  ),
+              ],
+              onChanged: (value) => setState(() {
+                _stage = value!;
+                _page = 0;
+              }),
+            ),
+          ),
+        if (_tab == _Tab.orders)
+          OutlinedButton.icon(
+            icon: const Icon(LucideIcons.calendar),
+            label: Text(
+              _dates == null
+                  ? 'Date range'
+                  : '${_dates!.start.day}/${_dates!.start.month} – ${_dates!.end.day}/${_dates!.end.month}',
+            ),
+            onPressed: () async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+                initialDateRange: _dates,
+              );
+              if (picked != null && mounted) {
+                setState(() {
+                  _dates = picked;
+                  _page = 0;
+                });
+              }
+            },
+          ),
+        if (_dates != null)
+          TextButton(
+            onPressed: () => setState(() {
+              _dates = null;
+              _page = 0;
+            }),
+            child: const Text('Clear dates'),
+          ),
+        OutlinedButton.icon(
+          icon: const Icon(LucideIcons.download),
+          label: const Text('Export CSV'),
+          onPressed: _filtered(_activeRows).isEmpty
+              ? null
+              : () async {
+                  try {
+                    final message = await exportCsv(
+                      'lamazon-${_tab.name}.csv',
+                      rowsToCsv(_filtered(_activeRows)),
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Export failed. Try again.'),
+                        ),
+                      );
+                    }
+                  }
+                },
+        ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    if (_filtered(_activeRows).isEmpty)
+      const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text('No matching records. Try another search or filter.'),
+      ),
+  ];
+  Widget _pagination() {
+    final total = _filtered(_activeRows).length;
+    final page = _page.clamp(0, total == 0 ? 0 : (total - 1) ~/ _pageSize);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Wrap(
+        spacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            total == 0
+                ? '0 records'
+                : '${page * _pageSize + 1}–${((page + 1) * _pageSize).clamp(0, total)} of $total',
+          ),
+          OutlinedButton(
+            onPressed: page == 0
+                ? null
+                : () => setState(() => _page = page - 1),
+            child: const Text('Previous'),
+          ),
+          OutlinedButton(
+            onPressed: (page + 1) * _pageSize >= total
+                ? null
+                : () => setState(() => _page = page + 1),
+            child: const Text('Next'),
+          ),
+        ],
+      ),
+    );
+  }
 
   List<Map<String, dynamic>> _storesWith(String status) => _stores
       .cast<Map<String, dynamic>>()
@@ -1126,6 +1397,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.rejected: _storesWith('rejected').length,
     _Tab.orders: _orders.length,
     _Tab.insights: (_insights?['topStores'] as List?)?.length ?? 0,
+    _Tab.banners: 0,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
     _Tab.policies: _policies.length,
     _Tab.compare: _groups.length,
@@ -1137,6 +1409,8 @@ class _AdminHomeState extends State<_AdminHome> {
   /// context it needs — the rules that are not visible in the rows themselves.
   List<Widget> _section() {
     switch (_tab) {
+      case _Tab.banners:
+        return [const CampaignManager()];
       case _Tab.review:
         final pending = _storesWith('pending');
         return [
@@ -1147,7 +1421,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (pending.isEmpty)
             const _Empty('Nothing waiting. Every store has been looked at.')
           else
-            for (final s in pending)
+            for (final s in _visible(pending))
               _StoreCard(
                 store: s,
                 onApprove: () => _approve(s['owner'] as String),
@@ -1163,7 +1437,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (live.isEmpty)
             const _Empty('No approved stores yet.')
           else
-            for (final s in live)
+            for (final s in _visible(live))
               _StoreCard(
                 store: s,
                 onReject: () => _reject(s['owner'] as String),
@@ -1181,7 +1455,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (out.isEmpty)
             const _Empty('Nothing rejected.')
           else
-            for (final s in out)
+            for (final s in _visible(out))
               _StoreCard(
                 store: s,
                 onApprove: () => _approve(s['owner'] as String),
@@ -1199,7 +1473,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (_orders.isEmpty)
             const _Empty('No orders yet.')
           else
-            for (final ord in _orders.cast<Map<String, dynamic>>())
+            for (final ord in _visible(_orders.cast<Map<String, dynamic>>()))
               _AdminOrderRow(
                 order: ord,
                 riders: _riders,
@@ -1429,7 +1703,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (_riders.isEmpty)
             const _Empty('No delivery numbers yet.')
           else
-            for (final r in _riders.cast<Map<String, dynamic>>())
+            for (final r in _visible(_riders.cast<Map<String, dynamic>>()))
               _RiderRow(
                 rider: r,
                 onResetPin: () => _resetPin(r),
@@ -1450,7 +1724,7 @@ class _AdminHomeState extends State<_AdminHome> {
           if (people.isEmpty)
             const _Empty('Nobody has signed in yet.')
           else
-            for (final p in people) _PersonRow(person: p),
+            for (final p in _visible(people.toList())) _PersonRow(person: p),
         ];
     }
   }
@@ -1718,7 +1992,7 @@ class _DepartmentTile extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   height: 1.4,
-                  color: Color(0xFF8A8A8A),
+                  color: Color(0xFF62645E),
                 ),
               ),
             ],
@@ -2113,6 +2387,7 @@ enum _Tab {
   orders('Orders'),
   insights('Insights'),
   categories('Categories'),
+  banners('Banners'),
   compare('Compare'),
   policies('Policies'),
   delivery('Delivery'),
@@ -2120,40 +2395,6 @@ enum _Tab {
 
   final String label;
   const _Tab(this.label);
-}
-
-class _Pill extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _Pill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? _ink : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : _muted,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _StoreCard extends StatelessWidget {

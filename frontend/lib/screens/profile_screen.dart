@@ -301,10 +301,17 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 26),
-                  Center(
-                    child: Opacity(
-                      opacity: 0.25,
-                      child: Image.asset('assets/banner.png', width: 190),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Lamazon',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -449,7 +456,7 @@ class _Row extends StatelessWidget {
       trailing: const Icon(
         LucideIcons.chevronRight,
         size: 16,
-        color: Color(0xFF9A9A9A),
+        color: Color(0xFF62645E),
       ),
       onTap: onTap,
     );

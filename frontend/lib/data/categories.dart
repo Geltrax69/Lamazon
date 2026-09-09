@@ -109,7 +109,7 @@ Future<List<Department>> loadDepartments() async {
         for (final r in rows)
           Department(
             r['name'] as String,
-            iconNamed(r['icon'] as String? ?? ''),
+            departmentIcon(r['name'] as String, r['icon'] as String? ?? ''),
             _colourOf(r['colour'] as String? ?? ''),
             [
               for (final c in (r['children'] as List<dynamic>? ?? const []))
@@ -185,3 +185,9 @@ List<CategoryNode> sectionsOf(String department) => departments
       orElse: () => const Department('', LucideIcons.tag, null),
     )
     .categories;
+
+IconData departmentIcon(String name, String key) {
+  if (name == 'Snacks & Drinks') return LucideIcons.cookie;
+  if (name == 'Stationery & Games') return LucideIcons.bookOpen;
+  return iconNamed(key);
+}

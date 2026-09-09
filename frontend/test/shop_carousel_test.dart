@@ -9,8 +9,23 @@ import 'package:network_image_mock/network_image_mock.dart';
 void main() {
   Future<void> openHome(WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
-    await tester.pump(const Duration(milliseconds: 400));
-    // The location prompt covers home until it is answered.
+    for (
+      var attempt = 0;
+      attempt < 12 && find.byType(Scrollable).evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    await tester.pump();
+    for (
+      var attempt = 0;
+      attempt < 12 && find.byType(PageView).evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+      await tester.pump();
+    }
+    // Older previews can still carry a location prompt.
     if (find.text('Enable device location').evaluate().isNotEmpty) {
       tester.state<NavigatorState>(find.byType(Navigator).first).pop();
       await tester.pump();
@@ -55,6 +70,8 @@ void main() {
     await mockNetworkImagesFor(() async {
       await openHome(tester);
 
+      await tester.ensureVisible(find.byType(PageView).first);
+      await tester.pump();
       await tester.drag(find.byType(PageView).first, const Offset(-300, 0));
       await tester.pumpAndSettle();
       final afterDrag = controller(tester).page?.round();

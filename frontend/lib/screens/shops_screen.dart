@@ -156,7 +156,7 @@ class _ShopRow extends StatelessWidget {
             const Icon(
               LucideIcons.chevronRight,
               size: 18,
-              color: Color(0xFF9A9A9A),
+              color: Color(0xFF62645E),
             ),
           ],
         ),

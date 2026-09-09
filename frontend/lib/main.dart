@@ -9,6 +9,7 @@ import 'data/wishlist.dart';
 import 'data/urls.dart';
 import 'data/staff.dart';
 import 'widgets/app_shell.dart';
+import 'widgets/design_system.dart';
 import 'screens/admin_screen.dart';
 import 'screens/delivery_screen.dart';
 import 'screens/home_screen.dart';
@@ -31,6 +32,8 @@ void main() async {
   // The stored session decides whether the login screen shows at all, so it
   // has to be read before the first frame.
   WidgetsFlutterBinding.ensureInitialized();
+  // Keep web semantics available without requiring a hidden opt-in gesture.
+  if (kIsWeb) WidgetsBinding.instance.ensureSemantics();
   await AppInfo.load();
   await Cart.instance.restore();
   await Wishlist.instance.restore();
@@ -70,12 +73,8 @@ class LamazonApp extends StatelessWidget {
     return MaterialApp(
       title: 'Lamazon',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF1F1EF),
-        colorScheme: ColorScheme.fromSeed(seedColor: kAccent),
-      ),
-      // One place to keep every screen phone-shaped, however wide the window.
+      theme: LamazonTheme.data,
+      // Shared responsive canvas; individual screens choose their reading width.
       builder: (context, child) => AppShell(child: child!),
       // The staff panels are their own entrances, on purpose: nothing in the
       // shopper's app links to them, and neither one uses a shopper session.

@@ -20,6 +20,17 @@ void main() {
         tester.view.devicePixelRatio = 1.0;
         await tester.pumpWidget(const LamazonApp());
         await tester.pump(const Duration(seconds: 1));
+        for (var attempt = 0;
+            attempt < 10 && find.byType(ProductCard).evaluate().isEmpty;
+            attempt++) {
+          if (find.byType(ListView).evaluate().isNotEmpty) {
+            await tester.drag(
+              find.byType(ListView).first,
+              const Offset(0, -500),
+            );
+          }
+          await tester.pump(const Duration(milliseconds: 250));
+        }
 
         final card = tester.getSize(find.byType(ProductCard).first);
         expect(card.width, lessThanOrEqualTo(productTileMax),

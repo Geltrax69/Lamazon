@@ -1,3 +1,4 @@
+import '../widgets/design_system.dart';
 import '../widgets/app_nav.dart';
 import 'dart:async';
 
@@ -119,7 +120,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
-        maxWidth: 980,
+        maxWidth: 1400,
         child: SafeArea(
           child: Column(
             children: [
@@ -146,7 +147,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Container(
-                        height: 48,
+                        height: 56,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -171,6 +172,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   // The scope is in the hint rather than
                                   // silent: a search that quietly ignores
                                   // half the catalogue reads as broken.
+                                  labelText: 'Search products',
                                   hintText: _scoped
                                       ? 'Search in $_tab...'
                                       : 'Search products, shops...',
@@ -178,7 +180,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                     color: Colors.grey,
                                     fontSize: 14,
                                   ),
+                                  filled: false,
                                   border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: const UnderlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: Color(0xFF1D4A3C),
+                                      width: 2,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -214,16 +224,25 @@ class _SearchScreenState extends State<SearchScreen> {
                         },
                       )
                     : _busy && results.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const CatalogSkeleton()
                     : results.isEmpty
-                    ? const _NoResults()
+                    ? _NoResults(
+                        onReset: () {
+                          _controller.clear();
+                          setState(() {
+                            _query = '';
+                            _tab = '';
+                            _hits = [];
+                          });
+                        },
+                      )
                     : GridView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: productTileMax,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: 0.68,
+                          childAspectRatio: 0.60,
                         ),
                         itemCount: results.length,
                         itemBuilder: (_, i) => ProductCard(
@@ -365,7 +384,7 @@ class _SearchHint extends StatelessWidget {
               maxCrossAxisExtent: productTileMax,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 0.68,
+              childAspectRatio: 0.60,
             ),
             itemCount: picks.length,
             itemBuilder: (_, i) => ProductCard(
@@ -467,22 +486,17 @@ class _HintHeading extends StatelessWidget {
 }
 
 class _NoResults extends StatelessWidget {
-  const _NoResults();
+  final VoidCallback onReset;
+  const _NoResults({required this.onReset});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(LucideIcons.packageSearch, size: 44, color: Colors.grey),
-          SizedBox(height: 12),
-          Text(
-            'No products found',
-            style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: LucideIcons.packageSearch,
+      title: 'No products found',
+      message: 'Try a different name or browse all departments.',
+      action: 'Browse all products',
+      onAction: onReset,
     );
   }
 }

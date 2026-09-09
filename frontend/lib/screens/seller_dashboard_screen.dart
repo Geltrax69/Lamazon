@@ -355,7 +355,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                     'Add your first one to start selling',
                                     style: TextStyle(
                                       fontSize: 12.5,
-                                      color: Color(0xFF9A9A9A),
+                                      color: Color(0xFF62645E),
                                     ),
                                   ),
                                 ],
@@ -612,7 +612,7 @@ class _OrderRow extends StatelessWidget {
                       '#${order.id.toUpperCase()}',
                       style: const TextStyle(
                         fontSize: 11.5,
-                        color: Color(0xFF9A9A9A),
+                        color: Color(0xFF62645E),
                       ),
                     ),
                   ],

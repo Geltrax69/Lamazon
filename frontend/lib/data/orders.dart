@@ -117,19 +117,20 @@ class MyOrders extends ChangeNotifier {
   }
 
   /// Commit the basket atomically. Failures propagate so the cart stays intact.
-  Future<void> place(
+  Future<List<MyOrder>> place(
     List<({String itemId, int qty})> lines, {
     required String addressId,
     required String requestId,
     required double expectedTotal,
   }) async {
-    await Api.instance.checkout(
+    final placed = await Api.instance.checkout(
       lines: lines,
       addressId: addressId,
       requestId: requestId,
       expectedTotal: expectedTotal,
     );
     await load();
+    return placed;
   }
 
   void clear() {

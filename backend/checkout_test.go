@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"testing"
 )
@@ -136,5 +137,23 @@ func TestCheckoutRetryDoesNotDuplicateOrders(t *testing.T) {
 	payload["expectedTotal"] = 85
 	if code, _ := call(t, h, http.MethodPost, "/api/orders/checkout", payload); code != 409 {
 		t.Fatalf("changed payload reused ID: %d", code)
+	}
+}
+
+func TestCatalogShowsUnreservedStock(t *testing.T) {
+	h := testAPI(t)
+	addRider(t, h, adminSignIn(t, h), "9876543210")
+	openApprovedStore(t, h, map[string]any{"name": "Stock Store", "location": "L", "city": "LPU", "categories": []string{"Food"}})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Stock Burger", "price": 20, "stock": 3})
+	_, order := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 2, "expectedTotal": 55})
+	found, err := lastTestDB.product(context.Background(), item["id"].(string))
+	if err != nil || found.AvailableStock == nil || *found.AvailableStock != 1 {
+		t.Fatalf("reserved stock was advertised: %+v %v", found, err)
+	}
+	call(t, h, "POST", "/api/orders/"+order["id"].(string)+"/cancel", nil)
+	found, err = lastTestDB.product(context.Background(), item["id"].(string))
+	if err != nil || found.AvailableStock == nil || *found.AvailableStock != 3 {
+		t.Fatalf("cancelled stock not restored: %+v %v", found, err)
 	}
 }

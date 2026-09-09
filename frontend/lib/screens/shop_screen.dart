@@ -37,7 +37,7 @@ class _ShopScreenState extends State<ShopScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1EF),
       body: ReadableBody(
-        maxWidth: 980,
+        maxWidth: 1400,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -88,9 +88,12 @@ class _ShopScreenState extends State<ShopScreen> {
               const SizedBox(height: 10),
               Row(
                 children: const [
-                  _InfoChip(icon: LucideIcons.timer, label: deliveryEta),
+                  _InfoChip(icon: LucideIcons.truck, label: 'Local delivery'),
                   SizedBox(width: 8),
-                  _InfoChip(icon: LucideIcons.mapPin, label: storeDistance),
+                  _InfoChip(
+                    icon: LucideIcons.banknote,
+                    label: 'Cash on delivery',
+                  ),
                   SizedBox(width: 8),
                   _InfoChip(icon: LucideIcons.star, label: '4.5'),
                 ],
@@ -123,7 +126,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     maxCrossAxisExtent: productTileMax,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 0.68,
+                    childAspectRatio: 0.60,
                   ),
                   itemCount: items.length,
                   itemBuilder: (_, i) => ProductCard(

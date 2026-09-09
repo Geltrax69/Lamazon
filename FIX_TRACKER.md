@@ -2,9 +2,8 @@
 
 Source: [QA_REPORT.md](QA_REPORT.md), 9 September 2026.
 
-Work order: functionality and data integrity first. Visual redesign, styling,
-category imagery and other presentation changes wait for the user's instruction.
-Only verified batches are committed and pushed to GitHub. The `web` branch
+Work order: functionality and data integrity first, followed by the requested
+storefront redesign. Only verified batches are committed and pushed to GitHub. The `web` branch
 triggers the existing API/web deployment pipelines; a push is not proof of a
 successful deployment.
 
@@ -29,7 +28,7 @@ are deployed; later batches need coordinated API, web and mobile rollout.
 | B12 | Partial | Fake support contacts removed. Working contact details must come from the owner. |
 | B13–B14 | Core actions fixed | Buyer cancellation before acceptance, order details and status refresh. GPS tracking and ETA remain open. |
 | B15–B17 | Fixed | Optimized image delivery, visible detail-page cart feedback, dead cart control removed. |
-| B18, B20, B32 | Deferred by request | Visual design, icons and imagery. |
+| B18, B20, B32 | Implemented in UI batch | Responsive design system, accessible navigation, category artwork and product imagery. |
 | B19, B21–B22 | Fixed | Department navigation, clearable search scope and accurate drawer empty state. |
 | B23–B26, B29 | Fixed | Server validation, product photo requirements and persistent address defaults. Product edits retain an omitted category. |
 | B27 | Fixed | Consistent delivered revenue and visible admin order amounts. |
@@ -46,9 +45,8 @@ are deployed; later batches need coordinated API, web and mobile rollout.
   These features are not implemented merely by removing their misleading controls.
 - Cross-device cart/wishlist sync, grouped order presentation, GPS tracking/ETA,
   product stock display and preservation of selected product options in orders.
-- Admin search/filter/date range/pagination/export, bulk/user actions, audit log,
-  additional admin identities and MFA; seller store closure; offline indication.
-- UI redesign remains deferred until the user requests it.
+- Bulk/user actions, audit log, additional admin identities and MFA; seller store
+  closure; offline indication; cross-device cart/wishlist sync.
 
 ## Verification and GitHub history
 
@@ -234,3 +232,22 @@ remain covered by the complete PostgreSQL race suite.
 Verified: full Go suite passes with `-race -count=1` against isolated PostgreSQL
 (22.5 seconds). This backend-only follow-up does not change the frontend source
 used for batch 6's passing tests, analysis and release builds.
+
+### Batch 8 — campaign-led storefront UI
+
+- Home now opens with admin-managed campaign artwork, picture-led departments,
+  themed category shelves, real discount collections and saved-product loops.
+- Added a reusable campaign deck, collection shelf, category visual, shared
+  tokens, skeletons, empty states and reduced-motion-aware quick transitions.
+- Added Admin → Banners: create, preview, edit, publish/hide, reorder, delete,
+  upload an image, set a colour, and route the CTA to an existing category.
+  Public responses only include enabled banners and reject unsafe destinations.
+- Preserved the existing checkout, account, catalogue and seller workflows;
+  product and promotional copy continues to use real data only.
+- Added `changes in UI.md` with the short reason for each visual change.
+
+Validation: 72 Flutter tests pass; the Go suite passes with `-race -count=1`
+against isolated PostgreSQL; `flutter analyze` reports no issues; and the
+release web build succeeds. Browser checks cover the phone and desktop home
+layouts and confirm labelled navigation, campaign controls, category imagery,
+real product cards and the store carousel.

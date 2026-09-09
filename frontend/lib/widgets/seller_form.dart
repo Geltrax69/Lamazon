@@ -91,7 +91,13 @@ class SellerField extends StatelessWidget {
               obscureText: obscure,
               onChanged: (_) => onChanged(),
               decoration: InputDecoration(
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF1D4A3C), width: 2),
+                ),
+                labelText: hint,
                 hintText: hint,
                 hintStyle: const TextStyle(color: Color(0xFF9A9A9A)),
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),

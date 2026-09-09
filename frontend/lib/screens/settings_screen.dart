@@ -299,7 +299,7 @@ class _Link extends StatelessWidget {
             const Icon(
               LucideIcons.chevronRight,
               size: 16,
-              color: Color(0xFF9A9A9A),
+              color: Color(0xFF62645E),
             ),
           ],
         ],

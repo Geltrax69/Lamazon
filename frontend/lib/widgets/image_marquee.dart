@@ -46,7 +46,9 @@ class _MarqueeStripState extends State<MarqueeStrip>
         child: AnimatedBuilder(
           animation: _c,
           builder: (context, _) {
-            final t = (widget.reverse ? -_c.value : _c.value) % 1;
+            final t = MediaQuery.disableAnimationsOf(context)
+                ? 0.0
+                : (widget.reverse ? -_c.value : _c.value) % 1;
             return Transform.translate(
               offset: Offset(-t * span, 0),
               child: Row(

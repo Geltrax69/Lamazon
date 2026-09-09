@@ -170,7 +170,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             n.time,
                                             style: const TextStyle(
                                               fontSize: 11,
-                                              color: Color(0xFF9A9A9A),
+                                              color: Color(0xFF62645E),
                                             ),
                                           ),
                                         ],

@@ -4,6 +4,7 @@ class Product {
   final String category;
   final String tab; // which top tab this belongs to; 'All' tab shows everything
   final double price;
+  final int? availableStock;
 
   /// Price before the discount. Zero means the seller is not running one.
   final double mrp;
@@ -28,6 +29,7 @@ class Product {
     required this.category,
     this.tab = 'All',
     required this.price,
+    this.availableStock,
     this.mrp = 0,
     required this.imageUrl,
     this.store = 'Lamazon Store',
@@ -47,6 +49,7 @@ class Product {
     'category': category,
     'tab': tab,
     'price': price,
+    'availableStock': availableStock,
     'mrp': mrp,
     'imageUrl': imageUrl,
     'store': store,
@@ -67,6 +70,7 @@ class Product {
     category: r['category'] as String,
     tab: r['tab'] as String,
     price: (r['price'] as num).toDouble(),
+    availableStock: (r['availableStock'] as num?)?.toInt(),
     mrp: (r['mrp'] as num).toDouble(),
     imageUrl: r['imageUrl'] as String,
     store: r['store'] as String,
@@ -202,18 +206,21 @@ class GroupAttribute {
     if (perUnit) 'perUnit': true,
   };
 
-  GroupAttribute copyWith({String? name, String? unit, String? mode, bool? perUnit}) =>
-      GroupAttribute(
-        name ?? this.name,
-        unit ?? this.unit,
-        mode ?? this.mode,
-        perUnit ?? this.perUnit,
-      );
+  GroupAttribute copyWith({
+    String? name,
+    String? unit,
+    String? mode,
+    bool? perUnit,
+  }) => GroupAttribute(
+    name ?? this.name,
+    unit ?? this.unit,
+    mode ?? this.mode,
+    perUnit ?? this.perUnit,
+  );
 
   /// Whether the compare screen picks a winner for this field. Only these two
   /// modes rank; feature, info and unset are shown and left alone.
-  bool get ranked =>
-      mode == CompareMode.higher || mode == CompareMode.lower;
+  bool get ranked => mode == CompareMode.higher || mode == CompareMode.lower;
 
   /// "20" plus "W" reads as 20W; a field with no unit is left alone.
   String show(String value) =>
@@ -228,14 +235,11 @@ class DerivedRow {
   final String winner;
   const DerivedRow(this.name, this.values, this.winner);
 
-  factory DerivedRow.fromJson(Map<String, dynamic> r) => DerivedRow(
-    r['name'] as String? ?? '',
-    {
-      for (final e in (r['values'] as Map? ?? {}).entries)
-        '${e.key}': (e.value as num).toDouble(),
-    },
-    r['winner'] as String? ?? '',
-  );
+  factory DerivedRow.fromJson(Map<String, dynamic> r) =>
+      DerivedRow(r['name'] as String? ?? '', {
+        for (final e in (r['values'] as Map? ?? {}).entries)
+          '${e.key}': (e.value as num).toDouble(),
+      }, r['winner'] as String? ?? '');
 }
 
 class ShopOffer {

@@ -1,8 +1,11 @@
+import '../widgets/design_system.dart';
+import '../widgets/screen_header.dart';
+import 'addresses_screen.dart';
+import 'order_confirmation_screen.dart';
 import '../data/money.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
-import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
@@ -11,7 +14,6 @@ import '../data/orders.dart';
 import '../data/session.dart';
 import '../widgets/product_card.dart';
 import 'location_screen.dart';
-import 'orders_screen.dart';
 
 const _ink = Color(0xFF1A1A1A);
 const _green = Color(0xFF1D4A3C); // deep green from the design
@@ -23,79 +25,160 @@ class CartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = Cart.instance;
     return Scaffold(
-      // The bar floats over the content rather than reserving a strip, which
-      // is how it sits on home — bottomNavigationBar would push every screen
-      // up by its height and leave a white band under it.
-      extendBody: true,
-      bottomNavigationBar: const SafeArea(
-        child: AppBottomNav(current: AppTab.cart),
-      ),
-      backgroundColor: const Color(0xFFF1F1EF),
-      body: ReadableBody(
-        maxWidth: 700,
-        child: SafeArea(
-          child: ListenableBuilder(
-            listenable: cart,
-            builder: (context, _) {
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _RoundIcon(
-                          icon: LucideIcons.arrowLeft,
-                          onTap: () => Navigator.pop(context),
+      bottomNavigationBar: const AppBottomNav(current: AppTab.cart),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const ScreenHeader(title: 'My Cart'),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: cart,
+                builder: (context, _) {
+                  if (cart.isEmpty) return const _EmptyCart();
+                  final summary = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _DeliveryAddress(),
+                      const SizedBox(height: 16),
+                      const Card(
+                        margin: EdgeInsets.zero,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.all(16),
+                          leading: Icon(LucideIcons.banknote),
+                          title: Text('Cash on delivery'),
+                          subtitle: Text(
+                            'Pay the rider on arrival. Online payments are not available.',
+                          ),
+                          trailing: Icon(
+                            LucideIcons.circleCheck,
+                            color: LamazonTheme.green,
+                          ),
                         ),
-                        // The count belongs in the title: it is the one
-                        // number people check before paying.
-                        Column(
-                          children: [
-                            const Text(
-                              'My Cart',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (!cart.isEmpty)
-                              Text(
-                                cart.count == 1
-                                    ? '1 item'
-                                    : '${cart.count} items',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF6B6B6B),
+                      ),
+                      const SizedBox(height: 16),
+                      _CheckoutPanel(cart: cart),
+                    ],
+                  );
+                  return LayoutBuilder(
+                    builder: (context, c) {
+                      final lines = [
+                        Text(
+                          '${cart.count} ${cart.count == 1 ? 'item' : 'items'}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        for (final item in cart.items)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _CartRow(item: item),
+                          ),
+                      ];
+                      if (c.maxWidth >= 900) {
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.all(32),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: lines,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(width: 46, height: 46),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: cart.isEmpty
-                        ? const _EmptyCart()
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                            itemCount: cart.items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (_, i) =>
-                                _CartRow(item: cart.items[i]),
+                              const SizedBox(width: 32),
+                              Expanded(flex: 4, child: summary),
+                            ],
                           ),
-                  ),
-                  if (!cart.isEmpty) _CheckoutPanel(cart: cart),
-                ],
-              );
-            },
-          ),
+                        );
+                      }
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                        children: [
+                          ...lines,
+                          const SizedBox(height: 12),
+                          summary,
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _DeliveryAddress extends StatelessWidget {
+  const _DeliveryAddress();
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AddressBook.instance,
+    builder: (context, _) {
+      final a =
+          AddressBook.instance.selected ??
+          AddressBook.instance.addresses.firstOrNull;
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Icon(LucideIcons.mapPin, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Deliver to',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddressesScreen(),
+                      ),
+                    ),
+                    child: Text(a == null ? 'Add address' : 'Change'),
+                  ),
+                ],
+              ),
+              if (a != null) ...[
+                Text(
+                  a.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${a.line}, ${a.city} ${a.pincode}',
+                  style: const TextStyle(color: LamazonTheme.muted),
+                ),
+                if (a.phone.isNotEmpty)
+                  Text(
+                    a.phone,
+                    style: const TextStyle(color: LamazonTheme.muted),
+                  ),
+              ] else
+                const Text(
+                  'Choose a delivery address before placing your order.',
+                  style: TextStyle(color: LamazonTheme.muted),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _EmptyCart extends StatelessWidget {
@@ -103,43 +186,12 @@ class _EmptyCart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(LucideIcons.shoppingBasket, size: 48, color: Colors.grey),
-          const SizedBox(height: 12),
-          const Text(
-            'Your cart is empty',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Items you add will show up here',
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF9A9A9A)),
-          ),
-          const SizedBox(height: 16),
-          // An empty screen with no way out is a dead end.
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-              decoration: BoxDecoration(
-                color: _green,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: const Text(
-                'Start shopping',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: LucideIcons.shoppingBasket,
+      title: 'Your cart is empty',
+      message: 'Find something you love from stores near you.',
+      action: 'Start shopping',
+      onAction: () => Navigator.of(context).popUntil((r) => r.isFirst),
     );
   }
 }
@@ -169,86 +221,92 @@ class _CartRow extends StatelessWidget {
           size: 22,
         ),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 74,
-                height: 74,
-                child: NetImage(url: p.imageUrl),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    p.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 88,
+                      height: 88,
+                      child: NetImage(url: p.imageUrl, semanticLabel: p.name),
                     ),
                   ),
-                  Text(
-                    p.store,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9A9A9A),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        '₹${(p.price * item.qty).moneyText}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      // The saving carries through to where they pay, rather
-                      // than being something they only saw on the way in.
-                      if (p.discounted) ...[
-                        const SizedBox(width: 6),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'MRP ₹${(p.mrp * item.qty).moneyText}',
+                          p.store,
                           style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF9A9A9A),
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFF9A9A9A),
+                            fontSize: 12,
+                            color: LamazonTheme.muted,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        DiscountBadge(percent: p.discountPercent, fontSize: 9),
+                        const SizedBox(height: 4),
+                        Text(
+                          p.name,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (p.discounted)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                'MRP ₹${(p.mrp * item.qty).moneyText}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: LamazonTheme.muted,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              DiscountBadge(percent: p.discountPercent),
+                            ],
+                          ),
+                        Text(
+                          '₹${(p.price * item.qty).moneyText}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ],
-                    ],
-                  ),
-                  // At one unit the line total and the unit price are the
-                  // same number, so only say it when they differ.
-                  if (item.qty > 1)
-                    Text(
-                      '₹${p.price.moneyText} each',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF9A9A9A),
-                      ),
                     ),
+                  ),
                 ],
               ),
-            ),
-            _QtyControls(item: item),
-          ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '₹${p.price.moneyText} each',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: LamazonTheme.muted,
+                      ),
+                    ),
+                  ),
+                  _QtyControls(item: item),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -294,31 +352,20 @@ class _QtyControls extends StatelessWidget {
     required bool filled,
     bool danger = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: filled ? _green : Colors.white,
-          shape: BoxShape.circle,
-          border: filled
-              ? null
-              : Border.all(
-                  color: danger
-                      ? const Color(0xFFF0C8CB)
-                      : const Color(0xFFE3E3E0),
-                ),
-        ),
-        child: Icon(
-          icon,
-          size: 13,
-          color: filled
-              ? Colors.white
-              : danger
-              ? const Color(0xFFD32F2F)
-              : _ink,
-        ),
+    return IconButton.filledTonal(
+      tooltip: danger
+          ? 'Remove item'
+          : filled
+          ? 'Increase quantity'
+          : 'Decrease quantity',
+      onPressed: onTap,
+      style: IconButton.styleFrom(
+        backgroundColor: filled ? LamazonTheme.accent : Colors.white,
+      ),
+      icon: Icon(
+        icon,
+        size: 18,
+        color: danger ? Colors.red.shade800 : LamazonTheme.ink,
       ),
     );
   }
@@ -370,7 +417,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
     setState(() => _placing = true);
     try {
       await cart.savedToStorage;
-      await MyOrders.instance.place(
+      final placed = await MyOrders.instance.place(
         lines,
         addressId: address.id,
         requestId: requestId,
@@ -386,10 +433,11 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       }
       await cart.savedToStorage;
       if (!mounted) return;
-      _say('Order placed. The shop will accept it in a moment.');
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OrdersScreen()),
+        MaterialPageRoute(
+          builder: (_) => OrderConfirmationScreen(orders: placed),
+        ),
       );
     } catch (e) {
       if (mounted) _say(e.toString().replaceFirst('ClientException: ', ''));
@@ -416,7 +464,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -451,38 +499,28 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
               children: [
                 const Icon(LucideIcons.badgePercent, size: 14, color: _green),
                 const SizedBox(width: 6),
-                Text(
-                  'You saved ₹${cart.saved.moneyText} on this order',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: _green,
+                Flexible(
+                  child: Text(
+                    'You saved ₹${cart.saved.moneyText} on this order',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: _green,
+                    ),
                   ),
                 ),
               ],
             ),
           ],
           const SizedBox(height: 14),
-          GestureDetector(
-            onTap: _placing ? null : _placeOrder,
-            child: Container(
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _green,
-                borderRadius: BorderRadius.circular(26),
-              ),
-              // The amount rides on the button, so nobody pays without
-              // seeing what they are paying.
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _placing ? null : _placeOrder,
               child: Text(
                 _placing
                     ? 'Placing your order…'
                     : 'Place order  ·  ₹${cart.total.moneyText}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
               ),
             ),
           ),
@@ -500,31 +538,16 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: style),
-        Text('₹${value.moneyText}', style: style),
-      ],
-    );
-  }
-}
-
-class _RoundIcon extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-  const _RoundIcon({required this.icon, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
+        Expanded(child: Text(label, style: style)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            '₹${value.moneyText}',
+            style: style,
+            textAlign: TextAlign.end,
+          ),
         ),
-        child: Icon(icon, size: 18, color: _ink),
-      ),
+      ],
     );
   }
 }

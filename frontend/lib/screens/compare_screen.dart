@@ -252,28 +252,28 @@ class _VendorRow extends StatelessWidget {
                         const Icon(
                           LucideIcons.mapPin,
                           size: 11,
-                          color: Color(0xFF9A9A9A),
+                          color: Color(0xFF62645E),
                         ),
                         const SizedBox(width: 3),
                         Text(
                           distance,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF9A9A9A),
+                            color: Color(0xFF62645E),
                           ),
                         ),
                         const SizedBox(width: 10),
                         const Icon(
                           LucideIcons.timer,
                           size: 11,
-                          color: Color(0xFF9A9A9A),
+                          color: Color(0xFF62645E),
                         ),
                         const SizedBox(width: 3),
                         Text(
                           eta,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF9A9A9A),
+                            color: Color(0xFF62645E),
                           ),
                         ),
                       ],
@@ -446,7 +446,7 @@ class _RivalsState extends State<_Rivals> {
                                     '${row['store']}',
                                     style: const TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF9A9A9A),
+                                      color: Color(0xFF62645E),
                                     ),
                                   ),
                                 ],
@@ -507,7 +507,7 @@ class _RivalsState extends State<_Rivals> {
                             'Price',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF9A9A9A),
+                              color: Color(0xFF62645E),
                             ),
                           ),
                         ),
@@ -518,7 +518,7 @@ class _RivalsState extends State<_Rivals> {
                               f.name,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF9A9A9A),
+                                color: Color(0xFF62645E),
                               ),
                             ),
                           ),
@@ -529,7 +529,7 @@ class _RivalsState extends State<_Rivals> {
                               d.name,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF9A9A9A),
+                                color: Color(0xFF62645E),
                               ),
                             ),
                           ),

@@ -315,7 +315,8 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                   children: [
                     SellerSection(
                       title: 'Photos (${_shots.length})',
-                      hint: 'Drag to reorder — the first one is the cover',
+                      hint:
+                          'Use clear, well-lit photos of the actual product. Keep it fully visible. Drag to reorder; the first photo is the cover.',
                     ),
                     PhotoManager(
                       shots: _shots,
