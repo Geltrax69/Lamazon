@@ -45,7 +45,7 @@ class CategoryVisual extends StatelessWidget {
             child: Transform.translate(
               offset: Offset(-(i % 4) * c.maxWidth, -(i ~/ 4) * c.maxHeight),
               child: Image.asset(
-                'assets/categories/category-atlas.png',
+                'assets/categories/category-atlas-v2.png',
                 width: c.maxWidth * 4,
                 height: c.maxHeight * 2,
                 fit: BoxFit.fill,

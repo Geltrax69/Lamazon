@@ -17,16 +17,27 @@ class OrderConfirmationScreen extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           children: [
             const SizedBox(height: 36),
-            const CircleAvatar(
-              radius: 40,
-              backgroundColor: LamazonTheme.accent,
-              child: Icon(LucideIcons.check, size: 36, color: LamazonTheme.ink),
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                color: LamazonTheme.lime,
+                shape: BoxShape.circle,
+                boxShadow: LamazonTheme.tactileShadows,
+              ),
+              child: const SizedBox(
+                width: 80,
+                height: 80,
+                child: Icon(
+                  LucideIcons.check,
+                  size: 36,
+                  color: LamazonTheme.strong,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'Your order is placed',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: LamazonTheme.titleText,
             ),
             const SizedBox(height: 12),
             const Text(
@@ -35,30 +46,29 @@ class OrderConfirmationScreen extends StatelessWidget {
               style: TextStyle(color: LamazonTheme.muted, height: 1.5),
             ),
             const SizedBox(height: 28),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Pay on delivery',
-                      style: TextStyle(color: LamazonTheme.muted),
-                    ),
-                    Text(
-                      '₹${orders.fold<double>(0, (sum, o) => sum + o.amount).moneyText}',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    if (orders.isNotEmpty) Text(orders.first.address),
-                  ],
-                ),
+            ElevatedSurface(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Pay on delivery',
+                    style: TextStyle(color: LamazonTheme.muted),
+                  ),
+                  Text(
+                    '₹${orders.fold<double>(0, (sum, o) => sum + o.amount).moneyText}',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  if (orders.isNotEmpty) Text(orders.first.address),
+                ],
               ),
             ),
             const SizedBox(height: 16),
             for (final order in orders)
-              Card(
-                child: Padding(
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ElevatedSurface(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,24 +83,29 @@ class OrderConfirmationScreen extends StatelessWidget {
                         order.storeName,
                         style: const TextStyle(color: LamazonTheme.muted),
                       ),
-                      TextButton.icon(
+                      const SizedBox(height: 12),
+                      const TrackDivider(),
+                      const SizedBox(height: 12),
+                      ActionButton(
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => OrderDetailScreen(order: order),
                           ),
                         ),
-                        icon: const Icon(LucideIcons.package),
-                        label: const Text('Track order'),
+                        icon: LucideIcons.package,
+                        label: 'Track order',
+                        primary: false,
                       ),
                     ],
                   ),
                 ),
               ),
             const SizedBox(height: 24),
-            FilledButton(
+            ActionButton(
               onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-              child: const Text('Continue shopping'),
+              label: 'Continue shopping',
+              expand: true,
             ),
           ],
         ),

@@ -82,63 +82,75 @@ class _AdminLoginState extends State<_AdminLogin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 460,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Icon(LucideIcons.shieldCheck, size: 40, color: _ink),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Lamazon admin',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: _ink,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Staff only. Sellers and riders sign in elsewhere.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: _muted),
-                  ),
-                  const SizedBox(height: 24),
-                  _Field(controller: _user, label: 'Username'),
-                  const SizedBox(height: 12),
-                  _Field(
-                    controller: _password,
-                    label: 'Password',
-                    obscure: true,
-                    onSubmit: _signIn,
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: const TextStyle(fontSize: 12.5, color: _red),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _ink,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(26),
+              child: ElevatedSurface(
+                padding: const EdgeInsets.all(24),
+                radius: LamazonTheme.featuredRadius,
+                prominent: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: LamazonTheme.lime,
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: Icon(
+                          LucideIcons.shieldCheck,
+                          size: 30,
+                          color: LamazonTheme.strong,
+                        ),
                       ),
                     ),
-                    onPressed: _busy ? null : _signIn,
-                    child: Text(_busy ? 'Signing in…' : 'Sign in'),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Lamazon admin',
+                      textAlign: TextAlign.center,
+                      style: LamazonTheme.titleText,
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Staff only. Sellers and riders sign in elsewhere.',
+                      textAlign: TextAlign.center,
+                      style: LamazonTheme.mutedBodyText,
+                    ),
+                    const SizedBox(height: 24),
+                    _Field(controller: _user, label: 'Username'),
+                    const SizedBox(height: 12),
+                    _Field(
+                      controller: _password,
+                      label: 'Password',
+                      obscure: true,
+                      onSubmit: _signIn,
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: LamazonTheme.danger,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    ActionButton(
+                      onPressed: _busy ? null : _signIn,
+                      label: _busy ? 'Signing in…' : 'Sign in',
+                      expand: true,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1035,7 +1047,7 @@ class _AdminHomeState extends State<_AdminHome> {
     final o = _overview;
     final counts = _counts();
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 1280,
         child: SafeArea(
@@ -1047,22 +1059,19 @@ class _AdminHomeState extends State<_AdminHome> {
                 Row(
                   children: [
                     const Expanded(
-                      child: Text(
-                        'Admin',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      child: Text('Admin', style: LamazonTheme.titleText),
                     ),
-                    IconButton(
-                      tooltip: 'Refresh',
+                    TactileIconButton(
+                      label: 'Refresh',
                       onPressed: _load,
-                      icon: const Icon(LucideIcons.refreshCw, size: 18),
+                      icon: LucideIcons.refreshCw,
+                      size: 40,
                     ),
-                    TextButton(
+                    const SizedBox(width: 8),
+                    ActionButton(
                       onPressed: StaffSession.admin.signOut,
-                      child: const Text('Sign out'),
+                      label: 'Sign out',
+                      primary: false,
                     ),
                   ],
                 ),
@@ -1168,6 +1177,11 @@ class _AdminHomeState extends State<_AdminHome> {
                           selected: _tab == tab,
                           onSelected: (_) => _show(tab),
                           selectedColor: LamazonTheme.accent,
+                          backgroundColor: LamazonTheme.surface,
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
                     ],
                   ),
@@ -1244,16 +1258,19 @@ class _AdminHomeState extends State<_AdminHome> {
   }
 
   List<Widget> _tableControls() => [
-    TextField(
-      key: ValueKey('search-$_tab'),
-      decoration: InputDecoration(
-        labelText: 'Search ${_tab.label.toLowerCase()}',
-        prefixIcon: const Icon(LucideIcons.search),
+    ElevatedSurface(
+      radius: LamazonTheme.smallRadius,
+      child: TextField(
+        key: ValueKey('search-$_tab'),
+        decoration: InputDecoration(
+          labelText: 'Search ${_tab.label.toLowerCase()}',
+          prefixIcon: const Icon(LucideIcons.search),
+        ),
+        onChanged: (value) => setState(() {
+          _search = value.trim();
+          _page = 0;
+        }),
       ),
-      onChanged: (value) => setState(() {
-        _search = value.trim();
-        _page = 0;
-      }),
     ),
     const SizedBox(height: 12),
     Wrap(
@@ -1289,13 +1306,12 @@ class _AdminHomeState extends State<_AdminHome> {
             ),
           ),
         if (_tab == _Tab.orders)
-          OutlinedButton.icon(
-            icon: const Icon(LucideIcons.calendar),
-            label: Text(
-              _dates == null
-                  ? 'Date range'
-                  : '${_dates!.start.day}/${_dates!.start.month} – ${_dates!.end.day}/${_dates!.end.month}',
-            ),
+          ActionButton(
+            icon: LucideIcons.calendar,
+            label: _dates == null
+                ? 'Date range'
+                : '${_dates!.start.day}/${_dates!.start.month} – ${_dates!.end.day}/${_dates!.end.month}',
+            primary: false,
             onPressed: () async {
               final picked = await showDateRangePicker(
                 context: context,
@@ -1319,9 +1335,10 @@ class _AdminHomeState extends State<_AdminHome> {
             }),
             child: const Text('Clear dates'),
           ),
-        OutlinedButton.icon(
-          icon: const Icon(LucideIcons.download),
-          label: const Text('Export CSV'),
+        ActionButton(
+          icon: LucideIcons.download,
+          label: 'Export CSV',
+          primary: false,
           onPressed: _filtered(_activeRows).isEmpty
               ? null
               : () async {
@@ -1369,17 +1386,19 @@ class _AdminHomeState extends State<_AdminHome> {
                 ? '0 records'
                 : '${page * _pageSize + 1}–${((page + 1) * _pageSize).clamp(0, total)} of $total',
           ),
-          OutlinedButton(
+          ActionButton(
             onPressed: page == 0
                 ? null
                 : () => setState(() => _page = page - 1),
-            child: const Text('Previous'),
+            label: 'Previous',
+            primary: false,
           ),
-          OutlinedButton(
+          ActionButton(
             onPressed: (page + 1) * _pageSize >= total
                 ? null
                 : () => setState(() => _page = page + 1),
-            child: const Text('Next'),
+            label: 'Next',
+            primary: false,
           ),
         ],
       ),
@@ -2796,32 +2815,27 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: ElevatedSurface(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: color ?? _ink,
-                ),
+        radius: LamazonTheme.featuredRadius,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color ?? LamazonTheme.text,
               ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: _muted),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
+            ),
+          ],
         ),
       ),
     );

@@ -71,7 +71,13 @@ flutter:
     - assets/logo.png
     - assets/banner.png
     - assets/categories/
+    - assets/fonts/
   uses-material-design: true
+
+  fonts:
+    - family: InterTight
+      fonts:
+        - asset: assets/fonts/InterTight-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

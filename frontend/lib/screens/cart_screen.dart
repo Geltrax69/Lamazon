@@ -42,8 +42,7 @@ class CartScreen extends StatelessWidget {
                     children: [
                       const _DeliveryAddress(),
                       const SizedBox(height: 16),
-                      const Card(
-                        margin: EdgeInsets.zero,
+                      const ElevatedSurface(
                         child: ListTile(
                           contentPadding: EdgeInsets.all(16),
                           leading: Icon(LucideIcons.banknote),
@@ -124,8 +123,7 @@ class _DeliveryAddress extends StatelessWidget {
       final a =
           AddressBook.instance.selected ??
           AddressBook.instance.addresses.firstOrNull;
-      return Card(
-        margin: EdgeInsets.zero,
+      return ElevatedSurface(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -221,8 +219,7 @@ class _CartRow extends StatelessWidget {
           size: 22,
         ),
       ),
-      child: Card(
-        margin: EdgeInsets.zero,
+      child: ElevatedSurface(
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -290,6 +287,8 @@ class _CartRow extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              const TrackDivider(),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -352,21 +351,17 @@ class _QtyControls extends StatelessWidget {
     required bool filled,
     bool danger = false,
   }) {
-    return IconButton.filledTonal(
-      tooltip: danger
+    return TactileIconButton(
+      label: danger
           ? 'Remove item'
           : filled
           ? 'Increase quantity'
           : 'Decrease quantity',
       onPressed: onTap,
-      style: IconButton.styleFrom(
-        backgroundColor: filled ? LamazonTheme.accent : Colors.white,
-      ),
-      icon: Icon(
-        icon,
-        size: 18,
-        color: danger ? Colors.red.shade800 : LamazonTheme.ink,
-      ),
+      icon: icon,
+      size: 38,
+      selected: filled,
+      foreground: danger ? LamazonTheme.danger : LamazonTheme.strong,
     );
   }
 }
@@ -460,23 +455,13 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-      ),
+    return ElevatedSurface(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Order Summary',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SectionHeading(title: 'Order Summary'),
+          const SizedBox(height: 12),
           _summaryRow(
             cart.count == 1
                 ? 'Sub Total (1 item)'
@@ -486,8 +471,8 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
           const SizedBox(height: 4),
           _summaryRow('Delivery', cart.shipping),
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(height: 1),
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: TrackDivider(),
           ),
           _summaryRow('Total', cart.total, bold: true),
           // Below the total, not inside it: the subtotal is already the
@@ -515,13 +500,12 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: FilledButton(
+            child: ActionButton(
               onPressed: _placing ? null : _placeOrder,
-              child: Text(
-                _placing
-                    ? 'Placing your order…'
-                    : 'Place order  ·  ₹${cart.total.moneyText}',
-              ),
+              expand: true,
+              label: _placing
+                  ? 'Placing your order…'
+                  : 'Place order  ·  ₹${cart.total.moneyText}',
             ),
           ),
         ],

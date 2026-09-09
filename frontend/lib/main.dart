@@ -10,7 +10,12 @@ import 'data/urls.dart';
 import 'data/staff.dart';
 import 'widgets/app_shell.dart';
 import 'widgets/design_system.dart';
+import 'widgets/app_nav.dart';
 import 'screens/admin_screen.dart';
+import 'screens/cart_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/seller_dashboard_screen.dart';
+import 'screens/wishlist_screen.dart';
 import 'screens/delivery_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -43,8 +48,9 @@ void main() async {
   runApp(const LamazonApp());
 }
 
-/// Resolves the two staff addresses, or null for everything else — which is
-/// what sends a shopper to the app they were asking for.
+/// Resolves the addresses the app knows by name — the two staff panels and
+/// the bottom bar's destinations — or null for everything else, which is what
+/// sends a shopper to the shop they were asking for.
 Route<dynamic>? _staffRoute(RouteSettings settings) {
   final path = (settings.name ?? '/').toLowerCase().replaceAll(
     RegExp(r'/+$'),
@@ -53,6 +59,13 @@ Route<dynamic>? _staffRoute(RouteSettings settings) {
   final screen = switch (path) {
     '/admin' || '/admin/log_in' => const AdminScreen(),
     '/delivery' => const DeliveryScreen(),
+    // The bottom bar's destinations. Built here because nothing imports
+    // main.dart, so naming them costs no import cycle — the nav asks for a
+    // path and this is the only place that knows what a path is made of.
+    AppRoutes.cart => const CartScreen(),
+    AppRoutes.saved => const WishlistScreen(),
+    AppRoutes.store => const SellerDashboardScreen(),
+    AppRoutes.account => const ProfileScreen(),
     _ => null,
   };
   if (screen == null) return null;

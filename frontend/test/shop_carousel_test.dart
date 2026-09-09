@@ -3,9 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/screens/home_screen.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
-/// The store carousel advances on its own and stops when a finger arrives.
-/// Driven through HomeScreen because the widget itself is private — this is
-/// what a shopper actually sees on the home screen.
+/// The store row on the home screen. It used to be a PageView advancing on a
+/// timer, and the two tests that guarded that timer went with it; it is now a
+/// rail the shopper pushes. What is left worth guarding is that the cards fit
+/// a narrow phone.
 void main() {
   Future<void> openHome(WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
@@ -17,24 +18,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
     }
     await tester.pump();
-    for (
-      var attempt = 0;
-      attempt < 12 && find.byType(PageView).evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.drag(find.byType(ListView).first, const Offset(0, -500));
-      await tester.pump();
-    }
-    // Older previews can still carry a location prompt.
-    if (find.text('Enable device location').evaluate().isNotEmpty) {
-      tester.state<NavigatorState>(find.byType(Navigator).first).pop();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-    }
   }
-
-  PageController controller(WidgetTester tester) =>
-      tester.widget<PageView>(find.byType(PageView).first).controller!;
 
   testWidgets('the store cards fit a narrow phone', (tester) async {
     await mockNetworkImagesFor(() async {
@@ -48,39 +32,6 @@ void main() {
       await openHome(tester);
       await tester.pump(const Duration(milliseconds: 200));
       expect(tester.takeException(), isNull);
-    });
-  });
-
-  testWidgets('the store row moves on by itself', (tester) async {
-    await mockNetworkImagesFor(() async {
-      await openHome(tester);
-      expect(controller(tester).page?.round(), 0);
-
-      // One dwell plus the animation.
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pump(const Duration(seconds: 1));
-      expect(controller(tester).page?.round(), 1);
-
-      // Let the pending animation settle so no timer outlives the test.
-      await tester.pump(const Duration(seconds: 1));
-    });
-  });
-
-  testWidgets('a swipe takes it over, and the timer waits', (tester) async {
-    await mockNetworkImagesFor(() async {
-      await openHome(tester);
-
-      await tester.ensureVisible(find.byType(PageView).first);
-      await tester.pump();
-      await tester.drag(find.byType(PageView).first, const Offset(-300, 0));
-      await tester.pumpAndSettle();
-      final afterDrag = controller(tester).page?.round();
-      expect(afterDrag, isNot(0)); // the shopper moved it
-
-      // The next tick must not yank the page away from someone reading it.
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pump(const Duration(seconds: 1));
-      expect(controller(tester).page?.round(), afterDrag);
     });
   });
 }

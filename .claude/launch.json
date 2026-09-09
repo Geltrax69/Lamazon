@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lamazon-frontend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd frontend && flutter run -d web-server --web-port 8766 --web-hostname 0.0.0.0"
+      ],
+      "port": 8766,
+      "url": "http://localhost:8766"
+    },
+    {
+      "name": "lamazon-release",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd frontend/build/web && python3 -m http.server 8767"
+      ],
+      "port": 8767,
+      "url": "http://localhost:8767"
+    }
+  ]
+}

@@ -13,8 +13,6 @@ import '../widgets/status_views.dart';
 import 'cart_screen.dart';
 import 'compare_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-
 class DetailsScreen extends StatefulWidget {
   final Product product;
   const DetailsScreen({super.key, required this.product});
@@ -131,23 +129,39 @@ class _DetailsScreenState extends State<DetailsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Divider(),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(LucideIcons.truck),
-            title: Text('Local delivery'),
-            subtitle: Text(
-              '₹15 delivery per order. Timing confirmed by the store.',
+          const SizedBox(height: 22),
+          ElevatedSurface(
+            radius: LamazonTheme.smallRadius,
+            padding: EdgeInsets.zero,
+            child: const Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  leading: Icon(LucideIcons.truck, color: LamazonTheme.strong),
+                  title: Text('Local delivery'),
+                  subtitle: Text(
+                    '₹15 delivery per order. Timing confirmed by the store.',
+                  ),
+                ),
+                TrackDivider(indent: 16, endIndent: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  leading: Icon(
+                    LucideIcons.banknote,
+                    color: LamazonTheme.strong,
+                  ),
+                  title: Text('Cash on delivery'),
+                  subtitle: Text('Pay the rider when your order arrives.'),
+                ),
+              ],
             ),
           ),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(LucideIcons.banknote),
-            title: Text('Cash on delivery'),
-            subtitle: Text('Pay the rider when your order arrives.'),
-          ),
-          const Divider(),
           const SizedBox(height: 12),
           Wrap(
             spacing: 24,
@@ -171,10 +185,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
               onPick: (v) => setState(() => _picked[option.name] = v),
             ),
           const SizedBox(height: 28),
-          Text(
-            'About this product',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          const Text('About this product', style: LamazonTheme.sectionText),
           const SizedBox(height: 8),
           Text(
             p.description.isEmpty
@@ -222,41 +233,50 @@ class _DetailsScreenState extends State<DetailsScreen> {
             },
           ),
         ),
-        bottomNavigationBar: Container(
+        bottomNavigationBar: DecoratedBox(
           decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: LamazonTheme.line)),
+            color: LamazonTheme.surface,
+            boxShadow: LamazonTheme.raisedShadows,
           ),
-          child: SafeArea(
-            top: false,
-            minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            child: ReadableBody(
-              maxWidth: 1100,
-              child: Row(
-                children: [
-                  if (MediaQuery.sizeOf(context).width >= 900)
-                    Expanded(
-                      child: Text(
-                        '₹${(p.price * _qty).moneyText}',
-                        style: Theme.of(context).textTheme.titleLarge,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const TrackDivider(),
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: ReadableBody(
+                  maxWidth: 1100,
+                  child: Row(
+                    children: [
+                      if (MediaQuery.sizeOf(context).width >= 900)
+                        Expanded(
+                          child: Text(
+                            '₹${(p.price * _qty).moneyText}',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                      Expanded(
+                        child: ActionButton(
+                          label: 'Add to Cart',
+                          primary: false,
+                          onPressed: p.availableStock == 0 ? null : _addToCart,
+                          expand: true,
+                        ),
                       ),
-                    ),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: p.availableStock == 0 ? null : _addToCart,
-                      child: const Text('Add to Cart'),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ActionButton(
+                          label: 'Buy Now',
+                          onPressed: p.availableStock == 0 ? null : _buyNow,
+                          expand: true,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: p.availableStock == 0 ? null : _buyNow,
-                      child: const Text('Buy Now'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -271,36 +291,17 @@ List<Widget> _compareSection(BuildContext context, Product p) {
   return [
     const SizedBox(height: 22),
     Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Flexible(
-          child: Text(
-            'Local vendors',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-          ),
+        const Expanded(
+          child: Text('Local vendors', style: LamazonTheme.sectionText),
         ),
-        GestureDetector(
-          onTap: () => Navigator.push(
+        const SizedBox(width: 10),
+        ActionButton(
+          label: 'Compare all',
+          primary: false,
+          onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => CompareScreen(product: p)),
-          ),
-          child: const Row(
-            children: [
-              Text(
-                'Compare all',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2E7D32),
-                ),
-              ),
-              SizedBox(width: 2),
-              Icon(
-                LucideIcons.chevronRight,
-                size: 15,
-                color: Color(0xFF2E7D32),
-              ),
-            ],
           ),
         ),
       ],
@@ -312,58 +313,61 @@ List<Widget> _compareSection(BuildContext context, Product p) {
     ),
     const SizedBox(height: 10),
     for (final o in p.offers)
-      Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F1EF),
-                shape: BoxShape.circle,
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: ElevatedSurface(
+          radius: LamazonTheme.smallRadius,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F1EF),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.store,
+                  size: 18,
+                  color: LamazonTheme.strong,
+                ),
               ),
-              child: const Icon(LucideIcons.store, size: 18, color: _ink),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      o.store,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Text(
+                      'Same product',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF62645E)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    o.store,
+                    '₹${o.price.moneyText}',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const Text(
-                    'Same product',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF62645E)),
-                  ),
+                  _diffBadge(o.price - p.price),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '₹${o.price.moneyText}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                _diffBadge(o.price - p.price),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
   ];
@@ -492,14 +496,11 @@ class _HeroState extends State<_Hero> {
                             curve: Curves.easeOut,
                           ),
                   ),
-                  Container(
+                  ElevatedSurface(
+                    radius: 14,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${_page + 1} / ${photos.length}',
@@ -551,12 +552,9 @@ class _QtyStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ElevatedSurface(
+      radius: 24,
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Row(
         children: [
           _step(LucideIcons.minus, () {
@@ -576,13 +574,13 @@ class _QtyStepper extends StatelessWidget {
   }
 
   Widget _step(IconData icon, VoidCallback onTap, {required bool filled}) {
-    return IconButton.filledTonal(
-      tooltip: filled ? 'Increase quantity' : 'Decrease quantity',
+    return TactileIconButton(
+      icon: icon,
+      label: filled ? 'Increase quantity' : 'Decrease quantity',
       onPressed: !filled && qty <= 1 ? null : onTap,
-      style: IconButton.styleFrom(
-        backgroundColor: filled ? LamazonTheme.accent : Colors.white,
-      ),
-      icon: Icon(icon, size: 18),
+      background: filled ? LamazonTheme.lime : LamazonTheme.surface,
+      foreground: LamazonTheme.strong,
+      size: 38,
     );
   }
 }
@@ -645,6 +643,8 @@ class _OptionPicker extends StatelessWidget {
                   selected: selected == value,
                   onSelected: (_) => onPick(value),
                   selectedColor: LamazonTheme.accent,
+                  showCheckmark: false,
+                  side: BorderSide.none,
                   materialTapTargetSize: MaterialTapTargetSize.padded,
                 ),
             ],

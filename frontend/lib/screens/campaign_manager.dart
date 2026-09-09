@@ -63,26 +63,20 @@ class _CampaignManagerState extends State<CampaignManager> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 12,
-        children: [
-          const Text(
-            'Storefront banners',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-          ),
-          FilledButton.icon(
-            onPressed: () => _edit(),
-            icon: const Icon(Icons.add),
-            label: const Text('Create banner'),
-          ),
-        ],
+      const SectionHeading(title: 'Storefront banners'),
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: ActionButton(
+          onPressed: () => _edit(),
+          icon: Icons.add,
+          label: 'Create banner',
+        ),
       ),
       const SizedBox(height: 8),
       const Text(
         'Set the mood for your store. Edit the image, message, category and display order. Published changes appear when shoppers refresh Home.',
+        style: LamazonTheme.mutedBodyText,
       ),
       const SizedBox(height: 20),
       FutureBuilder<List<Campaign>>(
@@ -120,29 +114,39 @@ class _CampaignManagerState extends State<CampaignManager> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       CampaignBanner(campaign: c, onTap: () => _edit(c)),
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            '${c.enabled ? 'Published' : 'Hidden'} · Order ${c.position} · ${c.department.isEmpty ? 'All departments' : c.department}',
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () => _edit(c),
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('Edit banner'),
-                              ),
-                              IconButton(
-                                tooltip: 'Delete ${c.title}',
-                                onPressed: () => _delete(c),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
-                          ),
-                        ],
+                      const SizedBox(height: 8),
+                      ElevatedSurface(
+                        radius: LamazonTheme.smallRadius,
+                        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${c.enabled ? 'Published' : 'Hidden'} · Order ${c.position} · ${c.department.isEmpty ? 'All departments' : c.department}',
+                              style: LamazonTheme.mutedBodyText,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ActionButton(
+                                  onPressed: () => _edit(c),
+                                  icon: Icons.edit_outlined,
+                                  label: 'Edit banner',
+                                  primary: false,
+                                ),
+                                TactileIconButton(
+                                  label: 'Delete ${c.title}',
+                                  onPressed: () => _delete(c),
+                                  icon: Icons.delete_outline,
+                                  foreground: LamazonTheme.danger,
+                                  size: 40,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -175,7 +179,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
     text: widget.campaign?.imageUrl ?? '',
   );
   late final _colour = TextEditingController(
-    text: widget.campaign?.colour ?? '#F2E8CE',
+    text: widget.campaign?.colour ?? CampaignPalette.forest.hex,
   );
   late final _position = TextEditingController(
     text: '${widget.campaign?.position ?? 0}',
@@ -299,186 +303,196 @@ class _CampaignEditorState extends State<CampaignEditor> {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    const Text(
-                      'Live preview',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    const SectionHeading(title: 'Live preview'),
                     const SizedBox(height: 12),
                     CampaignBanner(campaign: _draft),
                     const SizedBox(height: 24),
-                    Form(
-                      key: _form,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _field(
-                            'Headline',
-                            _title,
-                            max: 65,
-                            validate: (s) =>
-                                s!.trim().isEmpty ? 'Add a headline' : null,
-                          ),
-                          _field('Description', _subtitle, max: 120, lines: 2),
-                          _field(
-                            'Button label',
-                            _cta,
-                            max: 28,
-                            validate: (s) => s!.trim().isEmpty
-                                ? 'Name the button action'
-                                : null,
-                          ),
-                          DropdownButtonFormField<String>(
-                            initialValue: _category,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Open this category',
+                    ElevatedSurface(
+                      padding: const EdgeInsets.all(16),
+                      child: Form(
+                        key: _form,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _field(
+                              'Headline',
+                              _title,
+                              max: 65,
+                              validate: (s) =>
+                                  s!.trim().isEmpty ? 'Add a headline' : null,
                             ),
-                            items: [
-                              for (final c in categories)
-                                DropdownMenuItem(
-                                  value: c,
-                                  child: Text(c.isEmpty ? 'All products' : c),
-                                ),
-                            ],
-                            onChanged: _busy
-                                ? null
-                                : (v) => setState(() => _category = v!),
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            initialValue: _department,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Show banner in',
+                            _field(
+                              'Description',
+                              _subtitle,
+                              max: 120,
+                              lines: 2,
                             ),
-                            items: [
-                              for (final d in depts)
-                                DropdownMenuItem(
-                                  value: d,
-                                  child: Text(
-                                    d.isEmpty
-                                        ? 'Home + all departments'
-                                        : 'Home + $d',
+                            _field(
+                              'Button label',
+                              _cta,
+                              max: 28,
+                              validate: (s) => s!.trim().isEmpty
+                                  ? 'Name the button action'
+                                  : null,
+                            ),
+                            DropdownButtonFormField<String>(
+                              initialValue: _category,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Open this category',
+                              ),
+                              items: [
+                                for (final c in categories)
+                                  DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c.isEmpty ? 'All products' : c),
                                   ),
-                                ),
-                            ],
-                            onChanged: _busy
-                                ? null
-                                : (v) => setState(() => _department = v!),
-                          ),
-                          const SizedBox(height: 20),
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _upload,
-                            icon: const Icon(Icons.file_upload_outlined),
-                            label: Text(
-                              _busy ? 'Please wait…' : 'Upload campaign image',
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text(
-                              'Use a clear photo with the subject centred. The app adds the headline and button. Leave the image empty for category artwork.',
-                            ),
-                          ),
-                          _field(
-                            'Image URL (optional)',
-                            _image,
-                            validate: (s) {
-                              final u = Uri.tryParse(s!.trim());
-                              return s.trim().isEmpty ||
-                                      (u != null &&
-                                          u.scheme == 'https' &&
-                                          u.host.isNotEmpty &&
-                                          u.userInfo.isEmpty)
+                              ],
+                              onChanged: _busy
                                   ? null
-                                  : 'Use a valid HTTPS image URL';
-                            },
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              for (final hex in [
-                                '#F2E8CE',
-                                '#DCEACD',
-                                '#F7DCCB',
-                                '#E7DFF3',
-                                '#DCE9F5',
-                                '#1D4A3C',
-                              ])
-                                IconButton(
-                                  tooltip: 'Use $hex',
-                                  onPressed: _busy
-                                      ? null
-                                      : () =>
-                                            setState(() => _colour.text = hex),
-                                  icon: Icon(
-                                    _colour.text == hex
-                                        ? Icons.check_circle
-                                        : Icons.circle,
-                                    color: Campaign(
-                                      id: '',
-                                      title: '',
-                                      subtitle: '',
-                                      colour: hex,
-                                    ).background,
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    side: const BorderSide(
-                                      color: LamazonTheme.line,
+                                  : (v) => setState(() => _category = v!),
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<String>(
+                              initialValue: _department,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Show banner in',
+                              ),
+                              items: [
+                                for (final d in depts)
+                                  DropdownMenuItem(
+                                    value: d,
+                                    child: Text(
+                                      d.isEmpty
+                                          ? 'Home + all departments'
+                                          : 'Home + $d',
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _field(
-                            'Background colour',
-                            _colour,
-                            validate: (s) =>
-                                RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(s!.trim())
-                                ? null
-                                : 'Use a hex colour such as #F2E8CE',
-                          ),
-                          _field(
-                            'Display order (lowest first)',
-                            _position,
-                            validate: (s) {
-                              final n = int.tryParse(s ?? '');
-                              return n != null && n >= 0 && n <= 9999
+                              ],
+                              onChanged: _busy
                                   ? null
-                                  : 'Enter a number from 0 to 9999';
-                            },
-                          ),
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Published'),
-                            subtitle: Text(
-                              _enabled
-                                  ? 'Visible to shoppers after saving'
-                                  : 'Hidden from shoppers',
+                                  : (v) => setState(() => _department = v!),
                             ),
-                            value: _enabled,
-                            onChanged: _busy
-                                ? null
-                                : (v) => setState(() => _enabled = v),
-                          ),
-                          if (_error != null)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(color: Colors.red),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ActionButton(
+                                onPressed: _busy ? null : _upload,
+                                icon: Icons.file_upload_outlined,
+                                label: _busy
+                                    ? 'Please wait…'
+                                    : 'Upload campaign image',
+                                primary: false,
+                                expand: true,
                               ),
                             ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: _busy ? null : _save,
-                            child: Text(_busy ? 'Saving…' : 'Save banner'),
-                          ),
-                        ],
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Text(
+                                'Use a 16:9 photo with the subject on the right. The template keeps the headline and action legible on the left.',
+                                style: LamazonTheme.mutedBodyText,
+                              ),
+                            ),
+                            _field(
+                              'Image URL (optional)',
+                              _image,
+                              validate: (s) {
+                                final u = Uri.tryParse(s!.trim());
+                                return s.trim().isEmpty ||
+                                        (u != null &&
+                                            u.scheme == 'https' &&
+                                            u.host.isNotEmpty &&
+                                            u.userInfo.isEmpty)
+                                    ? null
+                                    : 'Use a valid HTTPS image URL';
+                              },
+                            ),
+                            const Text(
+                              'Choose a banner theme',
+                              style: LamazonTheme.bodyText,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                for (final palette in CampaignPalette.presets)
+                                  TactileIconButton(
+                                    label: 'Use ${palette.name}',
+                                    onPressed: _busy
+                                        ? null
+                                        : () => setState(
+                                            () => _colour.text = palette.hex,
+                                          ),
+                                    icon:
+                                        _colour.text.trim().toUpperCase() ==
+                                            palette.hex
+                                        ? Icons.check_circle
+                                        : Icons.circle,
+                                    background: palette.background,
+                                    foreground: palette.foreground,
+                                    selected:
+                                        _colour.text.trim().toUpperCase() ==
+                                        palette.hex,
+                                    size: 40,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _field(
+                              'Background colour',
+                              _colour,
+                              validate: (s) =>
+                                  RegExp(
+                                    r'^#[0-9a-fA-F]{6}$',
+                                  ).hasMatch(s!.trim())
+                                  ? null
+                                  : 'Use a hex colour such as #143E32',
+                            ),
+                            _field(
+                              'Display order (lowest first)',
+                              _position,
+                              validate: (s) {
+                                final n = int.tryParse(s ?? '');
+                                return n != null && n >= 0 && n <= 9999
+                                    ? null
+                                    : 'Enter a number from 0 to 9999';
+                              },
+                            ),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Published'),
+                              subtitle: Text(
+                                _enabled
+                                    ? 'Visible to shoppers after saving'
+                                    : 'Hidden from shoppers',
+                              ),
+                              value: _enabled,
+                              onChanged: _busy
+                                  ? null
+                                  : (v) => setState(() => _enabled = v),
+                            ),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(
+                                    color: LamazonTheme.danger,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            ActionButton(
+                              onPressed: _busy ? null : _save,
+                              label: _busy ? 'Saving…' : 'Save banner',
+                              expand: true,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

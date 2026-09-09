@@ -22,89 +22,103 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: NetImage(
-                          url: product.imageUrl,
-                          semanticLabel: product.name,
-                        ),
+    return ElevatedSurface(
+      radius: LamazonTheme.smallRadius,
+      onTap: onTap,
+      semanticLabel: product.name,
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: ColoredBox(
+                      color: const Color(0xFFF2F2EC),
+                      child: NetImage(
+                        url: product.imageUrl,
+                        semanticLabel: product.name,
                       ),
-                    ),
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: WishlistHeart(productId: product.id),
-                    ),
-                    if (product.discounted)
-                      Positioned(
-                        left: 4,
-                        bottom: 4,
-                        child: DiscountBadge(percent: product.discountPercent),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                product.store,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: LamazonTheme.muted),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  height: 1.25,
-                ),
-              ),
-              if (product.availableStock != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    product.availableStock == 0
-                        ? 'Out of stock'
-                        : product.availableStock! <= 5
-                        ? 'Only ${product.availableStock} left'
-                        : 'In stock',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: product.availableStock == 0
-                          ? Colors.red.shade800
-                          : LamazonTheme.green,
                     ),
                   ),
                 ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(child: PriceLine(product: product, fontSize: 17)),
-                  if (showAddToCart) CartButton(product: product),
-                ],
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: WishlistHeart(productId: product.id),
+                ),
+                if (product.discounted)
+                  Positioned(
+                    left: 5,
+                    bottom: 5,
+                    child: DiscountBadge(percent: product.discountPercent),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            product.store,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'InterTight',
+              fontSize: 11.5,
+              letterSpacing: .25,
+              color: LamazonTheme.muted,
+            ),
+          ),
+          const SizedBox(height: 3),
+          // Always two lines tall. The picture takes the leftover height, so a
+          // one-line name used to hand its card a taller photo than the card
+          // beside it — the row of products then looked misaligned.
+          SizedBox(
+            height: 36,
+            child: Text(
+              product.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'InterTight',
+                fontWeight: FontWeight.w600,
+                fontSize: 14.5,
+                height: 18 / 14.5,
+                letterSpacing: .1,
               ),
+            ),
+          ),
+          if (product.availableStock != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(
+                product.availableStock == 0
+                    ? 'Out of stock'
+                    : product.availableStock! <= 5
+                    ? 'Only ${product.availableStock} left'
+                    : 'In stock',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'InterTight',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: product.availableStock == 0
+                      ? LamazonTheme.danger
+                      : LamazonTheme.strong,
+                ),
+              ),
+            ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(child: PriceLine(product: product, fontSize: 17)),
+              if (showAddToCart) CartButton(product: product),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -122,13 +136,20 @@ class DiscountBadge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: fontSize * 0.7, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFD32F2F),
-        borderRadius: BorderRadius.circular(999),
+        color: LamazonTheme.peach,
+        borderRadius: BorderRadius.circular(9),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x290D2119),
+            offset: Offset(0, 2),
+            blurRadius: 5,
+          ),
+        ],
       ),
       child: Text(
         '$percent% OFF',
         style: TextStyle(
-          color: Colors.white,
+          color: LamazonTheme.text,
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
@@ -182,19 +203,16 @@ class WishlistHeart extends StatelessWidget {
       listenable: Wishlist.instance,
       builder: (context, _) {
         final liked = Wishlist.instance.contains(productId);
-        return IconButton.filledTonal(
-          tooltip: liked ? 'Remove from saved' : 'Save product',
+        return TactileIconButton(
+          icon: liked ? Icons.favorite : LucideIcons.heart,
+          label: liked ? 'Remove from saved' : 'Save product',
           onPressed: () => Wishlist.instance.toggle(productId),
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.white.withValues(alpha: .95),
-            minimumSize: const Size(48, 48),
-          ),
-          icon: Icon(
-            liked ? Icons.favorite : LucideIcons.heart,
-            size: 20,
-            color: liked ? const Color(0xFFC62828) : LamazonTheme.ink,
-          ),
-          isSelected: liked,
+          selected: liked,
+          size: 40,
+          background: liked
+              ? const Color(0xFFFCE3E5)
+              : Colors.white.withValues(alpha: .96),
+          foreground: liked ? LamazonTheme.danger : LamazonTheme.strong,
         );
       },
     );
@@ -225,21 +243,24 @@ class _CartButtonState extends State<CartButton> {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filled(
-      tooltip: widget.product.availableStock == 0
-          ? 'Out of stock'
-          : _added
-          ? 'Added to cart'
-          : 'Add ${widget.product.name} to cart',
-      onPressed: _added || widget.product.availableStock == 0 ? null : _add,
-      style: IconButton.styleFrom(
-        backgroundColor: LamazonTheme.accent,
-        foregroundColor: LamazonTheme.ink,
-        disabledBackgroundColor: LamazonTheme.green,
-        disabledForegroundColor: Colors.white,
-        minimumSize: const Size(48, 48),
+    final disabled = widget.product.availableStock == 0;
+    return AnimatedScale(
+      duration: Duration(
+        milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 180,
       ),
-      icon: Icon(_added ? LucideIcons.check : LucideIcons.plus, size: 20),
+      scale: _added ? 1.06 : 1,
+      child: TactileIconButton(
+        icon: _added ? LucideIcons.check : LucideIcons.plus,
+        label: disabled
+            ? 'Out of stock'
+            : _added
+            ? 'Added to cart'
+            : 'Add ${widget.product.name} to cart',
+        onPressed: _added || disabled ? null : _add,
+        background: disabled ? LamazonTheme.track : LamazonTheme.lime,
+        foreground: disabled ? LamazonTheme.muted : LamazonTheme.strong,
+        size: 42,
+      ),
     );
   }
 }
@@ -294,9 +315,9 @@ class NetImage extends StatelessWidget {
 
   Widget _fallback() {
     return Container(
-      color: const Color(0xFFE8E8E4),
+      color: const Color(0xFFF0F1EB),
       alignment: Alignment.center,
-      child: const Icon(LucideIcons.imageOff, color: Colors.grey),
+      child: const Icon(LucideIcons.imageOff, color: LamazonTheme.muted),
     );
   }
 }

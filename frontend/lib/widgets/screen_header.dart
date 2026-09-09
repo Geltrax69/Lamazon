@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'design_system.dart';
 
 /// Back button + centred title, the header every sub-screen uses.
 class ScreenHeader extends StatelessWidget {
@@ -23,14 +24,13 @@ class ScreenHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton.filledTonal(
-            tooltip: 'Back',
-            style: IconButton.styleFrom(backgroundColor: Colors.white),
+          TactileIconButton(
+            label: 'Back',
             onPressed: () async {
               if (onBack != null && !await onBack!()) return;
               if (context.mounted) Navigator.pop(context);
             },
-            icon: const Icon(LucideIcons.arrowLeft, size: 21),
+            icon: LucideIcons.arrowLeft,
           ),
           // Flexible, so a long title or a wide action shortens the title
           // rather than running off the edge of a narrow phone.
