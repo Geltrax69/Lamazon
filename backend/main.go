@@ -185,6 +185,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/orders/checkout", s.handleCheckout)
 	mux.HandleFunc("POST /api/seller/orders", s.handlePlaceOrder)
 	mux.HandleFunc("GET /api/orders", s.handleMyOrders)
+	mux.HandleFunc("POST /api/orders/{id}/cancel", s.handleCancelOrder)
 
 	// Admin. Everything but the login needs an admin token, checked in
 	// withStaff below.
@@ -192,6 +193,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
 	mux.HandleFunc("PUT /api/admin/policies/{slug}", s.handleSavePolicy)
+	mux.HandleFunc("GET /api/admin/policies", s.handlePolicies)
 	mux.HandleFunc("POST /api/admin/categories", s.handleAddCategory)
 	mux.HandleFunc("POST /api/admin/compare-groups", s.handleSaveCompareGroup)
 	mux.HandleFunc("DELETE /api/admin/compare-groups/{name}", s.handleDeleteCompareGroup)

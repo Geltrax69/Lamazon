@@ -1,3 +1,4 @@
+import '../data/app_info.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -12,18 +13,15 @@ const _muted = Color(0xFF6B6B6B);
 const _faqs = [
   (
     'Where is my order?',
-    'Open My Orders and tap an order to see live status. Most deliveries '
-        'arrive within 12–30 minutes of confirmation.',
+    'Open My Orders and tap an order for its current status, delivery address and cancellation options. Pull down to refresh.',
   ),
   (
     'How do I cancel an order?',
-    'You can cancel free of charge until the store accepts it. After that, '
-        'contact support and we will check with the store.',
+    'Open the order in My Orders and choose Cancel order before the shop accepts it. Accepted orders cannot be cancelled in the app.',
   ),
   (
     'When do I get my refund?',
-    'Refunds are issued to the original payment method and usually land in '
-        '3–5 business days.',
+    'The app does not process online payments or automatic refunds. Read the published Refunds policy for the applicable terms.',
   ),
   (
     'Can I change my delivery address?',
@@ -61,29 +59,9 @@ class HelpScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           _ContactTile(
-                            icon: LucideIcons.messageCircle,
-                            title: 'Chat with us',
-                            subtitle: 'Typically replies in under 2 minutes',
-                          ),
-                          const Divider(
-                            height: 1,
-                            indent: 56,
-                            color: Color(0xFFF1F1EF),
-                          ),
-                          _ContactTile(
-                            icon: LucideIcons.phone,
-                            title: 'Call support',
-                            subtitle: '1800-000-1234 · 8am – 11pm',
-                          ),
-                          const Divider(
-                            height: 1,
-                            indent: 56,
-                            color: Color(0xFFF1F1EF),
-                          ),
-                          _ContactTile(
                             icon: LucideIcons.mail,
-                            title: 'Email us',
-                            subtitle: 'help@lamazon.app',
+                            title: 'Support information',
+                            subtitle: 'View published contact details',
                           ),
                         ],
                       ),
@@ -164,9 +142,9 @@ class HelpScreen extends StatelessWidget {
                     ),
                     const PolicyLinks(),
                     const SizedBox(height: 22),
-                    const Center(
+                    Center(
                       child: Text(
-                        'Lamazon · v1.0.0',
+                        'Lamazon · ${AppInfo.version}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF9A9A9A),
@@ -211,17 +189,10 @@ class _ContactTile extends StatelessWidget {
         size: 16,
         color: Color(0xFF9A9A9A),
       ),
-      onTap: () {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text('$title — coming soon'),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 1),
-            ),
-          );
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PolicyScreen(slug: 'contact')),
+      ),
     );
   }
 }

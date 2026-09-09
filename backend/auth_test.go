@@ -32,7 +32,7 @@ func mailAPI(t *testing.T) (http.Handler, *sentMail) {
 	}))
 	t.Cleanup(srv.Close)
 
-	return routes(&API{db: testDB(t), mail: &Mailer{
+	return routes(&API{db: testDB(t), cloud: fixtureCloud(t), mail: &Mailer{
 		key: "test-key", from: "auth@simpedu.in", http: srv.Client(), base: srv.URL,
 	}}), sent
 }

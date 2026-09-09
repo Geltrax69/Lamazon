@@ -41,13 +41,27 @@ class PolicyDoc {
 /// frame before the server answers.
 List<PolicyDoc> get bundledPolicies => [
   for (final p in shippedPolicies)
-    PolicyDoc(slug: p['slug']!, title: p['title']!, body: p['body']!),
+    PolicyDoc(
+      slug: p['slug']!,
+      title: p['title']!,
+      body:
+          'This policy is unavailable. Check your connection and try again before ordering.',
+    ),
 ];
 
 /// Loaded once and kept, so opening a second policy does not re-fetch.
 List<PolicyDoc>? _cache;
 
-Future<List<PolicyDoc>> loadPolicies({bool refresh = false}) async {
+Future<List<PolicyDoc>> loadPolicies({
+  bool refresh = false,
+  bool admin = false,
+}) async {
+  if (admin) {
+    return [
+      for (final row in await Api.instance.adminPolicies())
+        PolicyDoc.fromJson(row as Map<String, dynamic>),
+    ];
+  }
   if (_cache != null && !refresh) return _cache!;
   try {
     final rows = await Api.instance.policies();

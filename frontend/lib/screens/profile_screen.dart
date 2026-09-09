@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
@@ -244,12 +246,28 @@ class ProfileScreen extends StatelessWidget {
                       _Row(
                         icon: LucideIcons.share,
                         label: 'Share the app',
-                        onTap: () => _soon(context, 'Share the app'),
+                        onTap: () async {
+                          await Clipboard.setData(
+                            ClipboardData(
+                              text: kIsWeb
+                                  ? Uri.base.origin
+                                  : 'https://github.com/Geltrax69/Lamazon/releases/latest',
+                            ),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('App link copied')),
+                            );
+                          }
+                        },
                       ),
                       _Row(
                         icon: LucideIcons.info,
                         label: 'About us',
-                        onTap: () => _soon(context, 'About us'),
+                        onTap: () => showAboutDialog(
+                          context: context,
+                          applicationName: 'Lamazon',
+                        ),
                       ),
                       _Row(
                         icon: LucideIcons.store,
@@ -326,19 +344,6 @@ Future<void> _openSeller(BuildContext context) async {
 /// between opening a store and the next refresh.
 bool get _sells => Session.instance.isSeller || Seller.instance.hasStore;
 
-void _soon(BuildContext context, String what) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text('$what — coming soon'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-}
-
-/// One of the three square shortcuts under the account header.
 class _Tile extends StatelessWidget {
   final IconData icon;
   final String label;

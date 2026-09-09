@@ -1,3 +1,4 @@
+import '../data/app_info.dart';
 import '../data/api.dart';
 import 'policy_screen.dart';
 import 'package:flutter/material.dart';
@@ -48,10 +49,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _loaded = true;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = e.toString().replaceFirst('ClientException: ', ''),
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -178,10 +180,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                         ),
-                        const _Link(
+                        _Link(
                           icon: LucideIcons.info,
                           title: 'App version',
-                          value: '1.0.0',
+                          value: AppInfo.version,
                         ),
                       ],
                     ),

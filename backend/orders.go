@@ -85,6 +85,15 @@ func (a *API) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "expectedTotal is required")
 		return
 	}
+	var available bool
+	if err := a.db.sql.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM riders WHERE active)`).Scan(&available); err != nil {
+		writeError(w, 503, "could not check delivery availability — try again")
+		return
+	}
+	if !available {
+		writeError(w, 503, "delivery is currently unavailable — please try again when riders are available")
+		return
+	}
 	a.placeBasket(w, r, in.Lines, in.AddressID, in.ExpectedTotal, false)
 }
 
@@ -403,4 +412,33 @@ func (a *API) orderMoved(w http.ResponseWriter, r *http.Request, id string, err 
 		writeError(w, http.StatusConflict, "that order is already "+stage)
 	}
 	return false
+}
+
+// Cancel only a buyer's own received order. The same conditional update used
+// by acceptance ensures a cancellation racing the seller cannot undo acceptance.
+func (a *API) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
+	o, err := scanOrder(a.db.sql.QueryRowContext(r.Context(), `UPDATE orders SET stage='rejected',
+  reject_reason='Cancelled by customer' WHERE id=$1 AND buyer_email=$2 AND stage='received'
+  RETURNING `+orderColumns, r.PathValue("id"), a.owner(r)))
+	if errors.Is(err, sql.ErrNoRows) {
+		var stage string
+		err = a.db.sql.QueryRowContext(r.Context(), `SELECT stage FROM orders WHERE id=$1 AND buyer_email=$2`, r.PathValue("id"), a.owner(r)).Scan(&stage)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, 404, "order not found")
+			return
+		}
+		if err != nil {
+			writeError(w, 500, "could not cancel order")
+			return
+		}
+		writeError(w, 409, "only orders waiting for the shop can be cancelled")
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "could not cancel order")
+		return
+	}
+	a.notifyOrder(r.Context(), o.StoreOwner, "Order "+o.ID+" was cancelled", "The customer cancelled the order before acceptance.")
+	o.StoreOwner = ""
+	writeJSON(w, 200, o)
 }

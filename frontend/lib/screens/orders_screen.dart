@@ -1,3 +1,5 @@
+import '../data/money.dart';
+import 'order_detail_screen.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -102,8 +104,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               itemCount: orders.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: 12),
-                              itemBuilder: (_, i) =>
-                                  _OrderCard(order: orders[i]),
+                              itemBuilder: (context, i) => InkWell(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        OrderDetailScreen(order: orders[i]),
+                                  ),
+                                ),
+                                child: _OrderCard(order: orders[i]),
+                              ),
                             ),
                     ),
                   ),
@@ -154,7 +164,9 @@ class _OrderCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  order.status.title,
+                  order.rejectReason == 'Cancelled by customer'
+                      ? 'Cancelled'
+                      : order.status.title,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -183,7 +195,9 @@ class _OrderCard extends StatelessWidget {
           if (order.rejectReason.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'The shop said: ${order.rejectReason}',
+              order.rejectReason == 'Cancelled by customer'
+                  ? order.rejectReason
+                  : 'The shop said: ${order.rejectReason}',
               style: const TextStyle(fontSize: 12.5, color: _red),
             ),
           ],
@@ -230,7 +244,7 @@ class _OrderCard extends StatelessWidget {
                 style: TextStyle(fontSize: 13, color: _muted),
               ),
               Text(
-                '₹${order.amount.toStringAsFixed(0)}',
+                '₹${order.amount.moneyText}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,

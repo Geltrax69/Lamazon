@@ -72,6 +72,14 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: 'Continue browsing',
+                icon: const Icon(LucideIcons.x),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
             const SizedBox(height: 24),
             Icon(
               here ? LucideIcons.mapPin : LucideIcons.mapPinOff,
@@ -150,6 +158,14 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: 'Continue browsing',
+                icon: const Icon(LucideIcons.x),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
             const SizedBox(height: 28),
             const _SlashedPin(),
             const SizedBox(height: 22),

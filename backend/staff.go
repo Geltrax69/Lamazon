@@ -319,7 +319,7 @@ func (a *API) handleAdminInsights(w http.ResponseWriter, r *http.Request) {
 	stores := make([]storeRow, 0)
 	rows, err := a.db.sql.QueryContext(r.Context(), `
 		SELECT store_name, count(*), COALESCE(sum(units), 0),
-		       COALESCE(sum(amount), 0),
+		       COALESCE(sum(amount) FILTER (WHERE stage = 'delivered'), 0),
 		       count(*) FILTER (WHERE stage = 'delivered')
 		FROM orders
 		WHERE stage <> 'rejected' AND store_name <> ''
@@ -358,7 +358,7 @@ func (a *API) handleAdminInsights(w http.ResponseWriter, r *http.Request) {
 	// same thing should not split their own bestseller into two rows.
 	rows, err = a.db.sql.QueryContext(r.Context(), `
 		SELECT item_title, store_name, COALESCE(sum(units), 0), count(*),
-		       COALESCE(sum(amount), 0)
+		       COALESCE(sum(amount) FILTER (WHERE stage = 'delivered'), 0)
 		FROM orders
 		WHERE stage <> 'rejected'
 		GROUP BY item_title, store_name
@@ -386,7 +386,7 @@ func (a *API) handleAdminInsights(w http.ResponseWriter, r *http.Request) {
 	var placed, delivered, rejected int
 	var revenue float64
 	a.db.sql.QueryRowContext(r.Context(), `
-		SELECT count(*) FILTER (WHERE stage <> 'rejected'),
+		SELECT count(*),
 		       count(*) FILTER (WHERE stage = 'delivered'),
 		       count(*) FILTER (WHERE stage = 'rejected'),
 		       COALESCE(sum(amount) FILTER (WHERE stage = 'delivered'), 0)
@@ -978,7 +978,7 @@ func (a *API) handleRiderOrders(w http.ResponseWriter, r *http.Request) {
 		       -- still leaves a rider holding it, and a card with no pickup
 		       -- line beats no card at all.
 		       trim(both ', ' FROM concat_ws(', ', s.location, s.city)),
-		       o.receiver_name, o.receiver_phone, o.receiver_address,
+		       CASE WHEN o.assigned_to=$1 OR o.rider_phone=$1 THEN o.receiver_name ELSE '' END, CASE WHEN o.assigned_to=$1 OR o.rider_phone=$1 THEN o.receiver_phone ELSE '' END, CASE WHEN o.assigned_to=$1 OR o.rider_phone=$1 THEN o.receiver_address ELSE '' END,
 		       o.rider_phone, o.assigned_to
 		FROM orders o
 		LEFT JOIN seller_stores s ON s.owner = o.store_owner

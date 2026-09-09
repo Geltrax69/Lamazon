@@ -29,6 +29,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   late String _query = widget.initialQuery;
+  late String _tab = widget.tab;
   late final _controller = TextEditingController(text: widget.initialQuery);
 
   /// What the server found. The screen used to filter whatever list happened
@@ -39,7 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _busy = false;
   Timer? _debounce;
 
-  bool get _scoped => widget.tab.isNotEmpty && widget.tab != 'All';
+  bool get _scoped => _tab.isNotEmpty && _tab != 'All';
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _run(String value) async {
     final q = value.trim();
+    final scope = _tab;
     if (q.isEmpty) {
       setState(() {
         _hits = const [];
@@ -73,26 +75,26 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _busy = true);
     try {
       final found = await Api.instance.products(
-        tab: _scoped ? widget.tab : null,
+        tab: _scoped ? _tab : null,
         query: q,
       );
       // The field may have moved on while this was in flight; a slow reply
       // for an old query must not overwrite a newer one.
-      if (!mounted || _query.trim() != q) return;
+      if (!mounted || _query.trim() != q || _tab != scope) return;
       setState(() {
         _hits = found;
         _busy = false;
       });
     } catch (e) {
       logApiFailure('search', e);
-      if (!mounted) return;
+      if (!mounted || _query.trim() != q || _tab != scope) return;
       // Offline, the catalogue in memory is still better than nothing.
       final lower = q.toLowerCase();
       setState(() {
         _hits = shownCatalog
             .where(
               (p) =>
-                  (!_scoped || p.tab == widget.tab) &&
+                  (!_scoped || p.tab == _tab) &&
                   (p.name.toLowerCase().contains(lower) ||
                       p.category.toLowerCase().contains(lower) ||
                       p.store.toLowerCase().contains(lower)),
@@ -170,7 +172,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   // silent: a search that quietly ignores
                                   // half the catalogue reads as broken.
                                   hintText: _scoped
-                                      ? 'Search in ${widget.tab}...'
+                                      ? 'Search in $_tab...'
                                       : 'Search products, shops...',
                                   hintStyle: const TextStyle(
                                     color: Colors.grey,
@@ -187,10 +189,25 @@ class _SearchScreenState extends State<SearchScreen> {
                   ],
                 ),
               ),
+              if (_scoped)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: InputChip(
+                      label: Text('In $_tab'),
+                      onDeleted: () {
+                        _debounce?.cancel();
+                        setState(() => _tab = '');
+                        _run(_query);
+                      },
+                    ),
+                  ),
+                ),
               Expanded(
                 child: q.isEmpty
                     ? _SearchHint(
-                        tab: widget.tab,
+                        tab: _tab,
                         onPick: (name) {
                           _controller.text = name;
                           _onTyped(name);

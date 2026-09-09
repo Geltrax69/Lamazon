@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -29,14 +30,12 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   late final _title = TextEditingController(text: widget.existing?.title);
   late final _desc = TextEditingController(text: widget.existing?.description);
   late final _price = TextEditingController(
-    text: widget.existing?.price.toStringAsFixed(0),
+    text: widget.existing?.price.moneyText,
   );
   // Blank rather than "0" when there is no discount: a zero in the box reads
   // as a price the seller has to clear before typing.
   late final _mrp = TextEditingController(
-    text: (widget.existing?.mrp ?? 0) > 0
-        ? widget.existing!.mrp.toStringAsFixed(0)
-        : '',
+    text: (widget.existing?.mrp ?? 0) > 0 ? widget.existing!.mrp.moneyText : '',
   );
   late final _stock = TextEditingController(
     text: widget.existing?.stock.toString(),
@@ -231,7 +230,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                   : same
                   ? 'Same as the selling price, so no discount is shown.'
                   : 'Buyers see $_percentOff% OFF — '
-                        '₹${(mrp - price).toStringAsFixed(0)} saved.',
+                        '₹${(mrp - price).moneyText} saved.',
               style: TextStyle(
                 fontSize: 12,
                 color: bad ? _amber : _muted,

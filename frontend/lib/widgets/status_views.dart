@@ -5,9 +5,13 @@ import '../models/product.dart';
 
 /// Styled confirmation shown when an item is added: basket UI for food &
 /// grocery, cart UI for everything else.
-void showAddedToast(BuildContext context, Product product) {
+void showAddedToast(
+  BuildContext context,
+  Product product, {
+  ScaffoldMessengerState? messenger,
+}) {
   final basket = product.tab == 'Food' || product.tab == 'Grocery';
-  ScaffoldMessenger.of(context)
+  (messenger ?? ScaffoldMessenger.of(context))
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(

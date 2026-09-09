@@ -114,8 +114,9 @@ class Session extends ChangeNotifier {
   /// on as a guest and the login screen asks for a new code.
   Future<String?> freshToken() async {
     if (_token == null || _refreshToken == null) return _token;
-    if (_expiresAt != null && DateTime.now().isBefore(_expiresAt!))
+    if (_expiresAt != null && DateTime.now().isBefore(_expiresAt!)) {
       return _token;
+    }
     try {
       await signIn(await Api.instance.refreshSession(_refreshToken!));
       return _token;

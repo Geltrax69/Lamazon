@@ -95,6 +95,13 @@ class Api {
 
   /// The written policies, newest text first from the server.
   Future<List<dynamic>> policies() => _getList('/api/policies');
+  Future<List<dynamic>> adminPolicies() async =>
+      (await _staffCall(
+            StaffSession.admin,
+            'GET',
+            '/api/admin/policies',
+          ))['policies']
+          as List<dynamic>;
 
   Future<void> savePolicy(String slug, String title, String body) => _staffCall(
     StaffSession.admin,
@@ -515,6 +522,10 @@ class Api {
       );
 
   // ---- Buying ------------------------------------------------------------
+
+  Future<void> cancelOrder(String id) async {
+    await _post('/api/orders/$id/cancel', body: {}, expect: 200);
+  }
 
   /// Atomic basket checkout. The server calculates prices and one delivery fee.
   Future<List<MyOrder>> checkout({

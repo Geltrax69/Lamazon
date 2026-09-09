@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool get _valid => switch (_step) {
     _Step.email => Session.isValidEmail(_email.text),
-    _Step.code => _code.text.trim().length == 6,
+    _Step.code => RegExp(r'^\d{6}$').hasMatch(_code.text.trim()),
     _Step.password => _password.text.isNotEmpty,
   };
 
@@ -386,6 +386,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _error ??
+                                (!_valid
+                                    ? switch (_step) {
+                                        _Step.email =>
+                                          'Enter a valid email address to continue.',
+                                        _Step.code =>
+                                          'Enter the six digits from your email.',
+                                        _Step.password =>
+                                          'Enter your password to sign in.',
+                                      }
+                                    : null) ??
                                 switch (_step) {
                                   _Step.email =>
                                     'We only use your email for order updates '

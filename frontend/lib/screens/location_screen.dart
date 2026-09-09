@@ -265,6 +265,22 @@ class _LocationScreenState extends State<LocationScreen> {
                   ],
                 ),
               ),
+              if (!_complete)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    _name.text.trim().isEmpty
+                        ? 'Enter the recipient name.'
+                        : !RegExp(
+                            r'^(?:\+91[ -]?)?[6-9][0-9]{9}$',
+                          ).hasMatch(_phone.text.trim())
+                        ? 'Enter a valid 10-digit Indian mobile number.'
+                        : 'Enter the delivery address.',
+                  ),
+                ),
               // Check first, then save only if serviceable.
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),

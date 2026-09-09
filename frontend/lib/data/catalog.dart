@@ -110,14 +110,14 @@ String thumb(String url, int width) =>
 ///
 /// ponytail: a string insert, not an image pipeline. Non-Cloudinary URLs
 /// (the sample catalogue is Unsplash) are returned untouched.
-String padded(String url, [double aspect = 1]) {
+String padded(String url, [double aspect = 1, int? sourceWidth]) {
   const marker = '/image/upload/';
   // Already transformed — a second c_pad would scale the padding, not the
   // picture, and quietly win.
   if (!url.contains(marker) || url.contains('c_pad')) return url;
   // Wide shapes are drawn full-bleed across the screen, so they get the wider
   // source; a square is a tile at most a third of that.
-  final width = aspect > 1 ? 1024 : 512;
+  final width = sourceWidth ?? (aspect > 1 ? 1024 : 512);
   final height = (width / aspect).round();
   return url.replaceFirst(
     marker,
@@ -566,3 +566,16 @@ const products = [
     offers: [ShopOffer('Nature Fresh', 102)],
   ),
 ];
+
+/// Bound full-bleed Cloudinary images too; preserve non-Cloudinary URLs.
+String optimizedImage(String url, [int width = 1024]) {
+  final uri = Uri.tryParse(url);
+  if (uri?.host != 'res.cloudinary.com' || !url.contains('/image/upload/')) {
+    return url;
+  }
+  if (url.contains('f_auto,q_auto,c_limit,')) return url;
+  return url.replaceFirst(
+    '/image/upload/',
+    '/image/upload/f_auto,q_auto,c_limit,w_$width/',
+  );
+}

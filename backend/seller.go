@@ -150,7 +150,11 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 40<<20)
 	in, photos, err := decodeItem(r)
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -176,6 +180,26 @@ func (a *API) handleAddItem(w http.ResponseWriter, r *http.Request) {
 	case in.MRP != 0 && in.MRP < in.Price:
 		writeError(w, http.StatusBadRequest,
 			"MRP cannot be below the selling price")
+		return
+	}
+
+	if len(photos) == 0 {
+		writeError(w, 400, "attach at least one product photo")
+		return
+	}
+	if len(photos) > 10 {
+		writeError(w, 400, "attach at most 10 product photos")
+		return
+	}
+	if in.Category == "" && len(store.Categories) > 0 {
+		in.Category = store.Categories[0]
+	}
+	if in.Category == "" {
+		writeError(w, 400, "choose an existing category")
+		return
+	}
+	if err := a.validateItem(r.Context(), &in); err != nil {
+		writeError(w, 400, err.Error())
 		return
 	}
 

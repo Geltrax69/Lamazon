@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -506,7 +507,7 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
               Text(
-                '₹${(order['amount'] as num).toStringAsFixed(0)}',
+                '₹${(order['amount'] as num).moneyText}',
                 style: const TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w800,
@@ -604,7 +605,7 @@ class _HistorySection extends StatelessWidget {
                 Text(
                   orders.isEmpty
                       ? 'None yet'
-                      : '${orders.length} · ₹${value.toStringAsFixed(0)}',
+                      : '${orders.length} · ₹${value.moneyText}',
                   style: const TextStyle(fontSize: 12.5, color: _muted),
                 ),
               ],
@@ -681,7 +682,7 @@ class _HistoryRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '₹${(order['amount'] as num).toStringAsFixed(0)}',
+                '₹${(order['amount'] as num).moneyText}',
                 style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w800,

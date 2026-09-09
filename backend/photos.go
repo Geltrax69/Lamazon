@@ -231,6 +231,10 @@ func (a *API) handleReorderItemPhotos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(out) == 0 {
+		writeError(w, 400, "keep at least one product photo")
+		return
+	}
 	var saved string
 	if err := a.db.sql.QueryRowContext(r.Context(), `
 		UPDATE inventory_items SET image_urls = $2::text[]

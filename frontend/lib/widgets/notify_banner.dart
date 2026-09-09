@@ -127,8 +127,9 @@ class _NotifyBannerState extends State<NotifyBanner> {
     final done = _step == _NotifyStep.confirmed;
     if (_hidden || !push.supported) return const SizedBox.shrink();
     // Already granted and nothing to prove: stay out of the way.
-    if (push.granted && _step == _NotifyStep.ask)
+    if (push.granted && _step == _NotifyStep.ask) {
       return const SizedBox.shrink();
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

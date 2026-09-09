@@ -133,3 +133,78 @@ func TestOrderNotificationHonorsPreferences(t *testing.T) {
 		t.Fatal("push opt-out should still allow order email")
 	}
 }
+
+func TestCancellationBeforeAcceptanceAndOwnership(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Food", "price": 20, "stock": 1})
+	_, order := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35})
+	id := order["id"].(string)
+	stranger := signIn(t, lastTestDB, "stranger@example.com")
+	if code, _ := callAs(t, h, stranger, "POST", "/api/orders/"+id+"/cancel", nil); code != 404 {
+		t.Fatalf("cross-buyer cancellation: %d", code)
+	}
+	if code, body := call(t, h, "POST", "/api/orders/"+id+"/cancel", nil); code != 200 || body["rejectReason"] != "Cancelled by customer" {
+		t.Fatalf("cancel: %d %v", code, body)
+	}
+	if code, _ := call(t, h, "POST", "/api/orders/"+id+"/cancel", nil); code != 409 {
+		t.Fatal("duplicate cancellation allowed")
+	}
+	code, next := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35})
+	if code != 201 {
+		t.Fatal("cancellation did not release reservation")
+	}
+	nextID := next["id"].(string)
+	call(t, h, "POST", "/api/seller/orders/"+nextID+"/accept", nil)
+	if code, _ := call(t, h, "POST", "/api/orders/"+nextID+"/cancel", nil); code != 409 {
+		t.Fatal("accepted order cancelled")
+	}
+}
+
+func TestCheckoutUnavailableWithoutRiders(t *testing.T) {
+	h := testAPI(t)
+	code, _ := call(t, h, "POST", "/api/orders/checkout", map[string]any{"lines": []map[string]any{{"itemId": "any", "units": 1}}, "expectedTotal": 35})
+	if code != 503 {
+		t.Fatalf("no rider: %d", code)
+	}
+}
+
+func TestPolicyDraftsStayPrivateAndCannotBePublished(t *testing.T) {
+	h := testAPI(t)
+	if err := lastTestDB.seedPolicies(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	admin := adminSignIn(t, h)
+	for _, row := range callList(t, h, "/api/policies") {
+		if policyHasBlanks(row.(map[string]any)["body"].(string)) {
+			t.Fatal("public endpoint exposed placeholders")
+		}
+	}
+	if code, body := callAs(t, h, admin, "PUT", "/api/admin/policies/contact", map[string]string{"title": "Contact", "body": "Write to [support@email.com]"}); code != 400 {
+		t.Fatalf("placeholder published: %d %v", code, body)
+	}
+	if policyHasBlanks("See [the contact page](https://example.com/contact)") {
+		t.Fatal("markdown links are not placeholders")
+	}
+	if code, _ := callAs(t, h, "", "GET", "/api/admin/policies", nil); code != 401 {
+		t.Fatal("drafts accessible without admin")
+	}
+	code, body := callAs(t, h, admin, "GET", "/api/admin/policies", nil)
+	if code != 200 || len(body["policies"].([]any)) != 5 {
+		t.Fatalf("admin cannot edit drafts: %d %v", code, body)
+	}
+}
+
+func TestPhotoRequiredForNewProduct(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})
+	code, body := callAs(t, h, testToken, "POST", "/api/seller/items", map[string]any{"title": "No photo", "price": 20, "stock": 1, "category": "Food"})
+	if code != 400 || body["error"] != "attach at least one product photo" {
+		t.Fatalf("photo-less listing accepted: %d %v", code, body)
+	}
+	code, body = call(t, h, "POST", "/api/seller/items", map[string]any{"title": "With photo", "price": 20, "stock": 1, "category": "Food"})
+	if code != 201 || len(body["imageUrls"].([]any)) != 1 {
+		t.Fatalf("photo upload failed: %d %v", code, body)
+	}
+}

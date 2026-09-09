@@ -23,8 +23,9 @@ void main() {
       final client = MockClient((request) async {
         final path = request.url.path;
         if (path == '/api/me') return http.Response('{}', 200);
-        if (refuse && request.method != 'GET')
+        if (refuse && request.method != 'GET') {
           return http.Response('{"error":"try again"}', 503);
+        }
         if (path == '/api/addresses') {
           if (request.method == 'POST') {
             final row = Map<String, dynamic>.from(
@@ -41,10 +42,11 @@ void main() {
           return http.Response('', 204);
         }
         if (path == '/api/preferences') {
-          if (request.method == 'PATCH')
+          if (request.method == 'PATCH') {
             preferences.addAll(
               Map<String, bool>.from(jsonDecode(request.body) as Map),
             );
+          }
           return http.Response(jsonEncode(preferences), 200);
         }
         return http.Response('[]', 200);

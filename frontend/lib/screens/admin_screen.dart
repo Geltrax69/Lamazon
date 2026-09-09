@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -201,7 +202,7 @@ class _AdminHomeState extends State<_AdminHome> {
         loadDepartments(),
         // refresh: the admin is the one editing these, so a cached copy is
         // exactly the wrong thing to put in front of them.
-        loadPolicies(refresh: true),
+        loadPolicies(refresh: true, admin: true),
       ).wait;
       if (!mounted) return;
       setState(() {
@@ -1230,8 +1231,7 @@ class _AdminHomeState extends State<_AdminHome> {
               const SizedBox(width: 10),
               _Stat(
                 label: 'Revenue',
-                value:
-                    '₹${((totals['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                value: '₹${((totals['revenue'] as num?) ?? 0).moneyText}',
               ),
             ],
           ),
@@ -1246,7 +1246,7 @@ class _AdminHomeState extends State<_AdminHome> {
                 title: s['name'] as String? ?? '',
                 subtitle: '${s['units']} units · ${s['delivered']} delivered',
                 trailing: '${s['orders']} orders',
-                note: '₹${((s['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                note: '₹${((s['revenue'] as num?) ?? 0).moneyText}',
                 // The bar is read against the top row, not against a total:
                 // "half of what the leader does" is the comparison an admin
                 // actually makes.
@@ -1263,7 +1263,7 @@ class _AdminHomeState extends State<_AdminHome> {
                 title: it['title'] as String? ?? '',
                 subtitle: '${it['store']} · ${it['orders']} orders',
                 trailing: '${it['units']} units',
-                note: '₹${((it['revenue'] as num?) ?? 0).toStringAsFixed(0)}',
+                note: '₹${((it['revenue'] as num?) ?? 0).moneyText}',
                 fraction: _share(it['units'], items.first['units']),
               ),
         ];
@@ -2224,7 +2224,7 @@ class _StoreCard extends StatelessWidget {
           ),
           Text(
             '${store['location']}, ${store['city']} · $categories · '
-            '${store['items']} products',
+            "${store['items']} ${store['items'] == 1 ? 'product' : 'products'}",
             style: const TextStyle(fontSize: 12, color: _muted),
           ),
           if ((store['rejectReason'] as String? ?? '').isNotEmpty)
@@ -2353,6 +2353,7 @@ class _AdminOrderRow extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
+            '₹${((order['amount'] as num?) ?? 0).moneyText} · '
             '${order['storeName']} → ${order['receiverName']} · '
             '${order['receiverPhone']}',
             style: const TextStyle(fontSize: 12, color: _muted),

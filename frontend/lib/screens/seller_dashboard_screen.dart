@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
@@ -245,7 +246,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                 ),
                               ),
                               Text(
-                                '₹${Seller.instance.inventoryValue.toStringAsFixed(0)}',
+                                '₹${Seller.instance.inventoryValue.moneyText}',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -628,7 +629,7 @@ class _OrderRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '₹${order.amount.toStringAsFixed(0)}',
+                  '₹${order.amount.moneyText}',
                   style: const TextStyle(fontSize: 12.5, color: _muted),
                 ),
                 if (order.receiverName.isNotEmpty) ...[
@@ -835,7 +836,7 @@ class _ItemRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '₹${item.price.toStringAsFixed(0)} · ${item.category}'
+                      '₹${item.price.moneyText} · ${item.category}'
                       '${item.photos.length > 1 ? " · ${item.photos.length} photos" : ""}',
                       style: const TextStyle(fontSize: 12.5, color: _muted),
                     ),

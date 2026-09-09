@@ -71,7 +71,8 @@ func notifyAPI(t *testing.T) (http.Handler, *sentMail, *fakeFCMService) {
 		t.Fatal(err)
 	}
 	return routes(&API{
-		db: testDB(t),
+		cloud: fixtureCloud(t),
+		db:    testDB(t),
 		mail: &Mailer{
 			key: "k", from: "auth@simpedu.in", http: mailSrv.Client(), base: mailSrv.URL,
 		},

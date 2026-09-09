@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -125,12 +126,12 @@ class PriceLine extends StatelessWidget {
       spacing: 6,
       children: [
         Text(
-          '₹${product.price.toStringAsFixed(0)}',
+          '₹${product.price.moneyText}',
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: fontSize),
         ),
         if (product.discounted)
           Text(
-            '₹${product.mrp.toStringAsFixed(0)}',
+            '₹${product.mrp.moneyText}',
             style: TextStyle(
               fontSize: fontSize - 2,
               color: const Color(0xFF8A8A8A),
@@ -259,7 +260,14 @@ class NetImage extends StatelessWidget {
   final String url;
   final BoxFit? fit;
   final double? padTo;
-  const NetImage({super.key, required this.url, this.fit, this.padTo = 1});
+  final int? sourceWidth;
+  const NetImage({
+    super.key,
+    required this.url,
+    this.fit,
+    this.padTo = 1,
+    this.sourceWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +276,9 @@ class NetImage extends StatelessWidget {
     // photoless rows came back as index.html and logged a decode failure.
     if (url.trim().isEmpty) return _fallback();
     return Image.network(
-      padTo == null ? url : padded(url, padTo!),
+      padTo == null
+          ? optimizedImage(url, sourceWidth ?? 1024)
+          : padded(url, padTo!, sourceWidth),
       fit: fit ?? (padTo == null ? BoxFit.cover : BoxFit.contain),
       loadingBuilder: (_, child, progress) =>
           progress == null ? child : Container(color: const Color(0xFFE8E8E4)),

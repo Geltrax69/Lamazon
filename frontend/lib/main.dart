@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'data/session.dart';
 import 'data/cart.dart';
+import 'data/app_info.dart';
 import 'data/wishlist.dart';
 import 'data/urls.dart';
 import 'data/staff.dart';
@@ -30,6 +31,7 @@ void main() async {
   // The stored session decides whether the login screen shows at all, so it
   // has to be read before the first frame.
   WidgetsFlutterBinding.ensureInitialized();
+  await AppInfo.load();
   await Cart.instance.restore();
   await Wishlist.instance.restore();
   await Session.instance.restore();

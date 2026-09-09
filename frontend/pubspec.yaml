@@ -66,6 +66,7 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   assets:
+    - pubspec.yaml
     - shorebird.yaml
     - assets/logo.png
     - assets/banner.png

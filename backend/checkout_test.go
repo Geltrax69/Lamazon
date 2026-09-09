@@ -7,6 +7,7 @@ import (
 
 func TestBasketCheckoutOneFeeAndMatchingViews(t *testing.T) {
 	h := testAPI(t)
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	openApprovedStore(t, h, map[string]any{"name": "Basket Store", "location": "Block 32", "city": "LPU", "categories": []string{"Food"}})
 	somewhereToDeliver(t, h)
 	_, first := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})
@@ -52,6 +53,7 @@ func TestBasketCheckoutOneFeeAndMatchingViews(t *testing.T) {
 
 func TestBasketCheckoutRollsBackEveryLine(t *testing.T) {
 	h := testAPI(t)
+	addRider(t, h, adminSignIn(t, h), "9876543210")
 	openApprovedStore(t, h, map[string]any{"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"}})
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})

@@ -1,3 +1,5 @@
+import '../data/money.dart';
+import '../data/wishlist.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -22,6 +24,7 @@ class DetailsScreen extends StatefulWidget {
 }
 
 class _DetailsScreenState extends State<DetailsScreen> {
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
   int _qty = 1;
 
   /// What the shopper has picked per option group, keyed by its name. Empty
@@ -31,7 +34,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
 
   void _addToCart() {
     Cart.instance.add(widget.product, _qty);
-    showAddedToast(context, widget.product);
+    showAddedToast(context, widget.product, messenger: _messenger.currentState);
   }
 
   void _buyNow() {
@@ -45,162 +48,168 @@ class _DetailsScreenState extends State<DetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F5F2),
-      body: ReadableBody(
-        maxWidth: 760,
-        child: Column(
-          children: [
-            _Hero(product: p),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          p.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+    return ScaffoldMessenger(
+      key: _messenger,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF6F5F2),
+        body: ReadableBody(
+          maxWidth: 760,
+          child: Column(
+            children: [
+              _Hero(product: p),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            p.name,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                      _QtyStepper(
-                        qty: _qty,
-                        onChanged: (q) => setState(() => _qty = q),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      // The number follows the stepper: two of them costs
-                      // twice as much, with the unit price kept in view so
-                      // the total is never a mystery.
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '₹${(p.price * _qty).toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              if (p.discounted) ...[
-                                const SizedBox(width: 8),
-                                // Named, not just struck through: a second
-                                // number with a line through it is only
-                                // obviously the old price if you already know
-                                // that is the convention.
+                        _QtyStepper(
+                          qty: _qty,
+                          onChanged: (q) => setState(() => _qty = q),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // The number follows the stepper: two of them costs
+                        // twice as much, with the unit price kept in view so
+                        // the total is never a mystery.
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
                                 Text(
-                                  'MRP ₹${(p.mrp * _qty).toStringAsFixed(0)}',
+                                  '₹${(p.price * _qty).moneyText}',
                                   style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Color(0xFF8A8A8A),
-                                    decoration: TextDecoration.lineThrough,
-                                    decorationColor: Color(0xFF8A8A8A),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                DiscountBadge(percent: p.discountPercent),
+                                if (p.discounted) ...[
+                                  const SizedBox(width: 8),
+                                  // Named, not just struck through: a second
+                                  // number with a line through it is only
+                                  // obviously the old price if you already know
+                                  // that is the convention.
+                                  Text(
+                                    'MRP ₹${(p.mrp * _qty).moneyText}',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: Color(0xFF8A8A8A),
+                                      decoration: TextDecoration.lineThrough,
+                                      decorationColor: Color(0xFF8A8A8A),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  DiscountBadge(percent: p.discountPercent),
+                                ],
                               ],
-                            ],
-                          ),
-                          // The saving in rupees as well as percent. The
-                          // rupees follow the stepper, because that is the
-                          // number that changes when you buy two.
-                          if (p.discounted)
+                            ),
+                            // The saving in rupees as well as percent. The
+                            // rupees follow the stepper, because that is the
+                            // number that changes when you buy two.
+                            if (p.discounted)
+                              Text(
+                                'You save ₹${((p.mrp - p.price) * _qty).moneyText}'
+                                ' (${p.discountPercent}%)',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1B7F3B),
+                                ),
+                              ),
                             Text(
-                              'You save ₹${((p.mrp - p.price) * _qty).toStringAsFixed(0)}'
-                              ' (${p.discountPercent}%)',
+                              _qty == 1
+                                  ? 'From: ₹${p.price.moneyText}'
+                                  : '$_qty × ₹${p.price.moneyText}',
                               style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1B7F3B),
+                                fontSize: 12,
+                                color: Color(0xFF6B6B6B),
                               ),
                             ),
-                          Text(
-                            _qty == 1
-                                ? 'From: ₹${p.price.toStringAsFixed(0)}'
-                                : '$_qty × ₹${p.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B6B6B),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ],
+                    ),
+                    // Whatever this shop sells by, in the order it listed them.
+                    // The size row used to be hardcoded and the colour dots were
+                    // decoration — four swatches every product had, none of
+                    // which any shop had chosen.
+                    for (final option in p.choices)
+                      _OptionPicker(
+                        option: option,
+                        selected: _picked[option.name],
+                        onPick: (v) => setState(() => _picked[option.name] = v),
                       ),
-                    ],
-                  ),
-                  // Whatever this shop sells by, in the order it listed them.
-                  // The size row used to be hardcoded and the colour dots were
-                  // decoration — four swatches every product had, none of
-                  // which any shop had chosen.
-                  for (final option in p.choices)
-                    _OptionPicker(
-                      option: option,
-                      selected: _picked[option.name],
-                      onPick: (v) => setState(() => _picked[option.name] = v),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Description',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    p.description,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.5,
-                      color: Color(0xFF6B6B6B),
+                    const SizedBox(height: 6),
+                    Text(
+                      p.description,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: Color(0xFF6B6B6B),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Sold by ${p.store}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9A9A9A),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sold by ${p.store}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9A9A9A),
+                      ),
                     ),
-                  ),
-                  ..._compareSection(context, p),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: ReadableBody(
-        maxWidth: 760,
-        child: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: _PillButton(
-                  label: 'Add to Cart',
-                  background: Colors.white,
-                  onTap: _addToCart,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _PillButton(
-                  label: 'Buy Now',
-                  background: _hero,
-                  onTap: _buyNow,
+                    ..._compareSection(context, p),
+                  ],
                 ),
               ),
             ],
+          ),
+        ),
+        bottomNavigationBar: ReadableBody(
+          maxWidth: 760,
+          child: SafeArea(
+            minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PillButton(
+                    label: 'Add to Cart',
+                    background: Colors.white,
+                    onTap: _addToCart,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PillButton(
+                    label: 'Buy Now',
+                    background: _hero,
+                    onTap: _buyNow,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -251,7 +260,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
     ),
     const SizedBox(height: 2),
     Text(
-      'Compared with ₹${p.price.toStringAsFixed(0)} at ${p.store}',
+      'Compared with ₹${p.price.moneyText} at ${p.store}',
       style: const TextStyle(fontSize: 12, color: Color(0xFF9A9A9A)),
     ),
     const SizedBox(height: 10),
@@ -298,7 +307,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '₹${o.price.toStringAsFixed(0)}',
+                  '₹${o.price.moneyText}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -317,10 +326,10 @@ Widget _diffBadge(double diff) {
   final String label;
   final Color color;
   if (diff > 0) {
-    label = '₹${diff.toStringAsFixed(0)} more';
+    label = '₹${diff.moneyText} more';
     color = const Color(0xFFD32F2F);
   } else if (diff < 0) {
-    label = '₹${(-diff).toStringAsFixed(0)} less';
+    label = '₹${(-diff).moneyText} less';
     color = const Color(0xFF2E7D32);
   } else {
     label = 'Same price';
@@ -370,7 +379,8 @@ class _HeroState extends State<_Hero> {
                 controller: _pages,
                 itemCount: photos.length,
                 onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (_, i) => NetImage(url: photos[i]),
+                itemBuilder: (_, i) =>
+                    NetImage(url: photos[i], sourceWidth: 1024),
               ),
             ),
           ),
@@ -385,7 +395,28 @@ class _HeroState extends State<_Hero> {
                     icon: LucideIcons.arrowLeft,
                     onTap: () => Navigator.pop(context),
                   ),
-                  const _RoundIcon(icon: LucideIcons.heart),
+                  Row(
+                    children: [
+                      ListenableBuilder(
+                        listenable: Wishlist.instance,
+                        builder: (context, _) => _RoundIcon(
+                          icon: Wishlist.instance.contains(widget.product.id)
+                              ? LucideIcons.heartHandshake
+                              : LucideIcons.heart,
+                          onTap: () =>
+                              Wishlist.instance.toggle(widget.product.id),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _RoundIcon(
+                        icon: LucideIcons.shoppingCart,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CartScreen()),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -1,3 +1,4 @@
+import '../data/app_info.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -334,17 +335,16 @@ class _VersionBadge extends StatelessWidget {
     final updater = ShorebirdUpdater();
     if (!updater.isAvailable) {
       // Debug builds and platforms without the Shorebird engine.
-      return const Text(
-        'dev build — no OTA',
-        style: TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)),
-      );
+      return const SizedBox.shrink();
     }
     return FutureBuilder<Patch?>(
       future: updater.readCurrentPatch(),
       builder: (context, snap) {
         final n = snap.data?.number;
         return Text(
-          n == null ? 'v1.0.1 • base release' : 'v1.0.1 • patch #$n',
+          n == null
+              ? 'v${AppInfo.version} • base release'
+              : 'v${AppInfo.version} • patch #$n',
           style: const TextStyle(fontSize: 11, color: Color(0xFFB0B0AC)),
         );
       },
@@ -595,7 +595,7 @@ class _MenuDrawer extends StatelessWidget {
                   ..._branch(context, node, tab, stocked, 0),
               const SizedBox(height: 6),
             ],
-            if (products.isEmpty)
+            if (departments.where((d) => d.name != 'All').isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Text(
@@ -759,14 +759,20 @@ List<Widget> _categoryBoard(BuildContext context, String tab) {
         onSeeAll: () => _openSearch(context, d.name),
       ),
       const SizedBox(height: 12),
-      _CategoryGrid(
-        department: d,
-        // A department with nothing inside it is still somewhere to go — one
-        // tile of itself, rather than a heading over a gap.
-        nodes: d.categories.isEmpty
-            ? [CategoryNode(d.name, const [], d.imageUrl)]
-            : d.categories,
-      ),
+      if (tab != 'All' && d.categories.isEmpty)
+        TextButton(
+          onPressed: () => _openSearch(context, d.name),
+          child: Text('Browse ${d.name} products'),
+        )
+      else
+        _CategoryGrid(
+          department: d,
+          // A department with nothing inside it is still somewhere to go — one
+          // tile of itself, rather than a heading over a gap.
+          nodes: d.categories.isEmpty
+              ? [CategoryNode(d.name, const [], d.imageUrl)]
+              : d.categories,
+        ),
       const SizedBox(height: 22),
     ],
   ];

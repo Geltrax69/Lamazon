@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
@@ -126,7 +127,7 @@ class CompareScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Save ₹${saving.toStringAsFixed(0)} by buying from '
+                          'Save ₹${saving.moneyText} by buying from '
                           '${best.store}',
                           style: const TextStyle(
                             fontSize: 13,
@@ -281,7 +282,7 @@ class _VendorRow extends StatelessWidget {
                 ),
               ),
               Text(
-                '₹${offer.price.toStringAsFixed(0)}',
+                '₹${offer.price.moneyText}',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -456,7 +457,7 @@ class _RivalsState extends State<_Rivals> {
                               child: Row(
                                 children: [
                                   Text(
-                                    '₹${(row['price'] as num).toStringAsFixed(0)}',
+                                    '₹${(row['price'] as num).moneyText}',
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w800,

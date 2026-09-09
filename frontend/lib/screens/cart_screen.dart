@@ -1,3 +1,4 @@
+import '../data/money.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
@@ -70,7 +71,7 @@ class CartScreen extends StatelessWidget {
                               ),
                           ],
                         ),
-                        const _RoundIcon(icon: LucideIcons.shoppingCart),
+                        const SizedBox(width: 46, height: 46),
                       ],
                     ),
                   ),
@@ -209,7 +210,7 @@ class _CartRow extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '₹${(p.price * item.qty).toStringAsFixed(0)}',
+                        '₹${(p.price * item.qty).moneyText}',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -220,7 +221,7 @@ class _CartRow extends StatelessWidget {
                       if (p.discounted) ...[
                         const SizedBox(width: 6),
                         Text(
-                          'MRP ₹${(p.mrp * item.qty).toStringAsFixed(0)}',
+                          'MRP ₹${(p.mrp * item.qty).moneyText}',
                           style: const TextStyle(
                             fontSize: 11.5,
                             color: Color(0xFF9A9A9A),
@@ -237,7 +238,7 @@ class _CartRow extends StatelessWidget {
                   // same number, so only say it when they differ.
                   if (item.qty > 1)
                     Text(
-                      '₹${p.price.toStringAsFixed(0)} each',
+                      '₹${p.price.moneyText} each',
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF9A9A9A),
@@ -417,46 +418,6 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.only(left: 16, right: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F1EF),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Promo code',
-                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 9,
-                  ),
-                  margin: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _green,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Apply',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -488,7 +449,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
                 const Icon(LucideIcons.badgePercent, size: 14, color: _green),
                 const SizedBox(width: 6),
                 Text(
-                  'You saved ₹${cart.saved.toStringAsFixed(0)} on this order',
+                  'You saved ₹${cart.saved.moneyText} on this order',
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -513,7 +474,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
               child: Text(
                 _placing
                     ? 'Placing your order…'
-                    : 'Place order  ·  ₹${cart.total.toStringAsFixed(0)}',
+                    : 'Place order  ·  ₹${cart.total.moneyText}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -537,7 +498,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: style),
-        Text('₹${value.toStringAsFixed(0)}', style: style),
+        Text('₹${value.moneyText}', style: style),
       ],
     );
   }

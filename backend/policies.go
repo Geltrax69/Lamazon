@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -36,7 +37,14 @@ func (a *API) handlePolicies(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		if !strings.HasPrefix(r.URL.Path, "/api/admin/") && policyHasBlanks(p.Body) {
+			p.Body = "This policy is not published yet. Please check back before placing an order."
+		}
 		out = append(out, p)
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/admin/") {
+		writeJSON(w, 200, map[string]any{"policies": out})
+		return
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -65,6 +73,25 @@ func (a *API) handleSavePolicy(w http.ResponseWriter, r *http.Request) {
 	// never what an admin means by saving.
 	if strings.TrimSpace(in.Body) == "" {
 		writeError(w, http.StatusBadRequest, "the policy text cannot be empty")
+		return
+	}
+
+	if policyHasBlanks(in.Body) || policyHasBlanks(in.Title) {
+		writeError(w, 400, "fill all policy placeholders before publishing")
+		return
+	}
+	if len(in.Body) > 100000 || len(in.Title) > 200 {
+		writeError(w, 400, "policy is too long")
+		return
+	}
+	valid := false
+	for _, allowed := range policyOrder() {
+		if slug == allowed {
+			valid = true
+		}
+	}
+	if !valid {
+		writeError(w, 400, "unknown policy")
 		return
 	}
 
@@ -99,4 +126,17 @@ func policyOrder() []string {
 		out = append(out, p.Slug)
 	}
 	return out
+}
+
+var policyBlank = regexp.MustCompile(`\[[^\]\n]+\]`)
+
+func policyHasBlanks(body string) bool {
+	for _, span := range policyBlank.FindAllStringIndex(body, -1) {
+		// Markdown links are content, not an unfilled template field.
+		if span[1] < len(body) && body[span[1]] == '(' {
+			continue
+		}
+		return true
+	}
+	return false
 }

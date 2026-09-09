@@ -124,3 +124,54 @@ expected the broken local-only settings/address behavior.
 These changes are pushed for review with the checkout batch; they are not yet
 on the production `web` branch. Business/support information has been requested
 from the owner and remains needed for B4/B12.
+
+### Batch 5 — order actions, honest controls and publication guards
+
+Implemented and verified:
+
+- **B3:** the atomic checkout endpoint refuses new baskets without active riders.
+  Rider recruitment and sufficient coverage remain operational requirements.
+- **B7:** unassigned rider-pool entries no longer disclose recipient names,
+  numbers or addresses. Assigned/claimed deliveries retain the details needed.
+- **B4 (code complete; content pending):** reject policy saves with template
+  placeholders; expose original drafts only through an authenticated admin API.
+  Public and offline policy views no longer render unfilled templates. Actual
+  business/legal text is still needed from the owner.
+- **B9:** removed the unwired promo field rather than accepting codes silently.
+- **B12 (partial):** removed fake phone/email/chat channels and response-time
+  promises. Support opens published contact information. Real contacts pending.
+- **B13/B14:** order details refresh status and show address, total and delivery
+  code. Buyers can cancel only their own orders before seller acceptance.
+  Cancellation uses the existing rejected terminal state with the explicit
+  reason `Cancelled by customer`; reservations are released atomically.
+- **B15:** existing tile padding already had Cloudinary optimization. Extended
+  optimization to full-bleed requests and allowed 1024px product detail sources.
+- **B16/B17:** product-page confirmation uses its own ScaffoldMessenger; added
+  working wishlist/cart actions there and removed the dead cart-header control.
+- **B19/B21/B22:** leaf department browsing no longer nests a tile of itself;
+  removable search scope and stale-response protection; drawer empty-copy fix.
+- **B25/B26:** new listings require uploaded photos; last-photo deletion is
+  refused. Requests have photo-count/body-size bounds. Real category and numeric
+  validation applies before writing listings; test fixtures exercise multipart
+  uploads with a stubbed Cloudinary service.
+- **B27:** ranked-store/item revenue counts delivered receipts, matching totals;
+  Orders placed now counts all orders consistently. Admin order cards show amounts.
+- **B30/B31/B34/B35/B36:** hide unavailable OTA diagnostics, explain incomplete
+  login/address inputs, fix product pluralization, source versions from bundled
+  pubspec, and provide visible location-dialog dismissal.
+- **Other controls:** Share copies the current web URL or native release link;
+  About opens app information. Money formatting preserves paise across checkout,
+  seller editing, buyer orders, rider collection and admin views.
+- **B38 verification:** current code already distinguishes Switch off from
+  permanent deletion and describes retained history; no further relabeling needed.
+
+Validation: 66 Flutter tests pass; full Go suite passes with `-race -count=1`.
+Regression tests cover product-page feedback, clearable search scope, version
+loading, money precision, image transformations, cancellation ownership/cutoff,
+no-rider checkout, policy guards and mandatory product photos.
+
+The Docker test database developed an I/O error. It was not used to certify this
+batch. A separate native PostgreSQL 16 test cluster is running at
+`127.0.0.1:55434`, data directory `/tmp/lamazon-functional-pg`, database
+`lamazon_test`. Explicit `LAMAZON_TEST_URL` failures now fail tests rather than
+silently skipping integration coverage. Other Docker projects were left alone.

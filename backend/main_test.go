@@ -17,7 +17,7 @@ import (
 // testAPI is the whole handler over a clean database, without photo storage.
 func testAPI(t *testing.T) http.Handler {
 	t.Helper()
-	return routes(&API{db: testDB(t)})
+	return routes(&API{db: testDB(t), cloud: fixtureCloud(t)})
 }
 
 // testDB connects to the DATABASE_URL Postgres and hands back a clean slate.
@@ -28,6 +28,9 @@ func testDB(t *testing.T) *DB {
 	dsn := testDSN(t)
 	db, err := OpenDB(dsn)
 	if err != nil {
+		if os.Getenv("LAMAZON_TEST_URL") != "" {
+			t.Fatalf("configured test database unavailable: %v", err)
+		}
 		t.Skipf("no Postgres at %s: %v", dsn, err)
 	}
 	t.Cleanup(func() { db.Close() })
@@ -106,6 +109,9 @@ var (
 // call runs one request against the API and returns status plus decoded body.
 func call(t *testing.T, h http.Handler, method, path string, body any) (int, map[string]any) {
 	t.Helper()
+	if method == http.MethodPost && path == "/api/seller/items" {
+		return callItemWithPhoto(t, h, body)
+	}
 	var buf bytes.Buffer
 	if body != nil {
 		if err := json.NewEncoder(&buf).Encode(body); err != nil {
