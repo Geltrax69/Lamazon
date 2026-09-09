@@ -1,3 +1,4 @@
+import '../widgets/design_system.dart';
 import '../data/money.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
@@ -151,14 +152,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        Text(
-                          store.name,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontFamily: 'Georgia',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text(store.name, style: LamazonTheme.titleText),
                         const SizedBox(height: 4),
                         Row(
                           children: [

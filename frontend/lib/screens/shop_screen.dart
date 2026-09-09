@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/design_system.dart';
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -72,14 +73,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              Text(
-                shop.name,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(shop.name, style: LamazonTheme.titleText),
               const SizedBox(height: 4),
               Text(
                 shop.tagline,

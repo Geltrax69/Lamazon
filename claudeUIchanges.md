@@ -137,3 +137,57 @@ instead of leaving them silent; and error text went from 11.5px to 13px.
   honours reduced motion, but its value is worth testing against its cost.
 - `settings_screen`, `shop_screen` and `seller_dashboard_screen` are still off
   the system; two of them hard-code `fontFamily: 'Georgia'`.
+
+### Store names stop rendering as a different font per platform
+
+**Area:** `ShopScreen`, `SellerDashboardScreen` — store name headings
+
+**Decision:** REPLACE
+
+**Problem**
+Both screens set `fontFamily: 'Georgia'` on the store name. `pubspec.yaml`
+declares exactly one font family, `InterTight`. Georgia is not bundled.
+
+**Why it mattered**
+This is not a token preference, it is a rendering bug. Georgia is a system
+font on iOS and macOS and absent on Android and most web contexts, so the
+store name came out serif on some devices and fell back to the default sans on
+others. The same screen looked like two different designs depending on who
+opened it — and a shop's own name is the most identity-carrying text on it.
+
+**Before**
+`fontSize: 22` / `fontSize: 24`, `fontFamily: 'Georgia'`, `w600`, no tracking,
+two arbitrary sizes for the same semantic element.
+
+**Decision**
+`LamazonTheme.titleText` on both.
+
+**Reasoning**
+A store name is the page title of that screen, which is what the title token
+is for. Using it also collapses the two arbitrary sizes into one and picks up
+the `-0.7` tracking, so a store name now reads like every other title in the
+app instead of like a leftover from a different design.
+
+**Change**
+Two hand-written `TextStyle`s replaced by the token. Last `Georgia` reference
+in the codebase.
+
+**Files**
+- `frontend/lib/screens/shop_screen.dart`
+- `frontend/lib/screens/seller_dashboard_screen.dart`
+
+**Verification**
+- [x] Visual
+- [x] Responsive — no layout dependency on the old sizes
+- [x] Functional — text only
+- [x] Accessibility — no contrast change; size stays well above minimum
+- [x] Regression — analyze clean, 70 tests pass
+
+**Result**
+Store names render identically on every platform, at the app's title scale.
+
+**Remaining**
+Roughly 200 hard-coded hex colours remain across ~20 screens, concentrated in
+`compare_screen`, `admin_screen`, `seller_dashboard_screen`, `profile_screen`
+and `location_screen`. That is a migration, not a fix, and is best done a
+screen at a time behind visual checks rather than by find-and-replace.
