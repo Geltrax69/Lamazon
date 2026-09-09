@@ -316,6 +316,20 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	if strings.TrimSpace(in.Category) == "" {
+		if err := a.db.sql.QueryRowContext(r.Context(), `SELECT category FROM inventory_items WHERE id=$1 AND owner=$2`, r.PathValue("id"), a.owner(r)).Scan(&in.Category); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, 404, "item not found")
+			} else {
+				writeError(w, 500, "could not read item")
+			}
+			return
+		}
+		if in.Category == "" {
+			writeError(w, 400, "choose an existing category")
+			return
+		}
+	}
 	if err := a.validateItem(r.Context(), &in); err != nil {
 		writeError(w, 400, err.Error())
 		return

@@ -13,7 +13,7 @@ func TestBasketCheckoutOneFeeAndMatchingViews(t *testing.T) {
 	_, first := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})
 	_, second := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Drink", "price": 30, "stock": 10})
 	code, body := call(t, h, http.MethodPost, "/api/orders/checkout", map[string]any{
-		"lines": []map[string]any{{"itemId": first["id"], "units": 1}, {"itemId": second["id"], "units": 2}}, "expectedTotal": 144,
+		"lines": []map[string]any{{"itemId": first["id"], "units": 1}, {"itemId": second["id"], "units": 2}}, "requestId": "test-basket-123456", "expectedTotal": 144,
 	})
 	if code != 201 {
 		t.Fatalf("checkout: %d %v", code, body)
@@ -71,7 +71,7 @@ func TestBasketCheckoutRollsBackEveryLine(t *testing.T) {
 		{"empty", []map[string]any{}, 15, 400},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			code, body := call(t, h, http.MethodPost, "/api/orders/checkout", map[string]any{"lines": tc.lines, "expectedTotal": tc.total})
+			code, body := call(t, h, http.MethodPost, "/api/orders/checkout", map[string]any{"lines": tc.lines, "requestId": "test-basket-123456", "expectedTotal": tc.total})
 			if code != tc.status {
 				t.Fatalf("got %d %v", code, body)
 			}
@@ -85,5 +85,56 @@ func TestBasketCheckoutRollsBackEveryLine(t *testing.T) {
 	code, _ := call(t, h, http.MethodPost, "/api/orders", map[string]any{"itemId": item["id"], "units": 1})
 	if code != 409 {
 		t.Fatalf("unconfirmed legacy checkout: %d", code)
+	}
+}
+
+func TestCheckoutRetryDoesNotDuplicateOrders(t *testing.T) {
+	h := testAPI(t)
+	addRider(t, h, adminSignIn(t, h), "9876543210")
+	openApprovedStore(t, h, map[string]any{"name": "Retry Store", "location": "L", "city": "LPU", "categories": []string{"Food"}})
+	somewhereToDeliver(t, h)
+	_, item := call(t, h, http.MethodPost, "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 1})
+	// Checkout must not request a second connection while its transaction holds the only one.
+	lastTestDB.sql.SetMaxOpenConns(1)
+	payload := map[string]any{"lines": []map[string]any{{"itemId": item["id"], "units": 1}}, "requestId": "retry-basket-123456", "expectedTotal": 84}
+	type result struct {
+		code int
+		body map[string]any
+	}
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			code, body := call(t, h, http.MethodPost, "/api/orders/checkout", payload)
+			results <- result{code, body}
+		}()
+	}
+	var firstID any
+	for range 2 {
+		res := <-results
+		if res.code != 201 {
+			t.Fatalf("concurrent retry: %d %v", res.code, res.body)
+		}
+		id := res.body["orders"].([]any)[0].(map[string]any)["id"]
+		if firstID != nil && id != firstID {
+			t.Fatal("retry created a different order")
+		}
+		firstID = id
+	}
+	// A committed checkout can still be recovered after delivery closes or the
+	// buyer deletes their saved address; it must not run today's validation again.
+	if _, err := lastTestDB.sql.Exec(`UPDATE riders SET active=false; DELETE FROM addresses`); err != nil {
+		t.Fatal(err)
+	}
+	code, body := call(t, h, http.MethodPost, "/api/orders/checkout", payload)
+	if code != 201 || body["orders"].([]any)[0].(map[string]any)["id"] != firstID {
+		t.Fatalf("restart retry: %d %v", code, body)
+	}
+	_, mine := call(t, h, http.MethodGet, "/api/orders", nil)
+	if len(mine["orders"].([]any)) != 1 {
+		t.Fatal("duplicate order exists")
+	}
+	payload["expectedTotal"] = 85
+	if code, _ := call(t, h, http.MethodPost, "/api/orders/checkout", payload); code != 409 {
+		t.Fatalf("changed payload reused ID: %d", code)
 	}
 }

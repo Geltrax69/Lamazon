@@ -532,6 +532,7 @@ class Api {
     required List<({String itemId, int qty})> lines,
     required double expectedTotal,
     required String addressId,
+    required String requestId,
   }) async {
     final body = await _post(
       '/api/orders/checkout',
@@ -540,6 +541,7 @@ class Api {
           for (final line in lines) {'itemId': line.itemId, 'units': line.qty},
         ],
         'addressId': addressId,
+        'requestId': requestId,
         'expectedTotal': expectedTotal,
       },
       expect: 201,

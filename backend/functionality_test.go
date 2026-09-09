@@ -121,14 +121,14 @@ func TestOrderNotificationHonorsPreferences(t *testing.T) {
 	call(t, h, "POST", "/api/push/subscribe", map[string]string{"token": "device-token"})
 	call(t, h, "PATCH", "/api/preferences", map[string]bool{"orderUpdates": false})
 	mails, pushes := sent.count, push.count()
-	if code, body := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35}); code != 201 {
+	if code, body := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "requestId": "test-basket-123456", "expectedTotal": 35}); code != 201 {
 		t.Fatalf("order %d %v", code, body)
 	}
 	if sent.count != mails || push.count() != pushes {
 		t.Fatal("order opt-out was ignored")
 	}
 	call(t, h, "PATCH", "/api/preferences", map[string]bool{"orderUpdates": true, "push": false})
-	call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35})
+	call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "requestId": "test-basket-123456", "expectedTotal": 35})
 	if sent.count != mails+1 || push.count() != pushes {
 		t.Fatal("push opt-out should still allow order email")
 	}
@@ -139,7 +139,7 @@ func TestCancellationBeforeAcceptanceAndOwnership(t *testing.T) {
 	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})
 	somewhereToDeliver(t, h)
 	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Food", "price": 20, "stock": 1})
-	_, order := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35})
+	_, order := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "requestId": "test-basket-123456", "expectedTotal": 35})
 	id := order["id"].(string)
 	stranger := signIn(t, lastTestDB, "stranger@example.com")
 	if code, _ := callAs(t, h, stranger, "POST", "/api/orders/"+id+"/cancel", nil); code != 404 {
@@ -151,7 +151,7 @@ func TestCancellationBeforeAcceptanceAndOwnership(t *testing.T) {
 	if code, _ := call(t, h, "POST", "/api/orders/"+id+"/cancel", nil); code != 409 {
 		t.Fatal("duplicate cancellation allowed")
 	}
-	code, next := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "expectedTotal": 35})
+	code, next := call(t, h, "POST", "/api/orders", map[string]any{"itemId": item["id"], "units": 1, "requestId": "test-basket-123456", "expectedTotal": 35})
 	if code != 201 {
 		t.Fatal("cancellation did not release reservation")
 	}
@@ -164,7 +164,7 @@ func TestCancellationBeforeAcceptanceAndOwnership(t *testing.T) {
 
 func TestCheckoutUnavailableWithoutRiders(t *testing.T) {
 	h := testAPI(t)
-	code, _ := call(t, h, "POST", "/api/orders/checkout", map[string]any{"lines": []map[string]any{{"itemId": "any", "units": 1}}, "expectedTotal": 35})
+	code, _ := call(t, h, "POST", "/api/orders/checkout", map[string]any{"lines": []map[string]any{{"itemId": "any", "units": 1}}, "requestId": "test-basket-123456", "expectedTotal": 35})
 	if code != 503 {
 		t.Fatalf("no rider: %d", code)
 	}
@@ -206,5 +206,15 @@ func TestPhotoRequiredForNewProduct(t *testing.T) {
 	code, body = call(t, h, "POST", "/api/seller/items", map[string]any{"title": "With photo", "price": 20, "stock": 1, "category": "Food"})
 	if code != 201 || len(body["imageUrls"].([]any)) != 1 {
 		t.Fatalf("photo upload failed: %d %v", code, body)
+	}
+}
+
+func TestProductEditRetainsCategoryWhenOmitted(t *testing.T) {
+	h := testAPI(t)
+	openApprovedStore(t, h, map[string]any{"name": "S", "location": "L", "city": "LPU", "categories": []string{"Food"}})
+	_, item := call(t, h, "POST", "/api/seller/items", map[string]any{"title": "Burger", "price": 69, "stock": 10})
+	code, edited := call(t, h, "PATCH", "/api/seller/items/"+item["id"].(string), map[string]any{"title": "Fresh Burger", "price": 70, "stock": 10})
+	if code != 200 || edited["category"] != "Food" {
+		t.Fatalf("edit lost category: %d %v", code, edited)
 	}
 }

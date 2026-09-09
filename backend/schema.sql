@@ -531,3 +531,13 @@ CREATE INDEX IF NOT EXISTS password_attempts_expiry ON password_attempts(expires
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (delivery_fee >= 0);
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}';
+
+-- Save each completed basket with its idempotency key in the same transaction.
+CREATE TABLE IF NOT EXISTS checkout_attempts (
+ buyer_email TEXT NOT NULL,
+ request_id TEXT NOT NULL,
+ fingerprint TEXT NOT NULL,
+ response JSONB NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY (buyer_email, request_id)
+);

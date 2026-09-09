@@ -67,13 +67,15 @@ func (a *API) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "please update Lamazon or reload the website before ordering")
 		return
 	}
-	a.placeBasket(w, r, []checkoutLine{{in.ItemID, in.Units}}, in.AddressID, in.ExpectedTotal, true)
+	a.placeBasket(w, r, []checkoutLine{{in.ItemID, in.Units}}, in.AddressID, in.ExpectedTotal, true, "")
 }
 
 // POST /api/orders/checkout commits every line or none, with one fee per basket.
 func (a *API) handleCheckout(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
 	var in struct {
 		Lines         []checkoutLine `json:"lines"`
+		RequestID     string         `json:"requestId"`
 		AddressID     string         `json:"addressId"`
 		ExpectedTotal *float64       `json:"expectedTotal"`
 	}
@@ -85,19 +87,14 @@ func (a *API) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "expectedTotal is required")
 		return
 	}
-	var available bool
-	if err := a.db.sql.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM riders WHERE active)`).Scan(&available); err != nil {
-		writeError(w, 503, "could not check delivery availability — try again")
+	if len(in.RequestID) < 8 || len(in.RequestID) > 100 {
+		writeError(w, 400, "a checkout request ID is required")
 		return
 	}
-	if !available {
-		writeError(w, 503, "delivery is currently unavailable — please try again when riders are available")
-		return
-	}
-	a.placeBasket(w, r, in.Lines, in.AddressID, in.ExpectedTotal, false)
+	a.placeBasket(w, r, in.Lines, in.AddressID, in.ExpectedTotal, false, in.RequestID)
 }
 
-func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checkoutLine, addressID string, expected *float64, single bool) {
+func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checkoutLine, addressID string, expected *float64, single bool, requestID string) {
 	if len(lines) == 0 || len(lines) > 100 {
 		writeError(w, 400, "order between 1 and 100 items")
 		return
@@ -111,11 +108,6 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 		seen[line.ItemID] = true
 	}
 	buyer := a.owner(r)
-	receiver, err := a.deliveryTarget(r.Context(), buyer, addressID)
-	if err != nil {
-		writeError(w, 400, "add a delivery address before ordering")
-		return
-	}
 	tx, err := a.db.sql.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, 500, "could not place order")
@@ -124,6 +116,55 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 	defer tx.Rollback()
 	// Deterministic locks prevent baskets with reversed item order deadlocking.
 	sort.Slice(lines, func(i, j int) bool { return lines[i].ItemID < lines[j].ItemID })
+	fingerprintBytes, _ := json.Marshal(struct {
+		Lines    []checkoutLine
+		Address  string
+		Expected *float64
+	}{lines, addressID, expected})
+	fingerprint := hashCode(string(fingerprintBytes))
+	if requestID != "" {
+		if _, err = tx.ExecContext(r.Context(), `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, buyer+":"+requestID); err != nil {
+			writeError(w, 500, "could not check checkout status")
+			return
+		}
+		var savedFingerprint string
+		var response []byte
+		err = tx.QueryRowContext(r.Context(), `SELECT fingerprint,response FROM checkout_attempts WHERE buyer_email=$1 AND request_id=$2`, buyer, requestID).Scan(&savedFingerprint, &response)
+		if err == nil {
+			if savedFingerprint != fingerprint {
+				writeError(w, 409, "this checkout ID belongs to a different basket")
+				return
+			}
+			var saved map[string]any
+			if json.Unmarshal(response, &saved) != nil {
+				writeError(w, 500, "could not read checkout confirmation")
+				return
+			}
+			writeJSON(w, 201, saved)
+			return
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			writeError(w, 500, "could not check checkout status")
+			return
+		}
+	}
+	if !single {
+		var available bool
+		if err = tx.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM riders WHERE active)`).Scan(&available); err != nil {
+			writeError(w, 503, "could not check delivery availability")
+			return
+		}
+		if !available {
+			writeError(w, 503, "delivery is currently unavailable — please try again when riders are available")
+			return
+		}
+	}
+	receiver, err := deliveryTarget(r.Context(), tx, buyer, addressID)
+	if err != nil {
+		writeError(w, 400, "add a delivery address before ordering")
+		return
+	}
+
 	out := make([]Order, 0, len(lines))
 	total := 0.0
 	for i, line := range lines {
@@ -179,6 +220,15 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 		writeError(w, 409, "prices have changed — remove and re-add the affected items before ordering")
 		return
 	}
+	response := map[string]any{"orders": out, "amount": total, "deliveryFee": checkoutDeliveryFee}
+	if requestID != "" {
+		encoded, _ := json.Marshal(response)
+		if _, err = tx.ExecContext(r.Context(), `INSERT INTO checkout_attempts(buyer_email,request_id,fingerprint,response)
+   VALUES($1,$2,$3,$4::jsonb)`, buyer, requestID, fingerprint, string(encoded)); err != nil {
+			writeError(w, 500, "could not save checkout confirmation")
+			return
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		writeError(w, 500, "could not confirm order — check your orders before retrying")
 		return
@@ -191,15 +241,15 @@ func (a *API) placeBasket(w http.ResponseWriter, r *http.Request, lines []checko
 		writeJSON(w, 201, out[0])
 		return
 	}
-	writeJSON(w, 201, map[string]any{"orders": out, "amount": total, "deliveryFee": checkoutDeliveryFee})
+	writeJSON(w, 201, response)
 }
 
 // deliveryTarget picks the address this order is for: the one asked for, or
 // the default. Scoped to the buyer, so an id from somebody else's book is
 // simply not found.
-func (a *API) deliveryTarget(ctx context.Context, buyer, addressID string) (Address, error) {
+func deliveryTarget(ctx context.Context, tx *sql.Tx, buyer, addressID string) (Address, error) {
 	var ad Address
-	err := a.db.sql.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT id, label, line, city, pincode, name, phone
 		FROM addresses
 		WHERE email = $1 AND ($2::text = '' OR id = $2)
@@ -211,7 +261,7 @@ func (a *API) deliveryTarget(ctx context.Context, buyer, addressID string) (Addr
 	// Whoever placed the order is who to call when nobody answers the door.
 	if ad.Name == "" || ad.Phone == "" {
 		var name, phone string
-		a.db.sql.QueryRowContext(ctx, `SELECT name, phone FROM users WHERE email = $1`,
+		tx.QueryRowContext(ctx, `SELECT name, phone FROM users WHERE email = $1`,
 			buyer).Scan(&name, &phone)
 		if ad.Name == "" {
 			ad.Name = name

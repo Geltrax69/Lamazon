@@ -365,12 +365,15 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
       for (final line in cart.items) (itemId: line.product.id, qty: line.qty),
     ];
     final expectedTotal = cart.total;
+    final requestId = cart.checkoutRequestId;
     if (lines.isEmpty) return;
     setState(() => _placing = true);
     try {
+      await cart.savedToStorage;
       await MyOrders.instance.place(
         lines,
         addressId: address.id,
+        requestId: requestId,
         expectedTotal: expectedTotal,
       );
       for (final line in lines) {

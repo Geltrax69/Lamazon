@@ -33,10 +33,13 @@ void main() {
       await cart.savedToStorage;
       final restarted = Cart();
       await restarted.restore();
+      expect(restarted.checkoutRequestId, cart.checkoutRequestId);
       expect(restarted.count, 3);
       expect(restarted.total, 222);
       expect(restarted.items.single.product.toJson(), product.toJson());
+      final previousId = restarted.checkoutRequestId;
       restarted.remove(product.id);
+      expect(restarted.checkoutRequestId, isNot(previousId));
       await restarted.savedToStorage;
       final empty = Cart();
       await empty.restore();
@@ -77,6 +80,10 @@ void main() {
     final cart = Cart();
     await cart.restore();
     expect(cart.count, 2);
+    final migrated = Cart();
+    await migrated.restore();
+    expect(migrated.checkoutRequestId, cart.checkoutRequestId);
+    expect(migrated.count, 2);
     SharedPreferences.setMockInitialValues({'cart.v1': 'broken json'});
     await cart.restore();
     expect(cart.isEmpty, isTrue);

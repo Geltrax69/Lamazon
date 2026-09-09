@@ -120,11 +120,13 @@ class MyOrders extends ChangeNotifier {
   Future<void> place(
     List<({String itemId, int qty})> lines, {
     required String addressId,
+    required String requestId,
     required double expectedTotal,
   }) async {
     await Api.instance.checkout(
       lines: lines,
       addressId: addressId,
+      requestId: requestId,
       expectedTotal: expectedTotal,
     );
     await load();

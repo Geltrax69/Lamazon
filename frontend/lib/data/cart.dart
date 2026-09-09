@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,13 +20,26 @@ class Cart extends ChangeNotifier {
   SharedPreferences? _preferences;
   Future<void> _pendingWrite = Future.value();
   Future<void> get savedToStorage => _pendingWrite;
+  String _requestId = _newRequestId();
+  String get checkoutRequestId => _requestId;
+  static String _newRequestId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
 
   Future<void> restore() async {
     _preferences = await SharedPreferences.getInstance();
     _items.clear();
     try {
-      final rows =
-          jsonDecode(_preferences!.getString('cart.v1') ?? '[]') as List;
+      final saved = _preferences!.getString('cart.v2');
+      final envelope = saved == null ? null : jsonDecode(saved) as Map;
+      final rows = envelope == null
+          ? jsonDecode(_preferences!.getString('cart.v1') ?? '[]') as List
+          : envelope['items'] as List;
+      _requestId = envelope?['requestId'] as String? ?? _newRequestId();
       for (final row in rows) {
         try {
           final product = Product.fromJson(
@@ -45,19 +59,26 @@ class Cart extends ChangeNotifier {
     } catch (_) {
       // Invalid local data must not prevent the app from starting.
     }
+    _save(rotate: false);
+    await savedToStorage;
     notifyListeners();
   }
 
-  void _save() {
+  void _save({bool rotate = true}) {
+    if (rotate) _requestId = _newRequestId();
     final preferences = _preferences;
     if (preferences == null) return;
-    final snapshot = jsonEncode([
-      for (final item in _items.values)
-        {'product': item.product.toJson(), 'qty': item.qty},
-    ]);
+    // Save the basket and retry ID together so a restart cannot mix revisions.
+    final snapshot = jsonEncode({
+      'requestId': _requestId,
+      'items': [
+        for (final item in _items.values)
+          {'product': item.product.toJson(), 'qty': item.qty},
+      ],
+    });
     _pendingWrite = _pendingWrite
         .then((_) async {
-          await preferences.setString('cart.v1', snapshot);
+          await preferences.setString('cart.v2', snapshot);
         })
         .catchError((Object error) {
           debugPrint('Could not save basket: $error');

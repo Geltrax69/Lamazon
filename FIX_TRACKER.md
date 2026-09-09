@@ -8,29 +8,47 @@ Only verified batches are committed and pushed to GitHub. The `web` branch
 triggers the existing API/web deployment pipelines; a push is not proof of a
 successful deployment.
 
-## Current batch
+## Current status
 
-| QA ID | Status | Change / remaining work |
+Latest functionality work is on `codex/functionality-checkout`, draft PR
+[#1](https://github.com/Geltrax69/Lamazon/pull/1) targeting `web`. Only batches 1–2
+are deployed; later batches need coordinated API, web and mobile rollout.
+
+| QA IDs | Status | Result / remaining work |
 |---|---|---|
-| B1 | Verified; rollout pending | Atomic basket checkout records exactly one ₹15 fee, verifies the displayed total, and returns matching buyer/seller/rider amounts. Kept on a review branch for coordinated mobile/web rollout. |
-| B2 | Verified | Restore cart product snapshots, quantities and wishlist IDs before startup; save mutations in order. Guest selections survive sign-in. Device-local storage; cross-device sync remains future work. |
-| B5 | Verified | Removed fabricated order/payment/promotion notifications; use the existing empty state until a real history API exists. |
-| B8 | Verified | Incorrect delivery codes return 400, preserving rider authentication. Existing delivery test verifies retry with the same token and unchanged stock. |
-| B11 | Verified | Settings Privacy and Terms open the existing policy screens. |
-| B6 | Verified | Database-backed limits: 10 attempts per account and 100 per network peer per 15 minutes, with HTTP 429 and Retry-After. Counts are atomic and survive restarts. |
-| B7 | Partially fixed | New and reset rider PINs have six digits. Existing credentials retained until admin resets them. |
+| B1 | Fixed; rollout pending | Atomic basket checkout, one delivery fee, matching totals and durable retry IDs. |
+| B2 | Fixed locally | Cart and wishlist survive restart. Cross-device synchronization remains open. |
+| B3 | Partial | Atomic checkout refuses orders without active riders. Legacy single-line endpoint still needs the same availability guard; actual rider staffing is operational work. |
+| B4 | Code fixed; owner content needed | Unfinished policy templates cannot be published or shown publicly. Real business/legal documents remain a launch requirement. |
+| B5 | Fixed | Fabricated notifications removed; real notification history remains unimplemented. |
+| B6 | Fixed | Persistent password/PIN rate limits with concurrent-request coverage. Proxy-aware network limiting needs infrastructure review. |
+| B7 | Partial | New/reset PINs are six digits; unassigned rider pool hides recipient details. Existing short PINs still require admin reset. |
+| B8 | Fixed | Wrong delivery code preserves rider login and allows retry. |
+| B9 | Fixed by removing dead control | Unwired promo field removed; promotion engine remains unimplemented. |
+| B10–B11 | Fixed | Server-persisted notification preferences and functional policy links. |
+| B12 | Partial | Fake support contacts removed. Working contact details must come from the owner. |
+| B13–B14 | Core actions fixed | Buyer cancellation before acceptance, order details and status refresh. GPS tracking and ETA remain open. |
+| B15–B17 | Fixed | Optimized image delivery, visible detail-page cart feedback, dead cart control removed. |
+| B18, B20, B32 | Deferred by request | Visual design, icons and imagery. |
+| B19, B21–B22 | Fixed | Department navigation, clearable search scope and accurate drawer empty state. |
+| B23–B26, B29 | Fixed | Server validation, product photo requirements and persistent address defaults. Product edits retain an omitted category. |
+| B27 | Fixed | Consistent delivered revenue and visible admin order amounts. |
+| B28, B33 | Content pending | Live test-product cleanup and catalogue corrections need the intended records/content confirmed; no production data changed. |
+| B30–B31, B34–B37 | Fixed | Honest OTA/version display, form guidance, pluralization, location dismissal and address editing. |
+| B38 | Verified existing behavior | Switch-off and permanent removal are distinct and describe retained history. |
 
-## Queue
+## Remaining functionality queue
 
-- B7 remaining: existing four-digit credentials require an admin PIN reset;
-  broader access to customer details in the unassigned rider pool still needs review.
-- B3: delivery availability guard; actual rider recruitment/onboarding is operational work.
-- B4: prevent publication of unfinished policies. Real business/legal/support details must come from the owner; do not invent them.
-- B9–B10, B12–B14: nonfunctional promo/support/settings and order actions.
-- B23–B26, B29: server-side validation and delivery-address consistency.
-- B15, B16–B17, B19, B21–B22, B27, B30, B34–B35: performance and remaining behavior defects.
-- B18, B20, B28, B32–B33: imagery/catalogue content and appearance deferred; live catalogue edits need identified intended content.
-- B31, B36–B38 and missing features: assess functionality separately from the deferred visual pass.
+- Close the legacy single-line checkout availability gap and coordinate rollout
+  for older installed clients. Historical order accounting is not rewritten.
+- Real support/policy content, existing rider PIN resets and delivery staffing.
+- Payment processing, receipts, reviews, notification history and promotions.
+  These features are not implemented merely by removing their misleading controls.
+- Cross-device cart/wishlist sync, grouped order presentation, GPS tracking/ETA,
+  product stock display and preservation of selected product options in orders.
+- Admin search/filter/date range/pagination/export, bulk/user actions, audit log,
+  additional admin identities and MFA; seller store closure; offline indication.
+- UI redesign remains deferred until the user requests it.
 
 ## Verification and GitHub history
 
@@ -89,9 +107,8 @@ branch `codex/functionality-checkout`, targeting `web`.
   validation build, not a published app release; iOS build was not exercised.
 - Published batches cover API/web deployment. Existing installed apps do not
   automatically receive these source changes through a push to `web`.
-- Follow-up: request idempotency for lost checkout responses, cross-device cart
-  sync, grouped order presentation, and existing historic amount reconciliation
-  remain open. No production orders or catalogue records were changed by tests.
+- Follow-up at that time: request idempotency (completed in batch 6), cross-device
+  cart sync, grouped order presentation, and historic amount reconciliation. No production orders or catalogue records were changed by tests.
 
 ### Batch 4 — address integrity, validation and preferences
 
@@ -175,3 +192,28 @@ batch. A separate native PostgreSQL 16 test cluster is running at
 `127.0.0.1:55434`, data directory `/tmp/lamazon-functional-pg`, database
 `lamazon_test`. Explicit `LAMAZON_TEST_URL` failures now fail tests rather than
 silently skipping integration coverage. Other Docker projects were left alone.
+
+### Batch 6 — safe checkout retries and product-edit integrity
+
+- Atomic checkout requires a request ID. PostgreSQL serializes concurrent requests
+  for that buyer/ID and stores the resulting confirmation in the same transaction
+  as the orders. Replays return those orders without reserving stock again or
+  sending duplicate order notifications. Reusing an ID for a changed payload is
+  rejected. Failed transactions do not consume the ID.
+- Cart storage migrates to one `cart.v2` envelope holding the product snapshot and
+  retry ID together. Quantity/product changes rotate the ID; retries and app
+  restarts preserve it. Existing `cart.v1` baskets are migrated automatically.
+- Checkout address reads use the existing transaction, avoiding connection-pool
+  starvation when multiple requests wait for the same basket lock.
+- Seller product edits preserve the existing category when omitted, instead of
+  silently moving a listing into an empty category.
+- Regression coverage: simultaneous identical requests with only one item in
+  stock and a one-connection pool; recovery after address deletion/rider shutdown;
+  different payload rejection; exactly one resulting order; persistent/migrated
+  cart IDs; category preservation.
+
+Validation: full PostgreSQL Go suite passes with `-race -count=1` (22.3 seconds),
+all 66 Flutter tests pass, `flutter analyze` reports no issues, and release web
+and Android APK builds succeed. Android output is a local validation APK using
+the repository's existing signing configuration; no app-store release or iOS
+verification is claimed. Batch is pushed on the PR branch, not deployed to `web`.
