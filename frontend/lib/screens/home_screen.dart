@@ -9,6 +9,7 @@ import '../data/campaigns.dart';
 import '../data/catalog.dart';
 import '../data/categories.dart';
 import '../data/orders.dart';
+import '../data/season.dart';
 import '../data/session.dart';
 import '../data/wishlist.dart';
 import '../models/product.dart';
@@ -195,7 +196,12 @@ class _HomeScreenState extends State<HomeScreen> {
               LamazonTheme.gutter(context);
           return ListView(
             controller: _scroll,
-            padding: EdgeInsets.fromLTRB(side, 8, side, bottomNavInset(context) + 24),
+            padding: EdgeInsets.fromLTRB(
+              side,
+              8,
+              side,
+              bottomNavInset(context) + 24,
+            ),
             children: [
               const _ServiceHeader(),
               const SizedBox(height: 12),
@@ -396,145 +402,227 @@ class _ServiceHeader extends StatelessWidget {
   const _ServiceHeader();
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(LamazonTheme.featuredRadius),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [LamazonTheme.forest, LamazonTheme.strong],
+  Widget build(BuildContext context) {
+    // The one surface a festival is allowed to repaint. Everything below it —
+    // product cards, prices, stock — keeps the app's own palette, because a
+    // shop that changes colour everywhere for Diwali is a shop nobody can
+    // read prices in. Null for most of the year.
+    final season = Seasons.instance.current;
+    final ground = season?.ground ?? LamazonTheme.forest;
+    final ink = season?.ink ?? Colors.white;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(LamazonTheme.featuredRadius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          // A season names one ground; the second stop is derived so a
+          // festival palette does not have to specify a gradient to get one.
+          colors: season == null
+              ? const [LamazonTheme.forest, LamazonTheme.strong]
+              : [
+                  ground,
+                  Color.alphaBlend(Colors.black.withValues(alpha: .18), ground),
+                ],
+        ),
+        boxShadow: LamazonTheme.raisedShadows,
       ),
-      boxShadow: LamazonTheme.raisedShadows,
-    ),
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 15),
-      // Two controls came out of this header, both of them duplicates.
-      //
-      // The hamburger opened a drawer listing departments and their
-      // categories — the fourth way to reach a department on this one screen,
-      // after the strip 60px below it, the titled grid per department further
-      // down, and "Shop by department" on search. It added nothing that was
-      // not already on screen.
-      //
-      // The avatar on the right went to AppRoutes.account. So does the
-      // Account tab in the bottom bar, which is always visible and carries a
-      // label. The same destination twice, 40px apart vertically.
-      //
-      // What is left is what the header is actually for: who you are shopping
-      // with, and where it is going. The location now gets the full width,
-      // which is why a long address no longer ellipses.
-      child: Row(
-        children: [
-          Expanded(
-            child: ListenableBuilder(
-              listenable: AddressBook.instance,
-              builder: (context, _) {
-                final address = AddressBook.instance.selected;
-                return InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddressesScreen()),
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Lamazon',
-                          style: TextStyle(
-                            fontFamily: 'InterTight',
-                            fontSize: 22,
-                            height: 28 / 22,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -.7,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            const Icon(
-                              LucideIcons.mapPin,
-                              size: 15,
-                              color: LamazonTheme.lime,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 15),
+        // Two controls came out of this header, both of them duplicates.
+        //
+        // The hamburger opened a drawer listing departments and their
+        // categories — the fourth way to reach a department on this one screen,
+        // after the strip 60px below it, the titled grid per department further
+        // down, and "Shop by department" on search. It added nothing that was
+        // not already on screen.
+        //
+        // The avatar on the right went to AppRoutes.account. So does the
+        // Account tab in the bottom bar, which is always visible and carries a
+        // label. The same destination twice, 40px apart vertically.
+        //
+        // What is left is what the header is actually for: who you are shopping
+        // with, and where it is going. The location now gets the full width,
+        // which is why a long address no longer ellipses.
+        child: Row(
+          children: [
+            Expanded(
+              child: ListenableBuilder(
+                listenable: AddressBook.instance,
+                builder: (context, _) {
+                  final address = AddressBook.instance.selected;
+                  return InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddressesScreen(),
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Lamazon',
+                            style: TextStyle(
+                              fontFamily: 'InterTight',
+                              fontSize: 22,
+                              height: 28 / 22,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -.7,
+                              color: ink,
                             ),
-                            const SizedBox(width: 5),
-                            // Flexible, not Expanded: the chevron follows the
-                            // text instead of being pushed to the far right
-                            // edge. Pinned right it sat flush against the
-                            // account avatar and read as that button's
-                            // dropdown, when it has always belonged to the
-                            // location it now sits beside.
-                            Flexible(
-                              child: Text(
-                                address == null
-                                    ? 'Choose delivery location'
-                                    : '${address.label.title} · ${address.line}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'InterTight',
-                                  fontSize: 13.5,
-                                  height: 18 / 13.5,
-                                  letterSpacing: .2,
-                                  color: Color(0xFFE4EBE6),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                LucideIcons.mapPin,
+                                size: 15,
+                                color: season?.accent ?? LamazonTheme.lime,
+                              ),
+                              const SizedBox(width: 5),
+                              // Flexible, not Expanded: the chevron follows the
+                              // text instead of being pushed to the far right
+                              // edge. Pinned right it sat flush against the
+                              // account avatar and read as that button's
+                              // dropdown, when it has always belonged to the
+                              // location it now sits beside.
+                              Flexible(
+                                child: Text(
+                                  address == null
+                                      ? 'Choose delivery location'
+                                      : '${address.label.title} · ${address.line}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'InterTight',
+                                    fontSize: 13.5,
+                                    height: 18 / 13.5,
+                                    letterSpacing: .2,
+                                    // The ink, softened. A season supplies one
+                                    // readable foreground and this is the
+                                    // quieter half of it.
+                                    color: ink.withValues(alpha: .82),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              LucideIcons.chevronDown,
-                              size: 16,
-                              color: LamazonTheme.lime,
-                            ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 4),
+                              Icon(
+                                LucideIcons.chevronDown,
+                                size: 16,
+                                color: season?.accent ?? LamazonTheme.lime,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-
-class _SearchLaunch extends StatelessWidget {
+class _SearchLaunch extends StatefulWidget {
   final VoidCallback onTap;
   const _SearchLaunch({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => ElevatedSurface(
-    radius: LamazonTheme.featuredRadius,
-    onTap: onTap,
-    semanticLabel: 'Search products and stores',
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    prominent: true,
-    child: const Row(
-      children: [
-        Icon(LucideIcons.search, size: 21, color: LamazonTheme.strong),
-        SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'Search products, shops and more',
-            style: TextStyle(
-              fontFamily: 'InterTight',
-              fontSize: 15,
-              letterSpacing: .2,
-              color: LamazonTheme.muted,
+  State<_SearchLaunch> createState() => _SearchLaunchState();
+}
+
+class _SearchLaunchState extends State<_SearchLaunch> {
+  int _hint = 0;
+  Timer? _rotate;
+
+  /// Slower than the campaign deck. This is a hint under a cursor, not a
+  /// billboard, and text that changes while you are reading it is worse than
+  /// text that does not change at all.
+  static const _dwell = Duration(seconds: 4);
+
+  List<String> get _hints => Seasons.instance.current?.hints ?? const [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (_hints.length > 1) {
+      _rotate = Timer.periodic(_dwell, (_) {
+        if (mounted) setState(() => _hint = (_hint + 1) % _hints.length);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _rotate?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    if (disabled && _rotate != null) {
+      _rotate!.cancel();
+      _rotate = null;
+    }
+    // During a festival the placeholder sells: Blinkit cycles "decorative
+    // lights" and "ganesh idol" through this field, which costs nothing and
+    // is the most-looked-at line on the screen. Outside a season it says what
+    // the field does, which is what a search field should say.
+    final hints = _hints;
+    final label = hints.isEmpty
+        ? 'Search products, shops and more'
+        : 'Search "${hints[_hint % hints.length]}"';
+    return ElevatedSurface(
+      radius: LamazonTheme.featuredRadius,
+      onTap: widget.onTap,
+      semanticLabel: 'Search products and stores',
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      prominent: true,
+      child: Row(
+        children: [
+          const Icon(LucideIcons.search, size: 21, color: LamazonTheme.strong),
+          const SizedBox(width: 12),
+          Expanded(
+            // Cross-faded, and the label is excluded from semantics because
+            // the surface above already names this control — a placeholder
+            // that changes every four seconds should not re-announce itself
+            // to a screen reader each time.
+            child: ExcludeSemantics(
+              child: AnimatedSwitcher(
+                duration: Duration(milliseconds: disabled ? 0 : 260),
+                child: Text(
+                  label,
+                  key: ValueKey(label),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'InterTight',
+                    fontSize: 15,
+                    letterSpacing: .2,
+                    color: LamazonTheme.muted,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-        Icon(LucideIcons.arrowUpRight, size: 18, color: LamazonTheme.strong),
-      ],
-    ),
-  );
+          const Icon(
+            LucideIcons.arrowUpRight,
+            size: 18,
+            color: LamazonTheme.strong,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DepartmentStrip extends StatelessWidget {
@@ -962,6 +1050,3 @@ class _HomeClose extends StatelessWidget {
     ),
   );
 }
-
-
-

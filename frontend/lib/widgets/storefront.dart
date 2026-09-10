@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/campaigns.dart';
@@ -304,6 +305,39 @@ class CampaignDeck extends StatefulWidget {
 
 class _CampaignDeckState extends State<CampaignDeck> {
   int _index = 0;
+  Timer? _rotate;
+
+  /// Long enough to read the copy and decide, short enough that a second
+  /// campaign is seen at all. Blinkit's festival deck sits at about this.
+  static const _dwell = Duration(seconds: 6);
+
+  @override
+  void initState() {
+    super.initState();
+    _restart();
+  }
+
+  @override
+  void didUpdateWidget(CampaignDeck old) {
+    super.didUpdateWidget(old);
+    if (widget.campaigns.length != old.campaigns.length) _restart();
+  }
+
+  void _restart() {
+    _rotate?.cancel();
+    // One campaign is not a carousel, and a timer that redraws the same card
+    // forever is a wakelock with no upside.
+    if (widget.campaigns.length < 2) return;
+    _rotate = Timer.periodic(_dwell, (_) {
+      if (mounted) _move(1);
+    });
+  }
+
+  @override
+  void dispose() {
+    _rotate?.cancel();
+    super.dispose();
+  }
 
   void _move(int direction) {
     setState(() {
@@ -311,6 +345,9 @@ class _CampaignDeckState extends State<CampaignDeck> {
           (_index + direction + widget.campaigns.length) %
           widget.campaigns.length;
     });
+    // A person who just pressed an arrow does not want the deck moving on
+    // under them a moment later.
+    _restart();
   }
 
   @override
@@ -319,6 +356,13 @@ class _CampaignDeckState extends State<CampaignDeck> {
     _index = _index.clamp(0, widget.campaigns.length - 1);
     final campaign = widget.campaigns[_index];
     final disabled = MediaQuery.disableAnimationsOf(context);
+    // WCAG 2.2.2: something that moves on its own for more than five seconds
+    // needs a way to stop it. Reduced motion is that person saying so in
+    // advance, so the deck simply does not advance — the arrows still work.
+    if (disabled && _rotate != null) {
+      _rotate!.cancel();
+      _rotate = null;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

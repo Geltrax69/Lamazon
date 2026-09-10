@@ -94,6 +94,42 @@ class Api {
     '/api/admin/compare-groups/${Uri.encodeComponent(name)}',
   );
 
+  /// The festival or sale running right now, or null for most of the year.
+  ///
+  /// Public: it decides what colour the shop is, so it is read before anyone
+  /// signs in.
+  Future<Map<String, dynamic>?> activeSeason() async {
+    final res = await http
+        .get(_url('/api/storefront/season'))
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['season'] as Map<String, dynamic>?;
+  }
+
+  /// Every season an admin has scheduled, past and future.
+  Future<List<dynamic>> adminSeasons() async =>
+      (await _staffCall(
+        StaffSession.admin,
+        'GET',
+        '/api/admin/seasons',
+      ))['seasons']
+          as List<dynamic>? ??
+      const [];
+
+  Future<void> saveSeason(String id, Map<String, Object?> season) => _staffCall(
+    StaffSession.admin,
+    'PUT',
+    '/api/admin/seasons/${Uri.encodeComponent(id)}',
+    season,
+  );
+
+  Future<void> deleteSeason(String id) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/seasons/${Uri.encodeComponent(id)}',
+  );
+
   /// The written policies, newest text first from the server.
   Future<List<dynamic>> policies() => _getList('/api/policies');
   Future<List<dynamic>> adminPolicies() async =>

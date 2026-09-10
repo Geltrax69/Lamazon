@@ -571,6 +571,37 @@ WHERE name LIKE '%Chesse%' OR name LIKE '%TIkki%';
 
 -- Staff-managed storefront artwork. Empty category means the whole catalogue;
 -- empty department shows the campaign on Home and every department.
+-- A festival, sale or season: a date-bounded skin for the shop.
+--
+-- Blinkit turns saffron for Ganesh Chaturthi and yellow again afterwards, and
+-- nobody deploys anything to make that happen. This is that: the dates decide
+-- when it is live, so an admin sets Diwali up in October and forgets about it.
+--
+-- Three colours, because one is not a theme. `ground` is the chrome the
+-- service header and department strip sit on, `accent` is what actions on
+-- that ground use, and `ink` is the text over it — a palette that cannot pick
+-- its own foreground is a palette that produces unreadable headers.
+--
+-- `hints` is newline-separated search placeholders. Blinkit rotates
+-- "decorative lights" and "ganesh idol" through the search field during the
+-- festival, which is the cheapest merchandising in the app.
+CREATE TABLE IF NOT EXISTS storefront_seasons (
+    id        TEXT PRIMARY KEY,
+    name      TEXT        NOT NULL,
+    starts_at TIMESTAMPTZ NOT NULL,
+    ends_at   TIMESTAMPTZ NOT NULL,
+    ground    TEXT        NOT NULL DEFAULT '#143E32',
+    accent    TEXT        NOT NULL DEFAULT '#C6EE63',
+    ink       TEXT        NOT NULL DEFAULT '#FFFDF8',
+    hints     TEXT        NOT NULL DEFAULT '',
+    enabled   BOOLEAN     NOT NULL DEFAULT true,
+    CONSTRAINT storefront_seasons_dates CHECK (ends_at > starts_at)
+);
+
+-- The lookup is "what is live right now", every time home loads.
+CREATE INDEX IF NOT EXISTS idx_seasons_window
+    ON storefront_seasons (starts_at, ends_at) WHERE enabled;
+
 CREATE TABLE IF NOT EXISTS storefront_campaigns (
  id TEXT PRIMARY KEY,
  title TEXT NOT NULL,

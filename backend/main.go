@@ -134,6 +134,9 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /api/shops/{name}/products", s.handleShopProducts)
 
 	// Delivery area
+	// Public: it decides what colour the shop is, so it is read before
+	// anyone signs in.
+	mux.HandleFunc("GET /api/storefront/season", s.handleActiveSeason)
 	mux.HandleFunc("GET /api/locations", handleLocations)
 	mux.HandleFunc("GET /api/locations/check", handleLocationCheck)
 
@@ -194,6 +197,9 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/campaigns", s.handleCampaigns)
+	mux.HandleFunc("GET /api/admin/seasons", s.handleAdminSeasons)
+	mux.HandleFunc("PUT /api/admin/seasons/{id}", s.handleSaveSeason)
+	mux.HandleFunc("DELETE /api/admin/seasons/{id}", s.handleDeleteSeason)
 	mux.HandleFunc("PUT /api/admin/campaigns/{id}", s.handleSaveCampaign)
 	mux.HandleFunc("DELETE /api/admin/campaigns/{id}", s.handleDeleteCampaign)
 	mux.HandleFunc("POST /api/admin/campaign-photos", s.handleCampaignPhoto)

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'data/season.dart';
 import 'data/session.dart';
 import 'data/cart.dart';
 import 'data/app_info.dart';
@@ -45,6 +46,11 @@ void main() async {
   await Session.instance.restore();
   await StaffSession.admin.restore();
   await StaffSession.rider.restore();
+  // Decides what colour the shop is, so it is read before the first frame
+  // rather than repainting the header a second after it draws. It swallows
+  // its own failures — a festival must never be the reason the shop will not
+  // open — so there is nothing to catch here.
+  await Seasons.instance.load();
   runApp(const LamazonApp());
 }
 
