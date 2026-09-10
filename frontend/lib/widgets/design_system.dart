@@ -136,6 +136,14 @@ abstract final class LamazonTheme {
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'InterTight',
+      pageTransitionsTheme: PageTransitionsTheme(
+        // Every platform, so the app does not change character with the
+        // browser it is opened in.
+        builders: {
+          for (final platform in TargetPlatform.values)
+            platform: const _RisePageTransition(),
+        },
+      ),
       colorScheme: scheme,
       scaffoldBackgroundColor: canvas,
       visualDensity: VisualDensity.standard,
@@ -261,6 +269,48 @@ abstract final class LamazonTheme {
             color: text,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Every push, on every platform, arrives the same way: a short fade with a
+/// small rise under it.
+///
+/// The defaults do not agree with each other — Android zooms the incoming page
+/// behind a scrim, iOS and macOS slide the whole screen in from the right with
+/// a parallax and an edge shadow — so opening the cart looked like a different
+/// application depending on the browser it was opened in, and on a wide screen
+/// a full-width horizontal slide reads as a phone gesture that wandered onto a
+/// desktop. This is quieter than either and says the same thing: something new
+/// is on top now.
+class _RisePageTransition extends PageTransitionsBuilder {
+  const _RisePageTransition();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        // A sixtieth of the screen. Enough to read as arriving, small enough
+        // that nothing appears to move across the page.
+        position: Tween(
+          begin: const Offset(0, 1 / 60),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
       ),
     );
   }

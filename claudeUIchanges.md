@@ -483,3 +483,115 @@ than re-showing what was already on screen.
   tapping: the shorter page left that control underneath the floating bottom
   bar, and a tap there hits the bar. That is inherent to a floating bar rather
   than a defect, but it is a real thing a thumb can hit too.
+
+### One page transition, instead of whichever one the browser felt like
+
+**Area:** design system — `pageTransitionsTheme` (every pushed route in the app)
+
+**Decision:** REPLACE
+
+**Problem**
+Nothing set `pageTransitionsTheme`, so every push used Flutter's per-platform
+default. Android zooms the incoming page behind a scrim; iOS and macOS slide
+the whole screen in from the right with a parallax and an edge shadow. On the
+web that is chosen from the browser's reported platform, so opening the cart
+looked like a different application depending on where it was opened.
+
+**Why it mattered**
+Raised by the user: the page changes looked wrong. They did. A full-width
+horizontal slide is a phone gesture, and on a desktop-width window it drags
+the entire page sideways for 300ms — a lot of movement to say "the cart is
+open now". The zoom is worse on a light canvas, because the scrim darkens the
+whole screen mid-push and then lets go.
+
+**Before**
+Cart, product, shop, address — each arrived with whatever the host platform
+does, and the app changed character between browsers.
+
+**Decision**
+A short fade with a small rise under it, on every platform.
+
+**Reasoning**
+Motion here has one job: say something new is on top. A fade does that with
+no travel, and a rise of a sixtieth of the screen height gives it a direction
+without anything appearing to move across the page. Set once in the theme
+rather than per route, so a screen cannot opt out by accident.
+
+`MaterialPageRoute` fixes its own 300ms duration and a `PageTransitionsBuilder`
+cannot change it, so this changes the character of the movement rather than
+its length. Replacing every call site with a custom `PageRoute` to shave 80ms
+was not worth the churn.
+
+Reduced motion returns the page with no transition at all.
+
+**Change**
+- `_RisePageTransition` registered for every `TargetPlatform`.
+- New `test/page_transition_test.dart` — seven tests: one per platform
+  asserting the fade is present and `CupertinoPageTransition` is not, plus one
+  asserting reduced motion animates nothing.
+
+**Files**
+- `frontend/lib/widgets/design_system.dart`
+- `frontend/test/page_transition_test.dart`
+
+**Verification**
+- [x] Functional — 77 tests pass
+- [x] Accessibility — reduced motion covered by test
+- [x] Regression — analyze clean
+- [ ] Visual — browser input still not responding; verified by test instead
+
+**Result**
+Every screen arrives the same way, in every browser.
+
+### The admin sign-in stops hiding its own fields
+
+**Area:** `AdminScreen` — `_Field`, used by both credential inputs
+
+**Decision:** IMPROVE
+
+**Problem**
+`_Field` set `fillColor: Colors.white` inside a card that is already `surface`
+(`#FFFDF8`), so the inputs were within one or two values of the card behind
+them and barely read as places to type. It also used radius 14 against the
+system's 18, had no `autofillHints`, and obscured the password with no way to
+reveal it.
+
+**Why it mattered**
+This is a staff panel whose only error message is "wrong username or password"
+— by design, so it does not say which half was wrong. Typing a password blind
+into that is a slow way to find a typo. Missing autofill hints also meant a
+password manager could not offer the credential, which pushes staff toward
+keeping it somewhere worse.
+
+**Decision**
+Field fill on `canvas`, a reveal toggle on the password, autofill hints on
+both, and the error as a live region.
+
+**Reasoning**
+Same fix as the shopper login: a field inside a `surface` card needs to sit a
+shade back from it to read as inset. The reveal toggle is the standard answer
+to a deliberately vague error message. `AutofillGroup` around the pair is what
+lets a manager treat them as one credential.
+
+**Change**
+`_Field` became stateful to hold the reveal state; `fillColor` → `canvas`;
+`suffixIcon` eye toggle with a tooltip; `autofillHints` wired for username and
+password; error text 12.5px → 13px and wrapped in `Semantics(liveRegion: true)`.
+
+**Files**
+- `frontend/lib/screens/admin_screen.dart`
+
+**Verification**
+- [x] Visual — `/admin` rendered at 375×812; fields now read as inset
+- [x] Functional — 77 tests pass
+- [x] Accessibility — tree reads `textbox "Username"`, `textbox "Password"
+      type=password`, `button "Show password"`, `button "Sign in"`
+- [x] Regression — analyze clean
+
+**Result**
+The panel's entrance is legible, fillable by a password manager, and its
+password can be checked before submitting.
+
+**Remaining**
+The signed-in panel behind it was not exercised — signing in means typing a
+password, which is not something to do on the owner's behalf.

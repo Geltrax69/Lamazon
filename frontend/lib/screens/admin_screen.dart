@@ -125,21 +125,39 @@ class _AdminLoginState extends State<_AdminLogin> {
                       style: LamazonTheme.mutedBodyText,
                     ),
                     const SizedBox(height: 24),
-                    _Field(controller: _user, label: 'Username'),
-                    const SizedBox(height: 12),
-                    _Field(
-                      controller: _password,
-                      label: 'Password',
-                      obscure: true,
-                      onSubmit: _signIn,
+                    AutofillGroup(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Field(
+                            controller: _user,
+                            label: 'Username',
+                            autofill: const [AutofillHints.username],
+                          ),
+                          const SizedBox(height: 12),
+                          _Field(
+                            controller: _password,
+                            label: 'Password',
+                            obscure: true,
+                            onSubmit: _signIn,
+                            autofill: const [AutofillHints.password],
+                          ),
+                        ],
+                      ),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: LamazonTheme.danger,
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'InterTight',
+                            fontSize: 13,
+                            height: 17 / 13,
+                            color: LamazonTheme.danger,
+                          ),
                         ),
                       ),
                     ],
@@ -2867,32 +2885,53 @@ class _Empty extends StatelessWidget {
   );
 }
 
-class _Field extends StatelessWidget {
+class _Field extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final bool obscure;
   final VoidCallback? onSubmit;
+  final Iterable<String>? autofill;
   const _Field({
     required this.controller,
     required this.label,
     this.obscure = false,
     this.onSubmit,
+    this.autofill,
   });
+
+  @override
+  State<_Field> createState() => _FieldState();
+}
+
+class _FieldState extends State<_Field> {
+  bool _shown = false;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      obscureText: obscure,
-      onSubmitted: onSubmit == null ? null : (_) => onSubmit!(),
+      controller: widget.controller,
+      obscureText: widget.obscure && !_shown,
+      autofillHints: widget.autofill,
+      onSubmitted: widget.onSubmit == null ? null : (_) => widget.onSubmit!(),
       decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
+        labelText: widget.label,
+        // The card behind this is already `surface`; white on it left the
+        // field with almost no edge, so it did not read as somewhere to type.
+        fillColor: LamazonTheme.canvas,
+        suffixIcon: !widget.obscure
+            ? null
+            : IconButton(
+                // A staff password typed blind into a panel that answers
+                // "wrong username or password" and nothing more is a slow way
+                // to find a typo.
+                tooltip: _shown ? 'Hide password' : 'Show password',
+                icon: Icon(
+                  _shown ? LucideIcons.eyeOff : LucideIcons.eye,
+                  size: 18,
+                  color: LamazonTheme.muted,
+                ),
+                onPressed: () => setState(() => _shown = !_shown),
+              ),
       ),
     );
   }
