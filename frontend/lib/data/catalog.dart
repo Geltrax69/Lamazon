@@ -110,6 +110,46 @@ String thumb(String url, int width) =>
 ///
 /// ponytail: a string insert, not an image pipeline. Non-Cloudinary URLs
 /// (the sample catalogue is Unsplash) are returned untouched.
+/// One shape for every product photograph in the shop.
+///
+/// A catalogue looks like a catalogue when the tiles agree, not when the
+/// photographs do. Sellers upload what they have — a burger on a dark slate,
+/// a sandwich on a patterned plate, a packshot on white — and no transform
+/// turns one into another. What a transform can do is make every tile the
+/// same square, filled edge to edge, with the subject in the middle of it,
+/// and that is what stops a grid reading as a pile of loose pictures.
+///
+///  * `c_fill,ar_1:1` — a square that is all photograph. Padding to a square
+///    instead leaves bars whose colour never matches the neighbouring tile,
+///    which is what made the grid look assembled rather than designed.
+///  * `g_auto` — Cloudinary's saliency crop, so filling the square takes the
+///    burger and not the corner of the tray it was sitting on.
+///  * `e_improve` — a mild lift, so an underexposed phone photo sits closer
+///    to a studio packshot beside it. Mild on purpose: food that has been
+///    pushed looks like food that has been pushed.
+///
+/// The original is never touched. Cloudinary transforms live in the URL, so
+/// what the seller uploaded stays exactly as uploaded and the details screen
+/// can still show it whole.
+///
+/// Background removal would do better than any of this — one white ground
+/// everywhere — but `e_background_removal` is a paid Cloudinary add-on and is
+/// not enabled on this account. It was tested: it silently returns the
+/// untransformed image, pixel for pixel. Enable it and the only change here
+/// is one more parameter.
+String catalogueImage(String url, [int width = 400]) {
+  const marker = '/image/upload/';
+  if (!url.contains(marker)) return url;
+  // Already transformed: a second crop would crop the crop.
+  if (url.contains('c_fill') || url.contains('c_pad') || url.contains('c_limit')) {
+    return url;
+  }
+  return url.replaceFirst(
+    marker,
+    '${marker}c_fill,ar_1:1,g_auto,e_improve:30,w_$width,f_auto,q_auto/',
+  );
+}
+
 String padded(String url, [double aspect = 1, int? sourceWidth]) {
   const marker = '/image/upload/';
   // Already transformed — a second c_pad would scale the padding, not the

@@ -102,14 +102,13 @@ class ProductCard extends StatelessWidget {
                           // above it. The picture is contained rather than
                           // cropped, so some ground always shows on one axis.
                           color: LamazonTheme.surface,
+                          // catalogueImage already returns a centred square,
+                          // so the box is filled rather than fitted — there is
+                          // nothing left to letterbox.
                           child: NetImage(
-                            url: product.imageUrl,
-                            // No square pad at Cloudinary: padding to a square
-                            // and then containing that into a taller box
-                            // banded the image twice, in two colours.
+                            url: catalogueImage(product.imageUrl),
                             padTo: null,
-                            fit: BoxFit.contain,
-                            sourceWidth: 512,
+                            fit: BoxFit.cover,
                             semanticLabel: product.name,
                           ),
                         ),
