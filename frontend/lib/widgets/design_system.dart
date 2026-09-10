@@ -452,12 +452,24 @@ class TactileIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base =
-        background ?? (selected ? LamazonTheme.lime : LamazonTheme.surface);
-    final color = foreground ?? LamazonTheme.strong;
+    // A disabled control has to look disabled. Without this a capped "+" in
+    // the cart kept its full lime fill and simply did nothing when pressed,
+    // which reads as a broken button rather than as a limit — and the tooltip
+    // saying why is only available to a mouse that happens to hover.
+    //
+    // The out-of-stock card already does this properly: grey plus a text
+    // label, never colour alone. This brings every other icon button in the
+    // app up to that standard.
+    final enabled = onPressed != null;
+    final base = enabled
+        ? (background ?? (selected ? LamazonTheme.lime : LamazonTheme.surface))
+        : LamazonTheme.track;
+    final color = enabled
+        ? (foreground ?? LamazonTheme.strong)
+        : LamazonTheme.muted;
     return Semantics(
       button: true,
-      enabled: onPressed != null,
+      enabled: enabled,
       label: label,
       selected: selected,
       child: SizedBox(
@@ -476,7 +488,10 @@ class TactileIconButton extends StatelessWidget {
                   base,
                 ],
               ),
-              boxShadow: LamazonTheme.tactileShadows,
+              // Nothing raised about a control that cannot be pressed.
+              boxShadow: enabled
+                  ? LamazonTheme.tactileShadows
+                  : const <BoxShadow>[],
             ),
             child: Material(
               color: Colors.transparent,

@@ -5,7 +5,7 @@ Every item below is a code change in this repo, verified by a test, a measuremen
 screenshot. Items I did **not** fix are listed in §7 with the reason — the point of this file
 is to be accurate about both halves.
 
-**Verification baseline:** 85 frontend widget tests and the full Go backend suite pass;
+**Verification baseline:** 87 frontend widget tests and the full Go backend suite pass;
 `flutter analyze` reports no issues; the release web bundle builds, renders, and was measured.
 
 ---
@@ -212,6 +212,39 @@ Driven by looking at the running app at 1280×800 and 375×812 rather than by th
 
 **Not done in this pass:** the admin panel itself was verified by analyzer and tests, not in the
 browser — reaching it means typing a password into a login form, which I don't do.
+
+
+---
+
+## 7d. Found by using the app, not by reading the register
+
+Driving the guest shopping flow end to end turned up a defect in **my own** C2-007 fix.
+
+The cart's `+` at the stock cap was correctly inert — pressing it did nothing — but it kept its
+full lime fill and raised shadow. A disabled control that looks live reads as a broken button,
+not as a limit, and the reason ("That is all the shop has") was only carried as a tooltip, so
+only a mouse that happened to hover ever saw it. `TactileIconButton` now renders `track` fill
+with no shadow when `onPressed` is null, which is the pattern the out-of-stock product card was
+already using correctly — grey **plus** a text label, never colour alone. One shared widget, so
+every disabled icon button in the app (cart steppers, the details-screen quantity stepper, the
+seller's stock ±) is fixed at once. `test/disabled_control_test.dart` pins both states.
+
+### Verified live in the running app during this pass
+
+| Behaviour | Result |
+|---|---|
+| Add 6 of a product with stock 5 | Refused at 5 with **"Your cart already holds every one the shop has."** Cart badge reads 5. |
+| Out-of-stock product card | Red "Out of stock" text **and** a greyed control — not colour alone. |
+| In-stock product at 5 units | Reads "In stock", not a false "Only 5 left" — the split scarcity threshold working. |
+| Cart quantity | Renders **5**, not "05". |
+| Cart summary | "Arrives in about 12 mins" present, total ₹75 correct. |
+| Cart `+` at cap | Inert, labelled "That is all the shop has" in the accessibility tree. |
+| Bottom nav | Nothing hidden behind it on the cart at 1280×800. |
+| Search landing | Eight departments in one band; categories and real products above the fold. |
+| Category glyphs | Six distinct icons across the six Electronics shelves. |
+| Product images | No letterbox bands. |
+| Unpublished policy | Still renders the placeholder, and the sign-in line still reads "Read our". |
+| Accessibility tree | Every control carries a role and `tabindex="0"`; labels announce once. |
 
 
 ---
