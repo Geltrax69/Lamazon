@@ -309,11 +309,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           maxCrossAxisExtent: productTileMax,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: 0.60,
+                          childAspectRatio: productTileAspect,
                         ),
                         itemCount: results.length,
                         itemBuilder: (_, i) => ProductCard(
                           product: results[i],
+                          showStore: mixesStores(results),
                           showAddToCart:
                               results[i].tab == 'Food' ||
                               results[i].tab == 'Grocery',
@@ -457,11 +458,12 @@ class _SearchHint extends StatelessWidget {
               maxCrossAxisExtent: productTileMax,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 0.60,
+              childAspectRatio: productTileAspect,
             ),
             itemCount: picks.length,
             itemBuilder: (_, i) => ProductCard(
               product: picks[i],
+              showStore: mixesStores(picks),
               showAddToCart:
                   picks[i].tab == 'Food' || picks[i].tab == 'Grocery',
               onTap: () => Navigator.push(

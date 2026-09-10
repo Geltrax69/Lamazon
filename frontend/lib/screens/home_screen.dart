@@ -345,11 +345,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxCrossAxisExtent: productTileMax,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    childAspectRatio: .60,
+                    childAspectRatio: productTileAspect,
                   ),
                   itemCount: visible.length,
                   itemBuilder: (_, index) => ProductCard(
                     product: visible[index],
+                    showStore: mixesStores(visible),
                     showAddToCart:
                         visible[index].options.isEmpty &&
                         visible[index].sizes.isEmpty,

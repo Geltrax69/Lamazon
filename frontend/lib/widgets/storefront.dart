@@ -533,6 +533,7 @@ class _CollectionShelfState extends State<CollectionShelf> {
               width: 166 * scaled,
               child: ProductCard(
                 product: widget.products[index],
+                showStore: mixesStores(widget.products),
                 showAddToCart:
                     widget.products[index].options.isEmpty &&
                     widget.products[index].sizes.isEmpty,

@@ -10,7 +10,21 @@ bool isWide(BuildContext context) =>
 /// Widest a product card is allowed to get. Cards keep their size and the
 /// grid simply fits more of them in — a card that grows with the monitor
 /// reads as a billboard, which is what made the desktop view look wrong.
-const productTileMax = 230.0;
+///
+/// 168, not 230. At 230 a 375px phone fits two, and the pair carried enough
+/// empty space inside them to look like placeholders. Three across is the
+/// density every grocery app that works runs at, and it is what makes a
+/// catalogue feel stocked rather than sparse.
+/// Flutter's grid takes ceil(width / (max + spacing)) columns, so this is the
+/// number that decides the count: at 335px of usable phone width with 14px
+/// gutters, 150 gives three and 168 gives two.
+const productTileMax = 150.0;
+
+/// Height as a multiple of width. The card is a square picture plus about
+/// four short lines, so it is meaningfully taller than it is wide — the old
+/// 0.60 was tuned for a card carrying a 36px name block and a button row that
+/// no longer exist.
+const productTileAspect = 0.50;
 
 /// Caps how wide the app content runs on a big monitor, and pads the sides
 /// once there is room. Content still fills the width — this is a page, not

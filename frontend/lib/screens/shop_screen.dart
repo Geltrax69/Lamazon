@@ -120,10 +120,11 @@ class _ShopScreenState extends State<ShopScreen> {
                     maxCrossAxisExtent: productTileMax,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 0.60,
+                    childAspectRatio: productTileAspect,
                   ),
                   itemCount: items.length,
                   itemBuilder: (_, i) => ProductCard(
+                    showStore: false,
                     product: items[i],
                     showAddToCart:
                         items[i].tab == 'Food' || items[i].tab == 'Grocery',

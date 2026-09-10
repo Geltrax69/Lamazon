@@ -10,128 +10,228 @@ import '../data/wishlist.dart';
 import '../models/product.dart';
 import 'status_views.dart';
 
+/// Whether naming the store on every card tells a shopper anything.
+///
+/// One shop's grid repeats the same word down the whole page; a mixed list
+/// genuinely needs it to tell two burgers apart. Computed from the list
+/// rather than set per screen, because which screens are single-store depends
+/// on the catalogue, not on the code.
+bool mixesStores(Iterable<Product> products) =>
+    products.map((p) => p.store).toSet().length > 1;
+
+/// One product, as a shopper scans it.
+///
+/// The order of this card is the whole design, and it used to be backwards.
+/// It read: store name, product name in the largest type on the card, "In
+/// stock", then the price last and smallest, next to a lime circle louder
+/// than any of them. In a shop the price is the decision — it belongs first
+/// and biggest, which is where every grocery app that works puts it.
+///
+/// Three things also came off it, because a line repeated on all 41 cards is
+/// not information:
+///
+///  * the store, unless the list actually mixes shops ([showStore]);
+///  * "In stock", which is the default state and so says nothing. Only the
+///    exceptions are worth a line: running out, or out;
+///  * the discount badge sitting over the photograph, which is now text
+///    beside the price where it is read rather than decoration over food.
+///
+/// The card itself lost its shadow. Forty-one elevated surfaces on one page
+/// is noise; the picture keeps a soft ground and the text sits on the page.
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
   final bool showAddToCart; // quick-add only for food & grocery
+
+  /// Whether the store's name earns its line. False inside a single shop or a
+  /// department that only one shop stocks, where it is the same word 41 times.
+  final bool showStore;
   const ProductCard({
     super.key,
     required this.product,
     this.onTap,
     this.showAddToCart = false,
+    this.showStore = true,
   });
+
+  /// The one line under the name, or nothing.
+  ///
+  /// Only exceptions get a line. "In stock" on every card is forty-one
+  /// identical green sentences down a page, which is how a shopper learns to
+  /// stop reading that row at all — so the scarcity warning that matters is
+  /// the one they miss.
+  (String, Color)? get _note {
+    final left = product.availableStock;
+    if (left == null) return null;
+    if (left == 0) return ('Out of stock', LamazonTheme.danger);
+    if (left <= scarceAt) return ('Only $left left', LamazonTheme.warning);
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedSurface(
-      radius: LamazonTheme.smallRadius,
-      onTap: onTap,
-      semanticLabel: product.name,
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: ColoredBox(
-                      // The card's own surface. The picture is contained
-                      // rather than cropped, so there is always some ground
-                      // showing on one axis; when that ground was a different
-                      // colour from the card it read as grey letterbox bands
-                      // around every product.
-                      color: LamazonTheme.surface,
-                      // padTo: null — no square pad at Cloudinary. Padding to
-                      // a square and then containing that square into a
-                      // taller box banded the image twice, in two different
-                      // colours. One shape, one ground.
-                      child: NetImage(
-                        url: product.imageUrl,
-                        padTo: null,
-                        fit: BoxFit.contain,
-                        sourceWidth: 512,
-                        semanticLabel: product.name,
+    final note = _note;
+    return Semantics(
+      button: onTap != null,
+      label: [
+        product.name,
+        '₹${product.price.moneyText}',
+        if (product.discounted) '${product.discountPercent} percent off',
+        if (showStore) 'from ${product.store}',
+        if (note != null) note.$1,
+      ].join(', '),
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: ColoredBox(
+                          // A ground of its own, so the picture reads as a
+                          // tile rather than as text with an image floating
+                          // above it. The picture is contained rather than
+                          // cropped, so some ground always shows on one axis.
+                          color: LamazonTheme.surface,
+                          child: NetImage(
+                            url: product.imageUrl,
+                            // No square pad at Cloudinary: padding to a square
+                            // and then containing that into a taller box
+                            // banded the image twice, in two colours.
+                            padTo: null,
+                            fit: BoxFit.contain,
+                            sourceWidth: 512,
+                            semanticLabel: product.name,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: WishlistHeart(productId: product.id),
+                    ),
+                    // Inside the picture, not under it. It is the thumb's
+                    // target and it was costing the card a whole row of
+                    // height beside the price, where it outweighed the number
+                    // the shopper is actually reading.
+                    if (showAddToCart)
+                      Positioned(
+                        right: 4,
+                        bottom: 4,
+                        child: CartButton(product: product),
+                      ),
+                  ],
                 ),
-                Positioned(
-                  top: 5,
-                  right: 5,
-                  child: WishlistHeart(productId: product.id),
-                ),
-                if (product.discounted)
-                  Positioned(
-                    left: 5,
-                    bottom: 5,
-                    child: DiscountBadge(percent: product.discountPercent),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            product.store,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: 'InterTight',
-              fontSize: 11.5,
-              letterSpacing: .25,
-              color: LamazonTheme.muted,
-            ),
-          ),
-          const SizedBox(height: 3),
-          // Always two lines tall. The picture takes the leftover height, so a
-          // one-line name used to hand its card a taller photo than the card
-          // beside it — the row of products then looked misaligned.
-          SizedBox(
-            height: 36,
-            child: Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'InterTight',
-                fontWeight: FontWeight.w600,
-                fontSize: 14.5,
-                height: 18 / 14.5,
-                letterSpacing: .1,
               ),
-            ),
-          ),
-          if (product.availableStock != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text(
-                product.availableStock == 0
-                    ? 'Out of stock'
-                    : product.availableStock! <= scarceAt
-                    ? 'Only ${product.availableStock} left'
-                    : 'In stock',
-                maxLines: 1,
+              const SizedBox(height: 8),
+              // Price first, and the largest thing on the card.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '₹${product.price.moneyText}',
+                    style: const TextStyle(
+                      fontFamily: 'InterTight',
+                      fontSize: 17,
+                      height: 21 / 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -.2,
+                      color: LamazonTheme.text,
+                    ),
+                  ),
+                  if (product.discounted) ...[
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        '₹${product.mrp.moneyText}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'InterTight',
+                          fontSize: 12.5,
+                          color: LamazonTheme.muted,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: LamazonTheme.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              // The saving as a readable line rather than a sticker over the
+              // food. Green, because it is good news, and it sits with the
+              // number it is about.
+              if (product.discounted)
+                Text(
+                  '${product.discountPercent}% off',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontFamily: 'InterTight',
+                    fontSize: 11.5,
+                    height: 15 / 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: LamazonTheme.strong,
+                  ),
+                ),
+              const SizedBox(height: 2),
+              // The name is what you are buying, but you already know that
+              // from the picture. Medium weight, two lines, and it stops
+              // shouting over the price.
+              Text(
+                product.name,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'InterTight',
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: product.availableStock == 0
-                      ? LamazonTheme.danger
-                      : LamazonTheme.strong,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                  height: 16.5 / 13,
+                  letterSpacing: .05,
+                  color: LamazonTheme.text,
                 ),
               ),
-            ),
-          const SizedBox(height: 7),
-          Row(
-            children: [
-              Expanded(child: PriceLine(product: product, fontSize: 17)),
-              if (showAddToCart) CartButton(product: product),
+              if (showStore) ...[
+                const SizedBox(height: 2),
+                Text(
+                  product.store,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'InterTight',
+                    fontSize: 11,
+                    letterSpacing: .2,
+                    color: LamazonTheme.muted,
+                  ),
+                ),
+              ],
+              if (note != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  note.$1,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'InterTight',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: note.$2,
+                  ),
+                ),
+              ],
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -289,7 +389,7 @@ class _CartButtonState extends State<CartButton> {
         onPressed: _added || disabled ? null : _add,
         background: disabled ? LamazonTheme.track : LamazonTheme.lime,
         foreground: disabled ? LamazonTheme.muted : LamazonTheme.strong,
-        size: 42,
+        size: LamazonTheme.touch,
       ),
     );
   }

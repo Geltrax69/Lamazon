@@ -86,10 +86,11 @@ class WishlistScreen extends StatelessWidget {
                                   maxCrossAxisExtent: productTileMax,
                                   mainAxisSpacing: 16,
                                   crossAxisSpacing: 16,
-                                  childAspectRatio: 0.60,
+                                  childAspectRatio: productTileAspect,
                                 ),
                             itemCount: items.length,
                             itemBuilder: (_, i) => ProductCard(
+                              showStore: mixesStores(items),
                               product: items[i],
                               showAddToCart:
                                   items[i].tab == 'Food' ||
