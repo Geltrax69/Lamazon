@@ -12,6 +12,7 @@ enum AppTab { home, cart, saved, account, none }
 /// construction.
 abstract final class AppRoutes {
   static const cart = '/cart';
+  static const login = '/login';
   static const saved = '/saved';
   static const store = '/store';
   static const account = '/account';

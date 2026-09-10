@@ -48,7 +48,9 @@ void main() {
         await tester.pumpWidget(app(const CartScreen()));
         await tester.pump();
         expect(tester.takeException(), isNull);
-        final place = find.textContaining('Place order');
+        // Signed out, so this is the sign-in label; either way it is the
+        // panel's primary action and the thing that must stay reachable.
+        final place = find.textContaining('place order');
         await tester.ensureVisible(place);
         await tester.pump();
         expect(tester.takeException(), isNull);

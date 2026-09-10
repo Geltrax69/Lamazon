@@ -399,12 +399,15 @@ void main() {
 
       await tester.pumpWidget(const MaterialApp(home: CartScreen()));
       expect(find.text(p.name), findsOneWidget);
-      // The amount is on the button, and the unit price is spelled out
-      // whenever the line holds more than one.
+      // Nobody is signed in here, and an order has to belong to someone — so
+      // the button names that step rather than promising a purchase it will
+      // refuse. The amount stays visible either way, in the Total row.
+      expect(find.text('Sign in to place order'), findsOneWidget);
       expect(
-        find.text('Place order  ·  ₹${Cart.instance.total.toStringAsFixed(0)}'),
-        findsOneWidget,
+        find.text('₹${Cart.instance.total.toStringAsFixed(0)}'),
+        findsWidgets,
       );
+      // The unit price is spelled out whenever the line holds more than one.
       expect(find.text('2 items'), findsOneWidget);
       expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsOneWidget);
 

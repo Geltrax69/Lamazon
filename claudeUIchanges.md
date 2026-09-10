@@ -273,3 +273,128 @@ button   "Privacy Policy"
 would be better exposed as a heading; Flutter's web semantics does not emit
 heading levels from `Semantics(header: true)` in a way this reader surfaces,
 so it is left as-is rather than faked.
+
+### The checkout button stops promising an order it will refuse
+
+**Area:** `CartScreen` — `_CheckoutPanel`, the primary conversion action
+
+**Decision:** IMPROVE
+
+**Problem**
+"Place order · ₹3613" was rendered at full primary emphasis for everyone,
+including guests. `_placeOrder` then checked `Session.instance.loggedIn`,
+showed a four-second snackbar — "Sign in first — an order has to belong to
+someone." — and returned. Nothing else on the screen said an account was
+needed.
+
+**Why it mattered**
+Skip login is on the very first screen, so shopping as a guest is a normal
+path, not an edge case. Such a shopper can browse, fill a cart, add a delivery
+address, and press the largest and most committed button in the app — and get
+a toast that disappears. It is a dead end at the exact moment the product asks
+for trust, and the requirement is invisible until the user has already failed.
+
+The screen was also inconsistent with itself: the *address* requirement is
+stated plainly in the delivery card ("Choose a delivery address before placing
+your order") and tapping through actually navigates to the address screen. Only
+sign-in behaved as a hidden trapdoor.
+
+**Before**
+Guest presses "Place order · ₹3613" → snackbar → nothing happens.
+
+**Decision**
+For a signed-out shopper the button reads "Sign in to place order" and goes to
+sign-in. Signed in, it is unchanged.
+
+**Reasoning**
+Considered and rejected: adding a "you need an account" notice above the
+button. That solves it by adding UI, and the button would still be lying until
+the user read the notice. Relabelling costs nothing, cannot be missed, and
+turns a refusal into the step the shopper actually asked for.
+
+The amount is deliberately dropped from the guest label. For a guest the
+button is navigation, not payment, and pricing a navigation step is the same
+false promise in smaller type. The total stays visible in the Total row
+directly above it, which is where the two existing tests were really getting
+their assurance from.
+
+Routed by name (`AppRoutes.login`) rather than by importing `LoginScreen`,
+because that import would close a cycle back through home — the same trap that
+had already caught the bottom bar and the account shortcut.
+
+**Change**
+- `AppRoutes.login` added and registered in `main.dart`.
+- The action is wrapped in a `ListenableBuilder` on `Session.instance`, since
+  the panel previously only rebuilt on cart changes and would not have noticed
+  a sign-in.
+- The signed-out branch of `_placeOrder` navigates instead of toasting.
+
+**Files**
+- `frontend/lib/screens/cart_screen.dart`
+- `frontend/lib/widgets/app_nav.dart`
+- `frontend/lib/main.dart`
+- `frontend/test/smoke_test.dart`, `frontend/test/ui_redesign_test.dart`
+
+**Verification**
+- [x] Functional — 70 tests pass; two updated to cover the guest label
+- [x] Responsive — label is single-line with ellipsis; 320/390/800/1400 with
+      1.3 text scale all pass
+- [x] Accessibility — `ActionButton` now reports button role and enabled state
+- [x] Regression — analyze clean
+- [ ] Visual — not re-checked in browser this round, see note below
+
+**Result**
+The primary action always describes what it will actually do.
+
+**Remaining**
+Two near-identical quantity steppers exist — `_QtyStepper` in details and
+`_QtyControls` in cart. They behave differently at qty 1 on purpose (details
+disables minus, cart turns it into remove), which is correct for their
+contexts, so they were left alone rather than merged behind a mode flag.
+
+### The purchase path moves onto the tokens
+
+**Area:** `CartScreen`, `DetailsScreen`
+
+**Decision:** SIMPLIFY
+
+**Problem**
+Twelve hard-coded colours across the two screens a shopper must pass through
+to spend money, including two private constants (`_ink`, `_green`) shadowing
+tokens that already existed, Material's `#D32F2F` and `#2E7D32` for
+error/success, and the pre-redesign canvas `#F1F1EF`.
+
+**Why it mattered**
+These are the screens where a product has to look most trustworthy. Off-system
+reds and greens read as belonging to a different application, and the private
+constants meant the checkout could drift away from the rest of the app any time
+a token changed.
+
+**Decision**
+All twelve onto tokens. The swipe-to-delete tint is now derived from the token
+(`danger` at 14% alpha) rather than being an independent pink, so the tint and
+the icon on top of it cannot drift apart.
+
+**Change**
+`_ink` → `text`, `_green` → `strong`, `#D32F2F` → `danger`, `#2E7D32` →
+`strong`, `#62645E`/`#6B6B6B` → `muted`, `#F1F1EF` → `track`,
+`#F8D7DA` → `danger` at 14%.
+
+**Files**
+- `frontend/lib/screens/cart_screen.dart`
+- `frontend/lib/screens/details_screen.dart`
+
+**Verification**
+- [x] Functional — 70 tests pass
+- [x] Regression — analyze clean; no hard-coded hex left on the purchase path
+- [ ] Visual — not re-checked in browser this round, see note below
+
+**Result**
+Zero hard-coded colours remain in cart, details or order confirmation.
+
+**Remaining**
+Browser input stopped responding partway through this session — screenshots and
+the accessibility tree still read correctly, but clicks no longer register, so
+the cart and details screens could not be walked visually after these edits.
+The changes are colour-token substitutions and one label, all covered by the
+suite, but they have not been seen on screen. Worth a look before release.

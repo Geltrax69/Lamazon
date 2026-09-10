@@ -63,6 +63,7 @@ Route<dynamic>? _staffRoute(RouteSettings settings) {
     // main.dart, so naming them costs no import cycle — the nav asks for a
     // path and this is the only place that knows what a path is made of.
     AppRoutes.cart => const CartScreen(),
+    AppRoutes.login => const LoginScreen(),
     AppRoutes.saved => const WishlistScreen(),
     AppRoutes.store => const SellerDashboardScreen(),
     AppRoutes.account => const ProfileScreen(),

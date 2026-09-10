@@ -15,9 +15,6 @@ import '../data/session.dart';
 import '../widgets/product_card.dart';
 import 'location_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _green = Color(0xFF1D4A3C); // deep green from the design
-
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
 
@@ -52,7 +49,7 @@ class CartScreen extends StatelessWidget {
                           ),
                           trailing: Icon(
                             LucideIcons.circleCheck,
-                            color: LamazonTheme.green,
+                            color: LamazonTheme.strong,
                           ),
                         ),
                       ),
@@ -210,12 +207,14 @@ class _CartRow extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8D7DA),
-          borderRadius: BorderRadius.circular(20),
+          // Derived from the token, so the swipe-to-delete tint cannot drift
+          // away from the colour of the icon sitting on it.
+          color: LamazonTheme.danger.withValues(alpha: .14),
+          borderRadius: BorderRadius.circular(LamazonTheme.featuredRadius),
         ),
         child: const Icon(
           LucideIcons.trash2,
-          color: Color(0xFFD32F2F),
+          color: LamazonTheme.danger,
           size: 22,
         ),
       ),
@@ -385,7 +384,10 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
   /// actually stocks.
   Future<void> _placeOrder() async {
     if (!Session.instance.loggedIn) {
-      _say('Sign in first — an order has to belong to someone.');
+      // The button already says "Sign in to place order", so this is the
+      // step the shopper asked for, not a refusal. Named, not constructed:
+      // importing LoginScreen here would close a cycle back through home.
+      await Navigator.pushNamed(context, AppRoutes.login);
       return;
     }
     // Whatever they picked, or the default — the server lists that one first.
@@ -482,7 +484,11 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(LucideIcons.badgePercent, size: 14, color: _green),
+                const Icon(
+                  LucideIcons.badgePercent,
+                  size: 14,
+                  color: LamazonTheme.strong,
+                ),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
@@ -490,7 +496,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: _green,
+                      color: LamazonTheme.strong,
                     ),
                   ),
                 ),
@@ -498,14 +504,23 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
             ),
           ],
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ActionButton(
-              onPressed: _placing ? null : _placeOrder,
-              expand: true,
-              label: _placing
-                  ? 'Placing your order…'
-                  : 'Place order  ·  ₹${cart.total.moneyText}',
+          // A guest reaches this button with a full cart and an address
+          // filled in, and it used to promise an order it could not place —
+          // one tap, one disappearing toast, no way forward. It names the
+          // step that is actually next instead.
+          ListenableBuilder(
+            listenable: Session.instance,
+            builder: (context, _) => SizedBox(
+              width: double.infinity,
+              child: ActionButton(
+                onPressed: _placing ? null : _placeOrder,
+                expand: true,
+                label: _placing
+                    ? 'Placing your order…'
+                    : Session.instance.loggedIn
+                    ? 'Place order  ·  ₹${cart.total.moneyText}'
+                    : 'Sign in to place order',
+              ),
             ),
           ),
         ],
@@ -517,7 +532,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
     final style = TextStyle(
       fontSize: bold ? 15 : 13,
       fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-      color: bold ? _ink : const Color(0xFF6B6B6B),
+      color: bold ? LamazonTheme.text : LamazonTheme.muted,
     );
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

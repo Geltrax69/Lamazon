@@ -309,7 +309,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
     const SizedBox(height: 2),
     Text(
       'Compared with ₹${p.price.moneyText} at ${p.store}',
-      style: const TextStyle(fontSize: 12, color: Color(0xFF62645E)),
+      style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
     ),
     const SizedBox(height: 10),
     for (final o in p.offers)
@@ -324,7 +324,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
                 width: 40,
                 height: 40,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF1F1EF),
+                  color: LamazonTheme.track,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -347,7 +347,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
                     ),
                     const Text(
                       'Same product',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF62645E)),
+                      style: TextStyle(fontSize: 11, color: LamazonTheme.muted),
                     ),
                   ],
                 ),
@@ -378,13 +378,13 @@ Widget _diffBadge(double diff) {
   final Color color;
   if (diff > 0) {
     label = '₹${diff.moneyText} more';
-    color = const Color(0xFFD32F2F);
+    color = LamazonTheme.danger;
   } else if (diff < 0) {
     label = '₹${(-diff).moneyText} less';
-    color = const Color(0xFF2E7D32);
+    color = LamazonTheme.strong;
   } else {
     label = 'Same price';
-    color = const Color(0xFF62645E);
+    color = LamazonTheme.muted;
   }
   return Text(
     label,
@@ -620,7 +620,7 @@ class _OptionPicker extends StatelessWidget {
                   option.isColour ? '' : selected!,
                   style: const TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF6B6B6B),
+                    color: LamazonTheme.muted,
                   ),
                 ),
               ],
