@@ -711,3 +711,66 @@ photograph, because there the atlas cell is genuinely about that department.
 - [x] Visual — Beauty section at 375×812
 - [x] Accessibility — keeps `Semantics(image: true, label: '$name category')`
 - [x] Functional — 77 tests pass
+
+### A shelf with no artwork borrows a real product photo, then a designed plate
+
+**Area:** `CategoryVisual`
+
+**Decision:** IMPROVE
+
+**Problem**
+The previous change replaced six repeated department photographs with a flat
+`#EDEFE7` plate and a faded icon. Honest, but the user's verdict was fair: it
+looked empty. Six departments — Beauty, Gifts, Grocery, Household, Snacks,
+Stationery — have no per-category artwork uploaded, so entire sections were
+grey.
+
+**Why it mattered**
+A page that looks unfinished reads as a shop that is unfinished. The honest
+state still has to look deliberate.
+
+**Decision**
+Two fallbacks in order: a real product photograph from that shelf, then a
+plate designed to match the artwork family.
+
+**Reasoning**
+No image generation is available in this session — the design tooling here
+produces layouts and code, not photographs — so inventing artwork was not an
+option, and the atlas holds one cell per department and cannot be extended
+without one.
+
+What *is* available is the shop's own inventory. A shelf that stocks something
+in stock, with a photo, now shows it. That is truer than any stand-in, it
+looks like the reference (whose category tiles are product photographs), and
+those tiles fill themselves in as stock arrives rather than waiting on an
+upload. Today that only reaches one shelf, because the catalogue is 42
+products and all but one are Food — but it costs nothing and pays off as the
+shop grows.
+
+Where there is neither, the plate became forest-to-strong with the department
+icon in lime, matching the still-life artwork beside it, which also sits on
+forest. Repetition is acceptable here in a way it was not for the photographs:
+a texture depicts nothing, so it claims nothing. Six identical *photos* of a
+shelf are a lie; six identical *plates* are a pattern.
+
+**Change**
+`CategoryVisual` looks up `shownCatalog` for an in-stock product on that shelf
+before falling back; `_Plate` restyled onto forest/lime.
+
+**Files**
+- `frontend/lib/widgets/category_visual.dart`
+
+**Verification**
+- [x] Visual — Beauty and Household Essentials sections at 375×812
+- [x] Functional — 77 tests pass
+- [x] Regression — analyze clean
+
+**Result**
+No section is grey. Beauty and Household read as designed tiles in the app's
+own colours rather than as missing images.
+
+**Remaining**
+This is a content gap wearing a good coat. The real fix is artwork per
+category, which the admin already supports (Admin → Categories, uploading to
+Cloudinary) and which Electronics and Food already use — those two sections
+are the ones that look like the reference. Six departments still need it.

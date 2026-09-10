@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'design_system.dart';
 import 'product_card.dart';
+import '../data/catalog.dart';
 import '../data/categories.dart';
+import '../models/product.dart';
 
 /// Bundled category artwork fills missing navigation images, never merchandise.
 class CategoryVisual extends StatelessWidget {
@@ -40,6 +42,26 @@ class CategoryVisual extends StatelessWidget {
     // the admin exactly which shelves still need one.
     final parent = departmentOf(name);
     if (parent.isNotEmpty && parent != name) {
+      // Before falling back, look for something the shop actually sells on
+      // this shelf. A real product photograph is both truer and better looking
+      // than any stand-in, and these fill themselves in as stock arrives.
+      final stocked = shownCatalog.firstWhere(
+        (p) =>
+            p.category == name &&
+            p.imageUrl.trim().isNotEmpty &&
+            p.availableStock != 0,
+        orElse: () => const Product(
+          id: '',
+          name: '',
+          category: '',
+          price: 0,
+          imageUrl: '',
+          description: '',
+        ),
+      );
+      if (stocked.imageUrl.trim().isNotEmpty) {
+        return NetImage(url: stocked.imageUrl, semanticLabel: name);
+      }
       return _Plate(name: name, parent: parent);
     }
     final i = indexFor(name);
@@ -83,13 +105,23 @@ class _Plate extends StatelessWidget {
     return Semantics(
       image: true,
       label: '$name category',
+      // Forest and lime, like the still-life artwork it sits beside, so a
+      // shelf without a photograph reads as part of the set rather than as a
+      // hole in it. A repeated texture is fine where a repeated photograph is
+      // not: it depicts nothing, so it claims nothing.
       child: DecoratedBox(
-        decoration: const BoxDecoration(color: Color(0xFFEDEFE7)),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [LamazonTheme.forest, LamazonTheme.strong],
+          ),
+        ),
         child: Center(
           child: Icon(
             department.icon,
-            size: 26,
-            color: LamazonTheme.strong.withValues(alpha: .55),
+            size: 28,
+            color: LamazonTheme.lime.withValues(alpha: .82),
           ),
         ),
       ),
