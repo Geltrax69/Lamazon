@@ -449,6 +449,15 @@ class TactileIconButton extends StatelessWidget {
   final Color? foreground;
   final Color? background;
   final double size;
+
+  /// Shrinks the drawn disc inside an unchanged tap target. A control can be
+  /// quieter without becoming harder to hit, and across a grid of nine cards
+  /// that difference is the difference between a shop and a control panel.
+  final double inset;
+
+  /// Drops the layered shadow. Elevation is for a control floating above the
+  /// page; one sitting on a photograph inside a card is already there.
+  final bool flat;
   const TactileIconButton({
     super.key,
     required this.icon,
@@ -458,6 +467,8 @@ class TactileIconButton extends StatelessWidget {
     this.foreground,
     this.background,
     this.size = LamazonTheme.touch,
+    this.inset = 0,
+    this.flat = false,
   });
 
   @override
@@ -485,39 +496,48 @@ class TactileIconButton extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: FocusRing(
-          shape: BoxShape.circle,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.alphaBlend(Colors.white.withValues(alpha: .52), base),
-                  base,
-                ],
+        child: Padding(
+          padding: EdgeInsets.all(inset),
+          child: FocusRing(
+            shape: BoxShape.circle,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.alphaBlend(Colors.white.withValues(alpha: .52), base),
+                    base,
+                  ],
+                ),
+                // Nothing raised about a control that cannot be pressed.
+                boxShadow: enabled && !flat
+                    ? LamazonTheme.tactileShadows
+                    : const <BoxShadow>[],
               ),
-              // Nothing raised about a control that cannot be pressed.
-              boxShadow: enabled
-                  ? LamazonTheme.tactileShadows
-                  : const <BoxShadow>[],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              shape: const CircleBorder(),
-              clipBehavior: Clip.antiAlias,
-              // excludeFromSemantics because the Semantics above already
-              // names this control. Without it every icon button announced
-              // its label twice — "Back Back", "Open account Open account".
-              child: Tooltip(
-                message: label,
-                excludeFromSemantics: true,
-                child: InkWell(
-                  onTap: onPressed,
-                  customBorder: const CircleBorder(),
-                  focusColor: LamazonTheme.lime.withValues(alpha: .42),
-                  child: Center(child: Icon(icon, size: 20, color: color)),
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                // excludeFromSemantics because the Semantics above already
+                // names this control. Without it every icon button announced
+                // its label twice — "Back Back", "Open account Open account".
+                child: Tooltip(
+                  message: label,
+                  excludeFromSemantics: true,
+                  child: InkWell(
+                    onTap: onPressed,
+                    customBorder: const CircleBorder(),
+                    focusColor: LamazonTheme.lime.withValues(alpha: .42),
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        size: inset > 0 ? 17 : 20,
+                        color: color,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

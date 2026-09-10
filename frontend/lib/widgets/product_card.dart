@@ -306,6 +306,15 @@ class PriceLine extends StatelessWidget {
 }
 
 /// Tappable heart that toggles the product in the global wishlist.
+/// Save for later, said quietly.
+///
+/// This was a 40px filled white circle with a drop shadow, sitting on every
+/// card opposite an equally heavy add button — eighteen weighted circles on a
+/// nine-card screen, all of them louder than the food they were sitting on.
+/// Saving is a secondary action and now looks like one: no disc, a thin
+/// outline, and a soft scrim only so the stroke survives a pale photograph.
+///
+/// The tap target stays at [LamazonTheme.touch]; only the drawing shrank.
 class WishlistHeart extends StatelessWidget {
   final String productId;
   const WishlistHeart({super.key, required this.productId});
@@ -316,16 +325,43 @@ class WishlistHeart extends StatelessWidget {
       listenable: Wishlist.instance,
       builder: (context, _) {
         final liked = Wishlist.instance.contains(productId);
-        return TactileIconButton(
-          icon: liked ? Icons.favorite : LucideIcons.heart,
-          label: liked ? 'Remove from saved' : 'Save product',
-          onPressed: () => Wishlist.instance.toggle(productId),
+        return Semantics(
+          button: true,
           selected: liked,
-          size: 40,
-          background: liked
-              ? const Color(0xFFFCE3E5)
-              : Colors.white.withValues(alpha: .96),
-          foreground: liked ? LamazonTheme.danger : LamazonTheme.strong,
+          label: liked ? 'Remove from saved' : 'Save product',
+          excludeSemantics: true,
+          child: Tooltip(
+            message: liked ? 'Remove from saved' : 'Save product',
+            excludeFromSemantics: true,
+            child: InkResponse(
+              onTap: () => Wishlist.instance.toggle(productId),
+              radius: 22,
+              child: SizedBox(
+                width: LamazonTheme.touch,
+                height: LamazonTheme.touch,
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      // Just enough ground for the stroke to read on a white
+                      // packshot and on a dark one, without becoming a button.
+                      color: LamazonTheme.surface.withValues(alpha: .78),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Icon(
+                        liked ? Icons.favorite : LucideIcons.heart,
+                        size: 17,
+                        color: liked
+                            ? LamazonTheme.danger
+                            : LamazonTheme.strong,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
@@ -377,6 +413,12 @@ class _CartButtonState extends State<CartButton> {
         milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 180,
       ),
       scale: _added ? 1.06 : 1,
+      // A 44px lime disc with a layered drop shadow, nine of them on a
+      // screen, was the loudest thing in the grid — louder than the
+      // photography it sat on and louder than the price it was meant to
+      // support. The tap target is unchanged; the disc inside it is smaller
+      // and flatter, and the lime now reads as an accent rather than as
+      // nine competing traffic lights.
       child: TactileIconButton(
         icon: _added ? LucideIcons.check : LucideIcons.plus,
         label: disabled
@@ -390,6 +432,8 @@ class _CartButtonState extends State<CartButton> {
         background: disabled ? LamazonTheme.track : LamazonTheme.lime,
         foreground: disabled ? LamazonTheme.muted : LamazonTheme.strong,
         size: LamazonTheme.touch,
+        inset: 5,
+        flat: true,
       ),
     );
   }

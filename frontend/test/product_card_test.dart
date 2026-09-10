@@ -217,4 +217,47 @@ void main() {
       expect(node.label, contains('Only 2 left'));
     });
   });
+
+  testWidgets('the controls stay hittable while looking secondary', (
+    tester,
+  ) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: LamazonTheme.data,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: productTileMax,
+                height: productTileMax / productTileAspect,
+                child: ProductCard(
+                  product: _p(),
+                  showAddToCart: true,
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Nine cards means eighteen of these on one screen. They were 40 and
+      // 44px filled discs with layered shadows, louder than the photography
+      // they sat on. They are quieter now — but WCAG 2.5.8 does not care how
+      // a control looks, so the target itself may not shrink with it.
+      for (final control in [
+        find.byType(WishlistHeart),
+        find.byType(CartButton),
+      ]) {
+        expect(control, findsOneWidget);
+        final size = tester.getSize(control);
+        expect(
+          size.shortestSide,
+          greaterThanOrEqualTo(LamazonTheme.touch - 0.5),
+          reason: 'the drawing shrank, the tap target must not have',
+        );
+      }
+    });
+  });
 }

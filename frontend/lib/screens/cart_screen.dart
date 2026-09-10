@@ -420,18 +420,11 @@ class _QtyControls extends StatelessWidget {
 void _removeWithUndo(BuildContext context, String id) {
   final gone = Cart.instance.remove(id);
   if (gone == null) return;
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('Removed ${gone.product.name}'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => Cart.instance.putBack(gone),
-        ),
-      ),
-    );
+  showAppSnack(
+    context,
+    'Removed ${gone.product.name}',
+    onUndo: () => Cart.instance.putBack(gone),
+  );
 }
 
 class _CheckoutPanel extends StatefulWidget {

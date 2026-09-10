@@ -31,6 +31,53 @@ abstract final class AppRoutes {
 double bottomNavInset(BuildContext context) =>
     72 + 12 + MediaQuery.viewPaddingOf(context).bottom;
 
+/// One shape for every transient message in the shop.
+///
+/// Two things were wrong with calling showSnackBar directly. A floating
+/// snackbar lands at the bottom of the screen, which is exactly where the
+/// app's navigation bar floats — so every "Removed X" sat on top of Home,
+/// Cart, Saved and Account and covered the way out. And because
+/// ScaffoldMessenger lives above the Navigator, the message then followed the
+/// shopper onto every screen they opened next.
+///
+/// [bottomNavInset] lifts it clear of the bar, and the message is dismissed
+/// when it has been read rather than left to trail through the app.
+void showAppSnack(
+  BuildContext context,
+  String message, {
+  String? undoLabel,
+  VoidCallback? onUndo,
+  bool overNav = true,
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          overNav ? bottomNavInset(context) + 8 : 16,
+        ),
+        // Long enough to read a product name and reach for Undo, short
+        // enough that it is gone before the next screen.
+        duration: Duration(seconds: onUndo == null ? 3 : 5),
+        content: Text(message),
+        action: onUndo == null
+            ? null
+            : SnackBarAction(
+                label: undoLabel ?? 'Undo',
+                onPressed: () {
+                  messenger.hideCurrentSnackBar();
+                  onUndo();
+                },
+              ),
+      ),
+    );
+}
+
 class AppBottomNav extends StatelessWidget {
   final Color? theme;
   final AppTab current;
