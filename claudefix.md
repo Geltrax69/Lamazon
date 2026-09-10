@@ -195,6 +195,27 @@ Being explicit so this file is not read as a clean sweep.
 
 ---
 
+## 7c. Third pass — hierarchy, density, and the last of the button system
+
+Driven by looking at the running app at 1280×800 and 375×812 rather than by the register alone.
+
+| Area | Fix |
+|---|---|
+| **Search landing** (§4.2) | The department tiles were `crossAxisCount: 2` at `childAspectRatio: 2.6` — 613×236 px each to carry one 24 px icon and one word, so two fit per viewport and reaching the ninth took four screens. Now `GridView.extent` at 240 px max, aspect 3.6: **all eight departments fit in one band**, five across on desktop and two on a phone. Departments, categories and real products now sit above the fold together. Verified in the browser before and after. |
+| C2-044 | Two primary buttons remained — `ActionButton` at a hardcoded 23 px radius (26 uses) and Material's `FilledButton` at `featuredRadius` 18 (24 uses), so the same action looked like a pill on one screen and a rounded rectangle on the next. Rather than convert 50 call sites, `LamazonTheme.pill` (a `StadiumBorder`) now shapes the filled, outlined and text button themes, and `ActionButton` drops its magic number. Cards keep the rounded rectangle. |
+| C2-047 | Product images letterboxed with grey bands. Two causes compounding: Cloudinary padded the source into a square (`c_pad`, `b_auto`), then `BoxFit.contain` letterboxed that square into a taller box against a `#F2F2EC` ground — two band colours per card. Now no square pad, contained once, on the card's own surface. Also: home was the one grid using its own `maxCrossAxisExtent: 240` instead of `productTileMax`, which is why the same card measured 232 px on home and 193 px in search. |
+| PAT-008 follow-up | "Batteries" and "Chargers & Cables" shared a glyph. Batteries got its own; verified visually that all six Electronics shelves now show six different icons. |
+| C2-036 | The remaining stacked empty states. `_Empty` is now a proper empty state (icon on a surface) rather than a bare grey sentence, and the search box, status dropdown and date range are hidden when the underlying list has no rows at all — three controls that could not do anything. |
+| §4.2 admin | Six KPI tiles in two rows took ~150 px of an 800 px viewport **on every section**, not just an overview. One row of six on desktop halves it; the phone keeps the 3-up reflow the report praised. |
+| §4.3 admin | Department cards were a `Wrap`, which sizes each child to its own content — "Gifts" stood 64 px tall beside "Beauty" at 96 px in the same row. Rows of two with `CrossAxisAlignment.stretch` make each pair agree on the taller. |
+| Duplicate constant | I introduced a second `deliveryEta` in `addresses.dart` when one already existed in `catalog.dart`. Removed; the three screens now import the original. |
+
+**Not done in this pass:** the admin panel itself was verified by analyzer and tests, not in the
+browser — reaching it means typing a password into a login form, which I don't do.
+
+
+---
+
 ## 8. Files changed
 
 **Backend (Go/SQL):** `schema.sql`, `seller.go`, `db.go`, `types.go`, `main.go`, `policies.go`,

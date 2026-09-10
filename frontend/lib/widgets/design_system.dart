@@ -27,6 +27,13 @@ abstract final class LamazonTheme {
   static const featuredRadius = 18.0;
   static const touch = 44.0;
 
+  /// Buttons are pills. ActionButton hardcoded a 23px radius — half of its
+  /// 46px height, so a pill by arithmetic — while the Material button themes
+  /// used featuredRadius and came out as rounded rectangles. Two primary
+  /// buttons, two shapes, 50 call sites between them. StadiumBorder says
+  /// "pill" at any height, so both now agree without a magic number.
+  static const pill = StadiumBorder();
+
   /// Focus is an outline, not only a wash. The lime background alone measured
   /// 1.10:1 against the surface behind it, where WCAG 1.4.11 asks for 3:1 —
   /// and controls outside the handful that set focusColor painted nothing at
@@ -236,7 +243,7 @@ abstract final class LamazonTheme {
             fontWeight: FontWeight.w600,
             letterSpacing: .15,
           ),
-          shape: rounded,
+          shape: pill,
         ).copyWith(side: focusSide(null)),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -248,7 +255,7 @@ abstract final class LamazonTheme {
             fontFamily: 'InterTight',
             fontWeight: FontWeight.w600,
           ),
-          shape: rounded,
+          shape: pill,
         ).copyWith(side: focusSide(BorderSide.none)),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -259,6 +266,7 @@ abstract final class LamazonTheme {
             fontFamily: 'InterTight',
             fontWeight: FontWeight.w600,
           ),
+          shape: pill,
         ).copyWith(side: focusSide(null)),
       ),
       iconButtonTheme: IconButtonThemeData(
@@ -631,7 +639,7 @@ class ActionButton extends StatelessWidget {
       child: Opacity(
         opacity: onPressed == null ? .5 : 1,
         child: FocusRing(
-          borderRadius: BorderRadius.circular(23),
+          borderRadius: BorderRadius.circular(999),
           child: _material(body, base),
         ),
       ),
@@ -641,7 +649,7 @@ class ActionButton extends StatelessWidget {
   Widget _material(Widget body, Color base) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -657,7 +665,7 @@ class ActionButton extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(999),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onPressed,

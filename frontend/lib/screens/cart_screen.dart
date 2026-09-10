@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
+import '../data/catalog.dart';
 import '../data/cart.dart';
 import '../data/orders.dart';
 import '../data/session.dart';

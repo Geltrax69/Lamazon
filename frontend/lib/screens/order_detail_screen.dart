@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../data/addresses.dart';
+import '../data/catalog.dart';
 import '../data/api.dart';
 import '../data/money.dart';
 import '../data/orders.dart';

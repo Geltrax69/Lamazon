@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../data/addresses.dart';
+import '../data/catalog.dart';
 import '../data/orders.dart';
 import '../data/money.dart';
 import '../widgets/design_system.dart';

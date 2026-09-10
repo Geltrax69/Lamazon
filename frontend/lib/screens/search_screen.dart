@@ -373,13 +373,19 @@ class _SearchHint extends StatelessWidget {
       children: [
         if (!scoped) ...[
           const _HintHeading('Shop by department'),
-          GridView.count(
+          // A tile sized to what it holds. crossAxisCount: 2 with an aspect
+          // ratio of 2.6 gave each department 613x236px to carry one 24px
+          // icon and one word, so two fit per viewport and reaching the ninth
+          // took four screens of scrolling. maxCrossAxisExtent lets the row
+          // fill the width it has — five across on a desktop, two on a phone
+          // — and mainAxisExtent fixes the height at what the content needs.
+          GridView.extent(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
+            maxCrossAxisExtent: 240,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 2.6,
+            childAspectRatio: 3.6,
             children: [
               for (final d in departments)
                 if (d.name != 'All')

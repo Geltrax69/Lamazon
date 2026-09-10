@@ -38,9 +38,21 @@ class ProductCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: ColoredBox(
-                      color: const Color(0xFFF2F2EC),
+                      // The card's own surface. The picture is contained
+                      // rather than cropped, so there is always some ground
+                      // showing on one axis; when that ground was a different
+                      // colour from the card it read as grey letterbox bands
+                      // around every product.
+                      color: LamazonTheme.surface,
+                      // padTo: null — no square pad at Cloudinary. Padding to
+                      // a square and then containing that square into a
+                      // taller box banded the image twice, in two different
+                      // colours. One shape, one ground.
                       child: NetImage(
                         url: product.imageUrl,
+                        padTo: null,
+                        fit: BoxFit.contain,
+                        sourceWidth: 512,
                         semanticLabel: product.name,
                       ),
                     ),

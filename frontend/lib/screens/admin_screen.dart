@@ -1129,54 +1129,7 @@ class _AdminHomeState extends State<_AdminHome> {
                     padding: EdgeInsets.symmetric(vertical: 40),
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                if (o != null) ...[
-                  // The numbers are also the way in: tapping one opens the
-                  // list behind it, so a count is never a dead end.
-                  Row(
-                    children: [
-                      _Tile(
-                        label: 'People',
-                        value: '${o['users']}',
-                        onTap: () => _show(_Tab.people),
-                      ),
-                      const SizedBox(width: 10),
-                      _Tile(
-                        label: 'Sellers',
-                        value: '${o['sellers']}',
-                        onTap: () => _show(_Tab.approved),
-                      ),
-                      const SizedBox(width: 10),
-                      _Tile(
-                        label: 'To review',
-                        value: '${counts[_Tab.review]}',
-                        color: counts[_Tab.review]! > 0 ? _amber : null,
-                        onTap: () => _show(_Tab.review),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _Tile(
-                        label: 'Riders',
-                        value: '${o['riders']}',
-                        onTap: () => _show(_Tab.delivery),
-                      ),
-                      const SizedBox(width: 10),
-                      _Tile(
-                        label: 'Orders',
-                        value: '${o['orders']}',
-                        onTap: () => _show(_Tab.orders),
-                      ),
-                      const SizedBox(width: 10),
-                      _Tile(
-                        label: 'Rejected',
-                        value: '${counts[_Tab.rejected]}',
-                        onTap: () => _show(_Tab.rejected),
-                      ),
-                    ],
-                  ),
-                ],
+                if (o != null) _kpis(o, counts),
                 const SizedBox(height: 22),
                 // One list at a time. Six sections stacked down one page meant
                 // scrolling past everything to reach anything.
@@ -1241,7 +1194,10 @@ class _AdminHomeState extends State<_AdminHome> {
                     ),
                   ),
                 const SizedBox(height: 20),
-                if (_hasTable) ..._tableControls(),
+                // Only when there is something to search or filter. A search
+                // box, a status dropdown and a date range above an empty list
+                // are three controls that cannot do anything.
+                if (_hasTable && _activeRows.isNotEmpty) ..._tableControls(),
                 ..._section(),
                 if (_hasTable) _pagination(),
               ],
@@ -1427,6 +1383,77 @@ class _AdminHomeState extends State<_AdminHome> {
         child: Text('No matching records. Try another search or filter.'),
       ),
   ];
+  /// The six counts, as one band rather than two.
+  ///
+  /// These sit above every section, not just an overview, so their height is
+  /// paid on each one — two rows of three took about 150px of a 800px
+  /// viewport before the admin could see any actual work. Six across on a
+  /// desktop halves that; a phone keeps the three-up reflow, which was
+  /// already the best responsive behaviour in the app.
+  ///
+  /// The numbers are also the way in: tapping one opens the list behind it,
+  /// so a count is never a dead end.
+  Widget _kpis(Map<String, dynamic> o, Map<_Tab, int> counts) {
+    final tiles = <Widget>[
+      _Tile(
+        label: 'People',
+        value: '${o['users']}',
+        onTap: () => _show(_Tab.people),
+      ),
+      _Tile(
+        label: 'Sellers',
+        value: '${o['sellers']}',
+        onTap: () => _show(_Tab.approved),
+      ),
+      _Tile(
+        label: 'To review',
+        value: '${counts[_Tab.review]}',
+        color: counts[_Tab.review]! > 0 ? _amber : null,
+        onTap: () => _show(_Tab.review),
+      ),
+      _Tile(
+        label: 'Riders',
+        value: '${o['riders']}',
+        onTap: () => _show(_Tab.delivery),
+      ),
+      _Tile(
+        label: 'Orders',
+        value: '${o['orders']}',
+        onTap: () => _show(_Tab.orders),
+      ),
+      _Tile(
+        label: 'Rejected',
+        value: '${counts[_Tab.rejected]}',
+        onTap: () => _show(_Tab.rejected),
+      ),
+    ];
+    if (isWide(context)) {
+      return Row(
+        children: [
+          for (var i = 0; i < tiles.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            tiles[i],
+          ],
+        ],
+      );
+    }
+    return Column(
+      children: [
+        for (var start = 0; start < tiles.length; start += 3) ...[
+          if (start > 0) const SizedBox(height: 10),
+          Row(
+            children: [
+              for (var i = start; i < start + 3 && i < tiles.length; i++) ...[
+                if (i > start) const SizedBox(width: 10),
+                tiles[i],
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _pagination() {
     final total = _filtered(_activeRows).length;
     // Nothing at all: the empty state above has already said so, and
@@ -1695,26 +1722,57 @@ class _AdminHomeState extends State<_AdminHome> {
               'you add one.',
             )
           else
+            // Rows of two, not a Wrap. A Wrap sizes every child to its own
+            // content, so a department that lists three categories stood 96px
+            // tall beside one that lists none at 64px — the same row, two
+            // heights, on every screen. A Row with stretch makes the pair
+            // agree on the taller of the two.
             LayoutBuilder(
-              builder: (context, box) => Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final d in real)
-                    SizedBox(
-                      // Two across when there is room, one when there is not.
-                      width: box.maxWidth > 560
-                          ? (box.maxWidth - 10) / 2
-                          : box.maxWidth,
-                      child: _DepartmentTile(
-                        department: d,
-                        onOpen: () => setState(() => _openDept = d.name),
-                        onDelete: () => _deleteCategory(d.name),
-                        onPhoto: () => _setCategoryPhoto(d.name),
+              builder: (context, box) {
+                final perRow = box.maxWidth > 560 ? 2 : 1;
+                Widget tile(Department d) => _DepartmentTile(
+                  department: d,
+                  onOpen: () => setState(() => _openDept = d.name),
+                  onDelete: () => _deleteCategory(d.name),
+                  onPhoto: () => _setCategoryPhoto(d.name),
+                );
+                return Column(
+                  children: [
+                    for (var start = 0; start < real.length; start += perRow)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: start + perRow < real.length ? 10 : 0,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (
+                                var i = start;
+                                i < start + perRow && i < real.length;
+                                i++
+                              ) ...[
+                                if (i > start) const SizedBox(width: 10),
+                                Expanded(child: tile(real[i])),
+                              ],
+                              // Keeps a lone tile on the last row half-width
+                              // rather than letting it stretch across.
+                              if (real.length - start < perRow)
+                                for (
+                                  var pad = real.length - start;
+                                  pad < perRow;
+                                  pad++
+                                ) ...[
+                                  const SizedBox(width: 10),
+                                  const Expanded(child: SizedBox.shrink()),
+                                ],
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                );
+              },
             ),
         ];
 
@@ -2921,6 +2979,15 @@ class _Note extends StatelessWidget {
   );
 }
 
+/// Nothing here, said once and properly.
+///
+/// This was a bare grey sentence sitting under an explanatory note and above
+/// a "0 records" pagination row — three stacked messages for one empty list,
+/// two of them contradicting each other in tone. The note above still
+/// explains what the section is for; this says the list is empty and stops.
+///
+/// No call to action: most of these have no next step the admin could take
+/// from here, and inventing one would be worse than the silence.
 class _Empty extends StatelessWidget {
   final String text;
   const _Empty(this.text);
@@ -2928,7 +2995,35 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: Text(text, style: const TextStyle(fontSize: 13, color: _muted)),
+    child: ElevatedSurface(
+      radius: LamazonTheme.featuredRadius,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: LamazonTheme.track,
+              borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
+            ),
+            child: const Icon(
+              LucideIcons.inbox,
+              size: 17,
+              color: LamazonTheme.muted,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13.5, color: _muted),
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 
