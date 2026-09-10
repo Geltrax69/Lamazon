@@ -421,7 +421,9 @@ class _SearchHint extends StatelessWidget {
                           ),
                           child: ClipOval(
                             child: NetImage(
-                              url: thumb(entry.value.imageUrl, 160),
+                              url: catalogueImage(entry.value.imageUrl, 160),
+                              fit: BoxFit.cover,
+                              padTo: null,
                             ),
                           ),
                         ),

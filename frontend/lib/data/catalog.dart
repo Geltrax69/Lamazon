@@ -141,13 +141,34 @@ String catalogueImage(String url, [int width = 400]) {
   const marker = '/image/upload/';
   if (!url.contains(marker)) return url;
   // Already transformed: a second crop would crop the crop.
-  if (url.contains('c_fill') || url.contains('c_pad') || url.contains('c_limit')) {
+  if (url.contains('c_fill') ||
+      url.contains('c_pad') ||
+      url.contains('c_limit')) {
     return url;
   }
   return url.replaceFirst(
     marker,
-    '${marker}c_fill,ar_1:1,g_auto,e_improve:30,w_$width,f_auto,q_auto/',
+    '${marker}c_fill,ar_1:1,g_auto,e_improve:30,'
+        'w_${_bucket(width)},f_auto,q_auto/',
   );
+}
+
+/// Rounds a requested width up to the next size the CDN already holds.
+///
+/// Cloudinary bills and caches per *derived* image, and a derived image is
+/// keyed by its exact URL. Asking for w_161 on one phone and w_163 on the next
+/// is two transformations, two cache entries and two charges for a picture
+/// nobody can tell apart. Four buckets cover a phone tile, a tablet tile, a
+/// desktop tile and a cart thumbnail, so the whole catalogue settles into at
+/// most four derivatives per photograph and is served from cache thereafter.
+///
+/// Rounds up, never down: a bucket below the requested size would be visibly
+/// soft, which is the one thing this must not trade away.
+int _bucket(int width) {
+  for (final size in const [160, 300, 400, 800]) {
+    if (width <= size) return size;
+  }
+  return 1200;
 }
 
 String padded(String url, [double aspect = 1, int? sourceWidth]) {

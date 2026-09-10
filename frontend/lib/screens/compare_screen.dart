@@ -1,5 +1,7 @@
 import '../data/money.dart';
 import 'package:flutter/material.dart';
+
+import '../data/catalog.dart';
 import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
@@ -79,7 +81,11 @@ class CompareScreen extends StatelessWidget {
                     child: SizedBox(
                       width: 72,
                       height: 72,
-                      child: NetImage(url: product.imageUrl),
+                      child: NetImage(
+                        url: catalogueImage(product.imageUrl, 300),
+                        fit: BoxFit.cover,
+                        padTo: null,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

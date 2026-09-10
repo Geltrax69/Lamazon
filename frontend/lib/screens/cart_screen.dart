@@ -265,7 +265,12 @@ class _CartRow extends StatelessWidget {
                     child: SizedBox(
                       width: 88,
                       height: 88,
-                      child: NetImage(url: p.imageUrl, semanticLabel: p.name),
+                      child: NetImage(
+                        url: catalogueImage(p.imageUrl, 160),
+                        fit: BoxFit.cover,
+                        padTo: null,
+                        semanticLabel: p.name,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),

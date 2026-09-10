@@ -61,7 +61,12 @@ class CategoryVisual extends StatelessWidget {
         ),
       );
       if (stocked.imageUrl.trim().isNotEmpty) {
-        return NetImage(url: stocked.imageUrl, semanticLabel: name);
+        return NetImage(
+          url: catalogueImage(stocked.imageUrl, 300),
+          fit: BoxFit.cover,
+          padTo: null,
+          semanticLabel: name,
+        );
       }
       return _Plate(name: name, parent: parent);
     }
