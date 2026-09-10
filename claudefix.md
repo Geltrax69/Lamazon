@@ -435,6 +435,126 @@ URL to reach.
 
 ---
 
+## 7h. Paste a link, and eight themes instead of three
+
+Asked for: *"they can just paste the link of animation, videos and other file
+formats — it auto detects and previews them, and then they can add"*, *"add
+more colours in banner theme"*, and *"i cant add pinterest images or videos"*.
+
+### Why Pinterest did not work
+
+The links were `assets.pinterest.com/ext/embed.html?id=…` and
+`in.pinterest.com/pin/…/`. Neither is a picture. The embed URL returns **524
+bytes of HTML, byte-identical for every id** — an iframe shell that loads the
+pin with JavaScript. The pin URL returns about **1.2 MB of HTML**. Putting
+either in an image field stores a web page, which renders as nothing.
+
+So the fix is not to make the field accept them; it is to work out what the
+link is actually about. `POST /api/admin/campaign-media` takes a pasted link
+and:
+
+  1. fetches it and reads the content type;
+  2. an image or a video is used as it is;
+  3. HTML is read for `og:video`, then `og:image` — the tag a page publishes
+     so link previews know what it is showing;
+  4. Cloudinary is handed the resulting URL and **stores** it, so the banner
+     lives on our own CDN.
+
+Storing rather than hotlinking is deliberate. A banner pointed at somebody
+else's server breaks the day they tidy up, and it puts our shoppers' requests
+in their logs.
+
+**Two things this got wrong first, both found by running it against the real
+web rather than a fixture:**
+
+  * **512 KB was not enough.** Open Graph tags are supposed to sit near the top
+    of `<head>`. Pinterest puts a megabyte of inline script between
+    `og:site_name` and `og:image` — measured at **byte 1,133,825** on a real
+    pin. The first version read 512 KB, found nothing, and told the admin their
+    link was unusable. The cap is 2 MB now, and there is a regression test
+    built from a fixture over a megabyte long.
+  * **`auto/upload` stores a web page as `raw`.** Cloudinary does not refuse
+    HTML, it files it as a raw asset — verified, 1.1 MB of it. A source that
+    lies about its content type would sail past step 1, so the resource type
+    Cloudinary decided on is checked as well, and anything that is not `image`
+    or `video` is refused.
+
+**Verified against the real thing.** All five pins resolve to their
+`i.pinimg.com` picture and import; the embed URL is refused with the message
+that says what to do instead. The probe assets were deleted from Cloudinary
+afterwards and the folder confirmed empty.
+
+### Fetching a URL from our own server
+
+This endpoint makes our server request an address a stranger chose, so it is
+held to public addresses only. The check runs in the dialler's `Control` hook
+— on the address actually resolved, not on the text of the URL — which is what
+closes DNS rebinding: a hostname that resolves to `169.254.169.254` is refused
+at connect time. Loopback, RFC1918, link-local and carrier NAT (`100.64/10`,
+which `IsPrivate` does not cover) are all rejected, redirects are re-checked
+per hop and capped at five, and only `https` is accepted. Covered by tests.
+
+### Auto-detect and preview
+
+The editor already had a live preview; it did not react to the URL field, and
+the field had no idea what had been pasted into it. Now:
+
+  * The preview updates as you type, trailing the field by 350 ms. Without the
+    delay every keystroke in a URL is a different address, and each one starts
+    and abandons a video request.
+  * A line under the field says what the link is: *Clip — plays muted, loops,
+    no sound* / *Animation — delivered as a clip, not as a GIF* / *Photo* /
+    *Use a full https:// link*. The detection is `bannerKind()` from §7g, so
+    the label and the rendering can never disagree.
+  * A **Fetch** button next to it runs the import above, for a page — or for
+    any link worth moving onto our own CDN.
+  * Uploads use `pickMedia()`, so picking a GIF from disk still works.
+
+### Eight themes, and a bug the eighth found
+
+Five palettes added — Teal / Reef, Indigo / Iris, Berry / Blush, Marigold /
+Maroon, Saffron / Amber — alongside Forest, Ink and Cacao. Every one was
+measured before it was written: the headline clears 4.5:1 on its ground and
+the button label clears 4.5:1 on the button, worst case 6.06:1.
+
+Writing the test for those found a real defect in the **custom hex** path,
+which predates this work. It chose text by a luminance threshold
+(`luminance < .42` → white), and a threshold guesses wrong in the middle:
+`#7F7F7F` took white text at **4.00:1**, under the floor. Worse, no choice
+of white-or-ink saves every colour — `#A56F81` tops out at 4.05:1 either way.
+
+So light grounds now keep their colour and take ink, and everything else is
+deepened — hue intact — until white clears 4.5:1. It is a small move in
+practice: `#7F7F7F → #757575`, `#FF0000 → #EB0000`, and light grounds such as
+`#FDF6E3` are untouched at 15:1. A test sweeps **4,913 grounds across the whole
+colour cube** and asserts every one is legible, and that fewer than half are
+altered at all — so the guarantee is not bought by repainting everything.
+
+`CampaignPalette` moved to `lib/widgets/campaign_palette.dart`. It is a palette
+definition, and the colour ratchet exempts palette files rather than screens —
+which let the ratchet **tighten from 69 literals to 60** and from 41 distinct
+hex values to 35, instead of being raised to accommodate the new themes.
+
+**Covered by** `remote_media_test.go` (9 tests: the private-address guard, the
+https rule, direct media passthrough, og:image resolution, og:video preferred
+over og:image, the megabyte-deep tag, a page that names nothing giving an
+actionable message, a non-media type refused, and the `raw` guard),
+`test/banner_theme_test.dart` (6, including the cube sweep) and
+`test/campaign_editor_test.dart` (3: every theme offered, the detected line for
+each kind, and Fetch enabling only with a link).
+
+**Not done.** The admin panel itself was not driven in a browser — that needs a
+sign-in, and I do not type passwords. The editor is covered by widget tests
+instead, and the import path was proven end to end against the real Pinterest
+and the real Cloudinary.
+
+**Worth saying once:** most Pinterest images are somebody else's copyrighted
+work. Importing one puts a copy on our CDN and a real shop's banner in front of
+customers, which is a licensing question rather than a technical one. The
+importer does not judge that; you do.
+
+---
+
 ## 8. Files changed
 
 **Backend (Go/SQL):** `schema.sql`, `seller.go`, `db.go`, `types.go`, `main.go`, `policies.go`,
@@ -452,6 +572,15 @@ URL to reach.
 
 **Build/packaging:** `pubspec.yaml`, `tool/prune_fonts.py` (new), `web/index.html`,
 `web/manifest.json`, `web/icons/Icon-maskable-*.png`, `vercel.json`.
+
+**Paste-a-link and banner themes (§7h):** `backend/remote_media.go` (new),
+`backend/remote_media_test.go` (new), `backend/cloudinary.go`,
+`backend/campaigns.go`, `backend/main.go`,
+`lib/widgets/campaign_palette.dart` (new, moved out of `storefront.dart`),
+`test/banner_theme_test.dart` (new), `test/campaign_editor_test.dart` (new),
+`lib/screens/campaign_manager.dart`, `lib/data/api.dart`,
+`lib/data/campaigns.dart`, `lib/widgets/photo_picker.dart`,
+`test/palette_ratchet_test.dart`.
 
 **Banner media (§7g):** `lib/widgets/banner_media.dart` (new),
 `test/banner_media_test.dart` (new), `lib/data/catalog.dart`,

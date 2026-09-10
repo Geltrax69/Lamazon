@@ -122,6 +122,55 @@ func (a *API) handleDeleteCampaign(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Import by link. Staff find artwork on the web and paste its address; this
+// works out what that address actually holds, has Cloudinary store it, and
+// hands back a URL on our own CDN. Storing rather than hotlinking is the
+// point: a banner pointed at somebody else's server is a banner that breaks
+// the day they tidy up, and it puts our shoppers' traffic on their logs.
+func (a *API) handleCampaignMedia(w http.ResponseWriter, r *http.Request) {
+	if a.cloud == nil {
+		writeError(w, 503, "photo storage is not configured")
+		return
+	}
+	var body struct {
+		URL string `json:"url"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body) != nil {
+		writeError(w, 400, "send a link to fetch")
+		return
+	}
+	target, err := mediaBehind(r.Context(), body.URL)
+	if err != nil {
+		writeError(w, 400, upperFirst(err.Error())+".")
+		return
+	}
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		writeError(w, 500, "could not prepare upload")
+		return
+	}
+	stored, kind, err := a.cloud.uploadRemote(
+		r.Context(), "Lamazon/Campaigns", hex.EncodeToString(id[:]), target)
+	if err != nil {
+		writeError(w, 502, "that link could not be fetched")
+		return
+	}
+	// "auto" files anything it cannot recognise as raw, so a web page that
+	// slipped through above would arrive here as a 1 MB HTML banner.
+	if kind != "image" && kind != "video" {
+		writeError(w, 400, "That link is not a picture or a clip.")
+		return
+	}
+	writeJSON(w, 200, map[string]string{"imageUrl": stored})
+}
+
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 // Upload returns a URL without publishing it. The editor previews it, then
 // saves the complete campaign in a single request.
 func (a *API) handleCampaignPhoto(w http.ResponseWriter, r *http.Request) {

@@ -203,6 +203,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("PUT /api/admin/campaigns/{id}", s.handleSaveCampaign)
 	mux.HandleFunc("DELETE /api/admin/campaigns/{id}", s.handleDeleteCampaign)
 	mux.HandleFunc("POST /api/admin/campaign-photos", s.handleCampaignPhoto)
+	mux.HandleFunc("POST /api/admin/campaign-media", s.handleCampaignMedia)
 	mux.HandleFunc("GET /api/admin/insights", s.handleAdminInsights)
 	mux.HandleFunc("PUT /api/admin/policies/{slug}", s.handleSavePolicy)
 	mux.HandleFunc("GET /api/admin/policies", s.handlePolicies)

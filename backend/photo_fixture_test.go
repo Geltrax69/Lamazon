@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -23,10 +24,30 @@ func fixtureCloud(t *testing.T) *Cloudinary {
 			return
 		}
 		defer r.MultipartForm.RemoveAll()
+		// A remote import sends the link as a field rather than a file part.
+		// The stub reads the resource type off the link so a test can drive
+		// what Cloudinary decides it was handed.
+		if remote := r.FormValue("file"); remote != "" {
+			kind := "image"
+			switch {
+			case strings.HasSuffix(remote, ".mp4"):
+				kind = "video"
+			case strings.HasSuffix(remote, ".html"):
+				kind = "raw"
+			}
+			writeJSON(w, 200, map[string]string{
+				"secure_url":    "https://res.cloudinary.com/test/" + kind + "/upload/fetched",
+				"resource_type": kind,
+			})
+			return
+		}
 		if len(r.MultipartForm.File["file"]) != 1 {
 			t.Error("missing uploaded file")
 		}
-		writeJSON(w, 200, map[string]string{"secure_url": "https://res.cloudinary.com/test/image/upload/fixture.png"})
+		writeJSON(w, 200, map[string]string{
+			"secure_url":    "https://res.cloudinary.com/test/image/upload/fixture.png",
+			"resource_type": "image",
+		})
 	}))
 	t.Cleanup(srv.Close)
 	return &Cloudinary{cloud: "test", key: "test", secret: "test", http: srv.Client(), base: srv.URL}

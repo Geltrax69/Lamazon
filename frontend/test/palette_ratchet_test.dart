@@ -12,11 +12,15 @@ import 'package:flutter_test/flutter_test.dart';
 /// ponytail: a test rather than a custom analyzer plugin. Same effect at the
 /// same moment (CI), no plugin to build or keep working across SDK bumps.
 /// Lower these as screens are migrated; never raise them.
-const _maxLiterals = 69;
-const _maxDistinctHex = 41;
+const _maxLiterals = 60;
+const _maxDistinctHex = 35;
 
-/// Where the palette is defined. It is allowed to hold hex; that is the point.
-const _tokenFile = 'lib/widgets/design_system.dart';
+/// Where the palettes are defined. These are allowed to hold hex; that is the
+/// point of them. Everything else in lib/ has to go through a token.
+const _paletteFiles = {
+  'lib/widgets/design_system.dart',
+  'lib/widgets/campaign_palette.dart',
+};
 
 void main() {
   test('hardcoded colours do not grow back', () {
@@ -27,10 +31,7 @@ void main() {
 
     for (final entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      if (entity.path.endsWith(_tokenFile.split('/').last) &&
-          entity.path.contains('widgets')) {
-        continue;
-      }
+      if (_paletteFiles.any((p) => entity.path.endsWith(p))) continue;
       final found = literal.allMatches(entity.readAsStringSync());
       if (found.isEmpty) continue;
       offenders[entity.path] = found.length;

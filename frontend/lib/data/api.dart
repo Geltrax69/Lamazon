@@ -189,6 +189,22 @@ class Api {
     return (jsonDecode(res.body) as Map<String, dynamic>)['imageUrl'] as String;
   }
 
+  /// Hands a pasted link to the server, which works out what it actually
+  /// holds and stores it on our own Cloudinary. Returns the stored URL.
+  ///
+  /// A page — a Pinterest pin, an Instagram post, a blog — resolves to the
+  /// picture it is about. Anything that is not a picture or a clip comes back
+  /// as a 400 whose message says what to do instead, so it is shown as-is.
+  Future<String> importCampaignMedia(String url) async {
+    final body = await _staffCall(
+      StaffSession.admin,
+      'POST',
+      '/api/admin/campaign-media',
+      {'url': url},
+    );
+    return body['imageUrl'] as String;
+  }
+
   /// The shop's navigation: departments, each with its categories nested.
   Future<List<dynamic>> categories() => _getList('/api/categories');
 

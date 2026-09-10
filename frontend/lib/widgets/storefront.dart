@@ -8,80 +8,9 @@ import '../models/product.dart';
 import '../screens/details_screen.dart';
 import '../screens/search_screen.dart';
 import 'banner_media.dart';
+import 'campaign_palette.dart';
 import 'design_system.dart';
 import 'product_card.dart';
-
-/// Named campaign palettes keep admin-managed images in one visual world while
-/// preserving the existing hexadecimal field for API compatibility.
-class CampaignPalette {
-  final String name;
-  final String hex;
-  final Color background;
-  final Color foreground;
-  final Color action;
-  final Color actionForeground;
-  const CampaignPalette._(
-    this.name,
-    this.hex,
-    this.background,
-    this.foreground,
-    this.action,
-    this.actionForeground,
-  );
-
-  static const forest = CampaignPalette._(
-    'Forest / Lime',
-    '#143E32',
-    Color(0xFF143E32),
-    Colors.white,
-    LamazonTheme.lime,
-    LamazonTheme.forest,
-  );
-  static const cacao = CampaignPalette._(
-    'Cacao / Peach',
-    '#4A3029',
-    Color(0xFF4A3029),
-    Colors.white,
-    Color(0xFFF7A38E),
-    Color(0xFF4A3029),
-  );
-  static const ink = CampaignPalette._(
-    'Ink / Mist',
-    '#263244',
-    Color(0xFF263244),
-    Colors.white,
-    Color(0xFFC8DBEE),
-    Color(0xFF263244),
-  );
-  static const presets = <CampaignPalette>[forest, cacao, ink];
-
-  static CampaignPalette resolve(String hex) {
-    final normalized = hex.trim().toUpperCase();
-    for (final preset in presets) {
-      if (preset.hex == normalized) return preset;
-    }
-    // Existing pastel campaigns are translated into the new, tighter three
-    // theme family. Custom valid colours still work, but the template derives
-    // readable text and action contrast rather than relying on the editor.
-    if (const ['#F2E8CE', '#DCEACD', '#1D4A3C'].contains(normalized)) {
-      return forest;
-    }
-    if (const ['#F7DCCB', '#E7DFF3'].contains(normalized)) return cacao;
-    if (normalized == '#DCE9F5') return ink;
-    final value = int.tryParse(normalized.replaceFirst('#', ''), radix: 16);
-    if (value == null || normalized.length != 7) return forest;
-    final background = Color(0xFF000000 | value);
-    final dark = background.computeLuminance() < .42;
-    return CampaignPalette._(
-      'Custom',
-      normalized,
-      background,
-      dark ? Colors.white : LamazonTheme.text,
-      dark ? LamazonTheme.lime : LamazonTheme.forest,
-      dark ? LamazonTheme.strong : Colors.white,
-    );
-  }
-}
 
 /// The shopper banner and admin preview share one safe crop, one contrast
 /// treatment and one text layout, regardless of the uploaded image.

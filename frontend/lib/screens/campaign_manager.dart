@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../data/api.dart';
+import '../data/catalog.dart';
 import '../data/campaigns.dart';
 import '../data/categories.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/design_system.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/campaign_palette.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/storefront.dart';
 
@@ -191,8 +195,24 @@ class _CampaignEditorState extends State<CampaignEditor> {
       widget.campaign?.id ?? 'banner-${DateTime.now().microsecondsSinceEpoch}';
   bool _busy = false;
   String? _error;
+
+  /// What the preview is currently showing. It trails the field by a moment:
+  /// every keystroke in a URL is a different address, and handing each of them
+  /// to a video player in turn starts and abandons a request per character.
+  late String _preview = _image.text.trim();
+  Timer? _settle;
+
+  void _previewSoon() {
+    _settle?.cancel();
+    _settle = Timer(const Duration(milliseconds: 350), () {
+      final now = _image.text.trim();
+      if (mounted && now != _preview) setState(() => _preview = now);
+    });
+  }
+
   @override
   void dispose() {
+    _settle?.cancel();
     for (final c in [_title, _subtitle, _cta, _image, _colour, _position]) {
       c.dispose();
     }
@@ -211,6 +231,58 @@ class _CampaignEditorState extends State<CampaignEditor> {
     enabled: _enabled,
     position: int.tryParse(_position.text) ?? 0,
   );
+  /// Takes the pasted link, whatever it is, and comes back with something the
+  /// banner can actually show.
+  static String _reason(Object error) =>
+      error.toString().replaceFirst('ClientException: ', '');
+
+  Future<void> _fetchLink() async {
+    final link = _image.text.trim();
+    if (link.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final url = await Api.instance.importCampaignMedia(link);
+      if (mounted) {
+        setState(() {
+          _image.text = url;
+          _preview = url;
+        });
+      }
+    } catch (error) {
+      // The server's message is the useful one — it says which part of the
+      // link it could not make sense of, and what to paste instead.
+      if (mounted) setState(() => _error = _reason(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// What the link in the field appears to be, said plainly under it.
+  (String, bool) get _detected {
+    if (_preview.isEmpty) {
+      return (
+        'Paste a link to a photo, GIF or clip — or a Pinterest, Instagram or '
+            'blog page, then press Fetch and we will pull the picture out of it.',
+        false,
+      );
+    }
+    final uri = Uri.tryParse(_preview);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      return ('Use a full https:// link.', true);
+    }
+    return switch (bannerKind(_preview)) {
+      BannerKind.video => ('Clip — plays muted, loops, no sound.', false),
+      BannerKind.animation => ('Animation — delivered as a clip, not as a GIF.', false),
+      BannerKind.picture => (
+        'Photo. If this is a page rather than a file, press Fetch.',
+        false,
+      ),
+    };
+  }
+
   Future<void> _upload() async {
     try {
       final picked = await pickBannerMedia();
@@ -223,7 +295,12 @@ class _CampaignEditorState extends State<CampaignEditor> {
         picked.bytes,
         filename: picked.name,
       );
-      if (mounted) setState(() => _image.text = url);
+      if (mounted) {
+        setState(() {
+          _image.text = url;
+          _preview = url;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -263,6 +340,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
     int? max,
     int lines = 1,
     String? Function(String?)? validate,
+    VoidCallback? onChanged,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
@@ -274,7 +352,10 @@ class _CampaignEditorState extends State<CampaignEditor> {
       ),
       maxLength: max,
       maxLines: lines,
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) {
+        setState(() {});
+        onChanged?.call();
+      },
       validator: validate,
     ),
   );
@@ -308,7 +389,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
                   children: [
                     const SectionHeading(title: 'Live preview'),
                     const SizedBox(height: 12),
-                    CampaignBanner(campaign: _draft),
+                    CampaignBanner(campaign: _draft.withArtwork(_preview)),
                     const SizedBox(height: 24),
                     ElevatedSurface(
                       padding: const EdgeInsets.all(16),
@@ -393,13 +474,14 @@ class _CampaignEditorState extends State<CampaignEditor> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 10),
                               child: Text(
-                                'A 16:9 photo, GIF or short clip, with the subject on the right — the template keeps the headline and action legible on the left. Clips play muted and on a loop, so keep them under about ten seconds and let the picture carry the message.',
+                                'A 16:9 photo, GIF or short clip, with the subject on the right — the template keeps the headline and action legible on the left. Clips play muted and on a loop, so keep them under about ten seconds and let the picture carry the message. You can also paste a link below instead of uploading.',
                                 style: LamazonTheme.mutedBodyText,
                               ),
                             ),
                             _field(
                               'Artwork URL (optional)',
                               _image,
+                              onChanged: _previewSoon,
                               validate: (s) {
                                 final u = Uri.tryParse(s!.trim());
                                 return s.trim().isEmpty ||
@@ -411,6 +493,14 @@ class _CampaignEditorState extends State<CampaignEditor> {
                                     : 'Use a valid HTTPS URL';
                               },
                             ),
+                            _LinkStatus(
+                              message: _detected.$1,
+                              wrong: _detected.$2,
+                              onFetch: _busy || _image.text.trim().isEmpty
+                                  ? null
+                                  : _fetchLink,
+                            ),
+                            const SizedBox(height: 16),
                             const Text(
                               'Choose a banner theme',
                               style: LamazonTheme.bodyText,
@@ -507,4 +597,41 @@ class _CampaignEditorState extends State<CampaignEditor> {
       ),
     );
   }
+}
+
+/// What the pasted link appears to be, and the one button that fixes it when
+/// it is a page rather than a file.
+class _LinkStatus extends StatelessWidget {
+  final String message;
+  final bool wrong;
+  final VoidCallback? onFetch;
+  const _LinkStatus({
+    required this.message,
+    required this.wrong,
+    this.onFetch,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Text(
+          message,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.35,
+            color: wrong ? LamazonTheme.warning : LamazonTheme.muted,
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      ActionButton(
+        onPressed: onFetch,
+        icon: Icons.link,
+        label: 'Fetch',
+        primary: false,
+      ),
+    ],
+  );
 }

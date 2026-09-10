@@ -90,6 +90,22 @@ func slug(s string) string {
 // dynamic folders, where a public id like "a/b/c" is just a name with slashes
 // in it and everything would otherwise pile up in Home.
 func (c *Cloudinary) upload(ctx context.Context, folder, name string, img []byte) (string, error) {
+	url, _, err := c.put(ctx, folder, name, img, "")
+	return url, err
+}
+
+// uploadRemote hands Cloudinary a URL and lets Cloudinary fetch it, which
+// keeps a stranger's server off ours and puts the result on our own CDN — a
+// banner pointed at somebody else's host is a banner that breaks the day they
+// tidy up. It also returns the resource type, because "auto" will happily
+// store a web page as a raw file and the caller has to refuse that.
+func (c *Cloudinary) uploadRemote(ctx context.Context, folder, name, remote string) (string, string, error) {
+	return c.put(ctx, folder, name, nil, remote)
+}
+
+// put is the one signed form POST. Exactly one of img and remote is used;
+// Cloudinary excludes the file field from the signature either way.
+func (c *Cloudinary) put(ctx context.Context, folder, name string, img []byte, remote string) (string, string, error) {
 	publicID := folder + "/" + name
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 	// Signed params, alphabetical, then the secret appended — Cloudinary's rule.
@@ -111,49 +127,57 @@ func (c *Cloudinary) upload(ctx context.Context, folder, name string, img []byte
 		"signature":    hex.EncodeToString(sum[:]),
 	} {
 		if err := form.WriteField(k, v); err != nil {
-			return "", err
+			return "", "", err
 		}
 	}
-	part, err := form.CreateFormFile("file", "upload")
-	if err != nil {
-		return "", err
-	}
-	if _, err := part.Write(img); err != nil {
-		return "", err
+	// A remote URL goes in as a plain field; bytes go in as a file part.
+	if remote != "" {
+		if err := form.WriteField("file", remote); err != nil {
+			return "", "", err
+		}
+	} else {
+		part, err := form.CreateFormFile("file", "upload")
+		if err != nil {
+			return "", "", err
+		}
+		if _, err := part.Write(img); err != nil {
+			return "", "", err
+		}
 	}
 	if err := form.Close(); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.base+"/v1_1/"+c.cloud+"/auto/upload", &body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Content-Type", form.FormDataContentType())
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer res.Body.Close()
 	payload, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if res.StatusCode != http.StatusOK {
 		// Cloudinary explains itself in the body; passing it through beats
 		// guessing at a bare 401.
-		return "", fmt.Errorf("cloudinary %s: %s", res.Status, strings.TrimSpace(string(payload)))
+		return "", "", fmt.Errorf("cloudinary %s: %s", res.Status, strings.TrimSpace(string(payload)))
 	}
 	var out struct {
-		SecureURL string `json:"secure_url"`
+		SecureURL    string `json:"secure_url"`
+		ResourceType string `json:"resource_type"`
 	}
 	if err := json.Unmarshal(payload, &out); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if out.SecureURL == "" {
-		return "", fmt.Errorf("cloudinary returned no url: %s", payload)
+		return "", "", fmt.Errorf("cloudinary returned no url: %s", payload)
 	}
-	return out.SecureURL, nil
+	return out.SecureURL, out.ResourceType, nil
 }
