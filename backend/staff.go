@@ -1232,16 +1232,111 @@ func (a *API) explainFailedDelivery(w http.ResponseWriter, r *http.Request, id, 
 // Scoped to a store rather than listing everything: the reason to open this is
 // always "that shop's pictures are wrong", and a catalogue-wide list would be
 // thousands of rows nobody scrolls.
+// GET /api/admin/items — one store's stock with ?owner=, or the whole
+// catalogue without it.
+//
+// owner used to be required, which meant an admin could only look at
+// inventory one shop at a time and had no way to answer "what is low across
+// the shop" at all.
 func (a *API) handleAdminItems(w http.ResponseWriter, r *http.Request) {
 	owner := strings.TrimSpace(r.URL.Query().Get("owner"))
+	var items []InventoryItem
+	var err error
 	if owner == "" {
-		writeError(w, http.StatusBadRequest, "owner is required")
-		return
+		items, err = a.db.allItems(r.Context())
+	} else {
+		items, err = a.db.items(r.Context(), owner)
 	}
-	items, err := a.db.items(r.Context(), owner)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// DELETE /api/admin/items/{id}
+//
+// The same guard the seller route uses, for the same reason: an order is the
+// record of a sale, and deleting the product it names would take it with it.
+// Being an admin does not make that outcome any less irreversible.
+func (a *API) handleAdminDeleteItem(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var placed int
+	a.db.sql.QueryRowContext(r.Context(),
+		`SELECT count(*) FROM orders WHERE item_id = $1`, id).Scan(&placed)
+	if placed > 0 {
+		writeError(w, http.StatusConflict, plural(placed, "order")+
+			" placed for this product. Hide it from the shop instead — "+
+			"deleting it would take the orders with it.")
+		return
+	}
+
+	// No owner in the WHERE clause: an admin is not scoped to one store, which
+	// is the whole point of the route.
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`DELETE FROM inventory_items WHERE id = $1`, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/admin/items/{id}/listing — {"delisted": true|false}
+//
+// The way past the delete guard: takes a product off the shop without
+// touching a single order.
+func (a *API) handleAdminPatchListing(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Delisted *bool `json:"delisted"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Delisted == nil {
+		writeError(w, http.StatusBadRequest, "send delisted: true or false")
+		return
+	}
+	id := r.PathValue("id")
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE inventory_items SET delisted = $2 WHERE id = $1`,
+		id, *in.Delisted)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/admin/items/{id}/stock — {"stock": n}
+//
+// A correction, not a sale. An admin fixing a miscount should not have to
+// sign in as the seller to do it.
+func (a *API) handleAdminPatchStock(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Stock *int `json:"stock"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Stock == nil {
+		writeError(w, http.StatusBadRequest, "send stock")
+		return
+	}
+	id := r.PathValue("id")
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE inventory_items SET stock = GREATEST($2, 0) WHERE id = $1`,
+		id, *in.Stock)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

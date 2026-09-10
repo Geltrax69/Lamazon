@@ -880,6 +880,9 @@ class Api {
           stock: (r['stock'] as num?)?.toInt() ?? 0,
           delisted: r['delisted'] as bool? ?? false,
           reserved: (r['reserved'] as num?)?.toInt() ?? 0,
+          storeName: r['storeName'] as String? ?? '',
+          owner: r['owner'] as String? ?? '',
+          orders: (r['orders'] as num?)?.toInt() ?? 0,
         )
         ..serverId = r['id'] as String
         ..imageUrls = (r['imageUrls'] as List<dynamic>? ?? const [])
@@ -965,17 +968,44 @@ class Api {
         .cast<String>();
   }
 
-  /// One store's stock, for an admin fixing its pictures.
-  Future<List<InventoryItem>> adminItems(String owner) async {
+  /// Stock, for an admin. One store with [owner], the whole catalogue without
+  /// it — which is what the Products section shows.
+  Future<List<InventoryItem>> adminItems([String? owner]) async {
     final body = await _staffCall(
       StaffSession.admin,
       'GET',
-      '/api/admin/items?owner=${Uri.encodeComponent(owner)}',
+      owner == null || owner.isEmpty
+          ? '/api/admin/items'
+          : '/api/admin/items?owner=${Uri.encodeComponent(owner)}',
     );
     return (body['items'] as List<dynamic>? ?? const [])
         .map((r) => _inventoryItem(r as Map<String, dynamic>))
         .toList();
   }
+
+  /// Refused with 409 while any order references the item, exactly as the
+  /// seller route is. Being an admin does not make the loss recoverable.
+  Future<void> adminDeleteItem(String id) => _staffCall(
+    StaffSession.admin,
+    'DELETE',
+    '/api/admin/items/$id',
+  );
+
+  /// Off the shop, history untouched. The way past the delete guard.
+  Future<void> adminSetDelisted(String id, bool delisted) => _staffCall(
+    StaffSession.admin,
+    'PATCH',
+    '/api/admin/items/$id/listing',
+    {'delisted': delisted},
+  );
+
+  /// Corrects a miscount without signing in as the seller.
+  Future<void> adminSetStock(String id, int stock) => _staffCall(
+    StaffSession.admin,
+    'PATCH',
+    '/api/admin/items/$id/stock',
+    {'stock': stock},
+  );
 
   /// Extra photos for an item that already exists — the edit screen's path.
   Future<List<String>> addItemPhotos(

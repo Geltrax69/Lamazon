@@ -309,6 +309,55 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 
 // items reads a seller's inventory, newest first, with status derived here
 // rather than stored — one less column that can drift out of sync.
+// allItems is every product in the shop, whoever sells it.
+//
+// The admin listing needs the whole catalogue in one place — which store, how
+// much stock, how much of it is already spoken for, and how many orders point
+// at the row. That last number is what makes the delete button honest: an item
+// with orders against it cannot be deleted (the FK refuses, and so does the
+// handler), so the screen says so before the admin tries rather than after.
+func (d *DB) allItems(ctx context.Context) ([]InventoryItem, error) {
+	rows, err := d.sql.QueryContext(ctx, `
+		SELECT i.id, i.title, i.description, i.category, i.price, i.mrp,
+		       i.options, i.compare_group, i.attributes, i.stock, i.delisted,
+		       COALESCE((SELECT sum(o.units) FROM orders o
+		                 WHERE o.item_id = i.id
+		                   AND o.stage NOT IN ('delivered','rejected')), 0)::int,
+		       (SELECT count(*) FROM orders o WHERE o.item_id = i.id)::int,
+		       s.name, i.owner,
+		       array_to_string(i.image_urls, E'\n')
+		FROM inventory_items i
+		JOIN seller_stores s ON s.owner = i.owner
+		ORDER BY s.name, i.title`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]InventoryItem, 0)
+	for rows.Next() {
+		var i InventoryItem
+		var urls string
+		var options, attributes []byte
+		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
+			&i.Price, &i.MRP, &options, &i.CompareGroup, &attributes,
+			&i.Stock, &i.Delisted, &i.Reserved, &i.Orders, &i.StoreName,
+			&i.Owner, &urls); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(options, &i.Options); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(attributes, &i.Attributes); err != nil {
+			return nil, err
+		}
+		i.Status = stockStatus(i.Stock)
+		i.ImageURLs = splitURLs(urls)
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
 		SELECT id, title, description, category, price, mrp, options,

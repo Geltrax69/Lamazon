@@ -91,6 +91,15 @@ class InventoryItem {
   /// [available], not [stock] — the seller dashboard showed the raw number
   /// and so told a seller "1 left" while the shop said "Out of stock".
   int reserved;
+
+  /// Filled only by the admin catalogue view, which spans every store. The
+  /// seller's own list leaves them empty — a seller knows whose shop it is.
+  String storeName;
+  String owner;
+
+  /// How many orders reference this row. Non-zero means it cannot be deleted,
+  /// which is why the admin screen shows the number beside the button.
+  int orders;
   List<Uint8List> photos; // first one is the cover
 
   /// Set once the backend has a row for this item, and the Cloudinary URLs
@@ -111,6 +120,9 @@ class InventoryItem {
     required this.stock,
     this.delisted = false,
     this.reserved = 0,
+    this.storeName = '',
+    this.owner = '',
+    this.orders = 0,
     this.photos = const [],
   });
 

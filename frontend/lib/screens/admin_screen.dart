@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
+import '../data/seller.dart';
 import '../data/catalog.dart';
 import '../data/categories.dart';
 import '../models/product.dart';
@@ -203,6 +204,9 @@ class _AdminHomeState extends State<_AdminHome> {
 
   /// The written documents, loaded with everything else.
   List<PolicyDoc> _policies = const [];
+
+  /// Every product in the shop, whoever sells it.
+  List<InventoryItem> _items = const [];
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
@@ -232,6 +236,7 @@ class _AdminHomeState extends State<_AdminHome> {
         groups,
         _,
         policies,
+        items,
       ) = await (
         Api.instance.adminOverview(),
         Api.instance.adminInsights(),
@@ -245,6 +250,8 @@ class _AdminHomeState extends State<_AdminHome> {
         // refresh: the admin is the one editing these, so a cached copy is
         // exactly the wrong thing to put in front of them.
         loadPolicies(refresh: true, admin: true),
+        // The whole catalogue, every store.
+        Api.instance.adminItems(),
       ).wait;
       if (!mounted) return;
       setState(() {
@@ -255,6 +262,7 @@ class _AdminHomeState extends State<_AdminHome> {
         _riders = riders;
         _orders = orders;
         _groups = groups;
+        _items = items;
         _error = null;
       });
     } catch (e) {
@@ -265,6 +273,140 @@ class _AdminHomeState extends State<_AdminHome> {
       }
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Reports whatever the server said, and stays quiet when it worked —
+  /// the list redraws either way.
+  Future<void> _itemAction(Future<void> Function() call, String done) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await call();
+      await _load();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(done),
+          ),
+        );
+    } catch (e) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(e.toString().replaceFirst('ClientException: ', '')),
+          ),
+        );
+    }
+  }
+
+  /// Deleting is irreversible and the server refuses it once the product has
+  /// been ordered, so the dialog says which of those applies before asking.
+  Future<void> _deleteItem(InventoryItem item) async {
+    final blocked = item.orders > 0;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(
+          blocked ? 'This product cannot be deleted' : 'Delete this product?',
+        ),
+        content: Text(
+          blocked
+              ? '"${item.title}" has ${item.orders == 1 ? "1 order" : "${item.orders} orders"} '
+                    'against it. Deleting it would destroy those records, so the '
+                    'server refuses. Hide it from the shop instead — it stops '
+                    'selling and its history stays.'
+              : '"${item.title}" from ${item.storeName} is removed for good, '
+                    'along with its photos. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: Text(blocked ? 'Close' : 'Keep it'),
+          ),
+          if (blocked)
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: const Text('Hide it instead'),
+            )
+          else
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              style: TextButton.styleFrom(foregroundColor: _red),
+              child: const Text('Delete'),
+            ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    if (blocked) {
+      await _itemAction(
+        () => Api.instance.adminSetDelisted(item.id, true),
+        '"${item.title}" is hidden from the shop.',
+      );
+      return;
+    }
+    await _itemAction(
+      () => Api.instance.adminDeleteItem(item.id),
+      '"${item.title}" deleted.',
+    );
+  }
+
+  Future<void> _toggleItemListing(InventoryItem item) => _itemAction(
+    () => Api.instance.adminSetDelisted(item.id, !item.delisted),
+    item.delisted
+        ? '"${item.title}" is back on sale.'
+        : '"${item.title}" is hidden from the shop.',
+  );
+
+  /// A correction, so it asks for the number rather than nudging it.
+  Future<void> _editStock(InventoryItem item) async {
+    final field = TextEditingController(text: '${item.stock}');
+    final entered = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text('Stock for ${item.title}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${item.reserved} of the current ${item.stock} '
+              '${item.reserved == 1 ? "unit is" : "units are"} already in '
+              'live orders. Shoppers can buy ${item.available}.',
+              style: LamazonTheme.mutedBodyText,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: field,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Units on the shelf'),
+              onSubmitted: (v) => Navigator.pop(dialog, v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, field.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    field.dispose();
+    final next = int.tryParse((entered ?? '').trim());
+    if (next == null || next == item.stock) return;
+    await _itemAction(
+      () => Api.instance.adminSetStock(item.id, next),
+      'Stock for "${item.title}" set to $next.',
+    );
   }
 
   Future<void> _approve(String owner) async {
@@ -1217,6 +1359,7 @@ class _AdminHomeState extends State<_AdminHome> {
   });
 
   bool get _hasTable => {
+    _Tab.products,
     _Tab.review,
     _Tab.approved,
     _Tab.rejected,
@@ -1229,6 +1372,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.approved => _storesWith('approved'),
     _Tab.rejected => _storesWith('rejected'),
     _Tab.orders => _orders.cast<Map<String, dynamic>>(),
+    _Tab.products => _items.map((i) => {'item': i}).toList(),
     _Tab.delivery => _riders.cast<Map<String, dynamic>>(),
     _Tab.people =>
       (_overview?['people'] as List<dynamic>? ?? [])
@@ -1504,6 +1648,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.approved: _storesWith('approved').length,
     _Tab.rejected: _storesWith('rejected').length,
     _Tab.orders: _orders.length,
+    _Tab.products: _items.length,
     _Tab.insights: (_insights?['topStores'] as List?)?.length ?? 0,
     _Tab.banners: 0,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
@@ -1647,6 +1792,42 @@ class _AdminHomeState extends State<_AdminHome> {
                 trailing: '${it['units']} units',
                 note: '₹${((it['revenue'] as num?) ?? 0).moneyText}',
                 fraction: _share(it['units'], items.first['units']),
+              ),
+        ];
+
+      case _Tab.products:
+        final rows = _visible(
+          _items
+              .where(
+                (i) =>
+                    _search.isEmpty ||
+                    '${i.title} ${i.storeName} ${i.category}'
+                        .toLowerCase()
+                        .contains(_search.toLowerCase()),
+              )
+              .map((i) => {'item': i})
+              .toList(),
+        );
+        return [
+          const _Note(
+            'Every product in the shop, whichever store lists it. Stock is '
+            'what is on the shelf; "in orders" is what is already spoken for, '
+            'so a shopper sees the difference. A product with orders against '
+            'it cannot be deleted — the orders are the record of those sales '
+            '— so hide it from the shop instead.',
+          ),
+          if (_items.isEmpty)
+            const _Empty('No products listed yet, by any store.')
+          else if (rows.isEmpty)
+            _Empty('No product matches "$_search".')
+          else
+            for (final row in rows)
+              _ProductRow(
+                item: row['item'] as InventoryItem,
+                onDelete: () => _deleteItem(row['item'] as InventoryItem),
+                onToggleListing: () =>
+                    _toggleItemListing(row['item'] as InventoryItem),
+                onEditStock: () => _editStock(row['item'] as InventoryItem),
               ),
         ];
 
@@ -2519,6 +2700,7 @@ enum _Tab {
   approved('Approved'),
   rejected('Rejected'),
   orders('Orders'),
+  products('Products'),
   insights('Insights'),
   categories('Categories'),
   banners('Banners'),
@@ -2529,6 +2711,238 @@ enum _Tab {
 
   final String label;
   const _Tab(this.label);
+}
+
+/// One product, everywhere it is sold from, with the numbers that decide what
+/// its buttons are allowed to do.
+class _ProductRow extends StatelessWidget {
+  final InventoryItem item;
+  final VoidCallback onDelete;
+  final VoidCallback onToggleListing;
+  final VoidCallback onEditStock;
+  const _ProductRow({
+    required this.item,
+    required this.onDelete,
+    required this.onToggleListing,
+    required this.onEditStock,
+  });
+
+  Color get _stockColour => switch (item.status) {
+    StockStatus.inStock => _green,
+    StockStatus.low => _amber,
+    StockStatus.out => _red,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = isWide(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ElevatedSurface(
+        radius: LamazonTheme.featuredRadius,
+        padding: const EdgeInsets.all(14),
+        child: Flex(
+          direction: wide ? Axis.horizontal : Axis.vertical,
+          crossAxisAlignment: wide
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: wide ? 1 : 0,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      LamazonTheme.smallRadius,
+                    ),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: item.imageUrls.isEmpty
+                          ? Container(
+                              color: LamazonTheme.track,
+                              child: const Icon(
+                                LucideIcons.imageOff,
+                                size: 18,
+                                color: _muted,
+                              ),
+                            )
+                          : NetImage(
+                              url: item.imageUrls.first,
+                              sourceWidth: 160,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${item.storeName} · ${item.category.isEmpty ? "Uncategorised" : item.category}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: _muted),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            _Pill(
+                              text: item.status.label,
+                              colour: _stockColour,
+                            ),
+                            if (item.delisted)
+                              const _Pill(text: 'Hidden', colour: _muted),
+                            if (item.orders > 0)
+                              _Pill(
+                                text: item.orders == 1
+                                    ? '1 order'
+                                    : '${item.orders} orders',
+                                colour: _muted,
+                              ),
+                            if (item.discounted)
+                              _Pill(
+                                text: '${item.discountPercent}% off',
+                                colour: _green,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: wide ? 16 : 0, height: wide ? 0 : 12),
+            // The three numbers that matter, and they do not mean the same
+            // thing: stock is the shelf, reserved is already sold, and what a
+            // shopper can buy is the difference.
+            Expanded(
+              flex: wide ? 1 : 0,
+              child: Wrap(
+                spacing: 18,
+                runSpacing: 8,
+                children: [
+                  _Figure(label: 'Price', value: '₹${item.price.moneyText}'),
+                  if (item.discounted)
+                    _Figure(label: 'MRP', value: '₹${item.mrp.moneyText}'),
+                  _Figure(label: 'On shelf', value: '${item.stock}'),
+                  if (item.reserved > 0)
+                    _Figure(label: 'In orders', value: '${item.reserved}'),
+                  _Figure(
+                    label: 'Can be sold',
+                    value: '${item.available}',
+                    colour: _stockColour,
+                  ),
+                  _Figure(
+                    label: 'Shelf value',
+                    value: '₹${item.value.moneyText}',
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: wide ? 8 : 0, height: wide ? 0 : 10),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Correct the stock count',
+                  onPressed: onEditStock,
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                ),
+                IconButton(
+                  tooltip: item.delisted
+                      ? 'Put ${item.title} back on sale'
+                      : 'Hide ${item.title} from the shop',
+                  onPressed: onToggleListing,
+                  icon: Icon(
+                    item.delisted ? LucideIcons.eye : LucideIcons.eyeOff,
+                    size: 16,
+                    color: _muted,
+                  ),
+                ),
+                _QuietDelete(
+                  tooltip: 'Delete ${item.title}',
+                  onDelete: onDelete,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A small status word. Tinted, never colour alone — the word carries it.
+class _Pill extends StatelessWidget {
+  final String text;
+  final Color colour;
+  const _Pill({required this.text, required this.colour});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: colour.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: colour,
+      ),
+    ),
+  );
+}
+
+/// One labelled number. The label is not optional: "18" on its own says
+/// nothing, and it is what the KPI tiles used to announce.
+class _Figure extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? colour;
+  const _Figure({required this.label, required this.value, this.colour});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: '$label: $value',
+    excludeSemantics: true,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10.5, color: _muted),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: colour ?? LamazonTheme.text,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _StoreCard extends StatelessWidget {

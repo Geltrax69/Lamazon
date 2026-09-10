@@ -75,7 +75,14 @@ type InventoryItem struct {
 	// Units held by orders that have not been delivered or rejected. What a
 	// shopper can buy is Stock - Reserved, and the seller needs to see the
 	// same arithmetic the shop does.
-	Reserved  int      `json:"reserved"`
+	Reserved int `json:"reserved"`
+	// Filled only by the admin listing, which spans every store. The seller's
+	// own list leaves them zero: a seller knows whose shop they are looking at,
+	// and counting orders per row on a screen they refresh constantly is work
+	// nobody asked for.
+	StoreName string   `json:"storeName,omitempty"`
+	Owner     string   `json:"owner,omitempty"`
+	Orders    int      `json:"orders,omitempty"`
 	Status    string   `json:"status"`    // derived from stock, never stored
 	ImageURLs []string `json:"imageUrls"` // Cloudinary, in upload order
 }
