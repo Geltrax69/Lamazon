@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'product_card.dart';
 import '../data/categories.dart';
 
@@ -32,6 +33,15 @@ class CategoryVisual extends StatelessWidget {
     if (imageUrl.isNotEmpty) {
       return NetImage(url: imageUrl, semanticLabel: name);
     }
+    // The atlas holds one picture per department, so every category under one
+    // resolves to the same cell. On a department tile that is right; on a grid
+    // of six shelves it drew the same photograph six times, which says nothing
+    // and reads as broken. A plate says "no artwork yet" honestly, and shows
+    // the admin exactly which shelves still need one.
+    final parent = departmentOf(name);
+    if (parent.isNotEmpty && parent != name) {
+      return _Plate(name: name, parent: parent);
+    }
     final i = indexFor(name);
     return Semantics(
       image: true,
@@ -52,6 +62,34 @@ class CategoryVisual extends StatelessWidget {
                 excludeFromSemantics: true,
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Stands in for a shelf the shop has not photographed yet.
+class _Plate extends StatelessWidget {
+  final String name, parent;
+  const _Plate({required this.name, required this.parent});
+
+  @override
+  Widget build(BuildContext context) {
+    final department = departments.firstWhere(
+      (d) => d.name == parent,
+      orElse: () => allDepartment,
+    );
+    return Semantics(
+      image: true,
+      label: '$name category',
+      child: DecoratedBox(
+        decoration: const BoxDecoration(color: Color(0xFFEDEFE7)),
+        child: Center(
+          child: Icon(
+            department.icon,
+            size: 26,
+            color: LamazonTheme.strong.withValues(alpha: .55),
           ),
         ),
       ),

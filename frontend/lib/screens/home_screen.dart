@@ -100,6 +100,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _openCategory(String category, String department) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchScreen(initialQuery: category, tab: department),
+      ),
+    );
+  }
+
   void _openSearch([String initialQuery = '']) {
     final department = departments[_tab].name;
     Navigator.push(
@@ -226,19 +235,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onTap: () => _openSearch(tabName == 'All' ? '' : tabName),
                 ),
-              if (activeDepartment.categories.isNotEmpty) ...[
-                const SizedBox(height: 34),
-                _CategoryBoard(
-                  activeTab: _tab,
-                  onOpenCategory: (name, department) => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          SearchScreen(initialQuery: name, tab: department),
-                    ),
-                  ),
-                ),
-              ],
               if (offers.isNotEmpty) ...[
                 const SizedBox(height: 34),
                 CollectionShelf(
@@ -248,6 +244,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   onSeeAll: () => _openSearch(),
                 ),
               ],
+              // On All, one titled grid per department — the whole shop laid
+              // out to scan, rather than a single board that made you choose a
+              // department before it would show you anything. Scoped, just the
+              // one department's shelves.
+              if (_tab == 0)
+                for (final (index, department) in departments.indexed)
+                  if (index != 0 && department.categories.isNotEmpty) ...[
+                    const SizedBox(height: 34),
+                    _CategorySection(
+                      title: department.name,
+                      department: department.name,
+                      categories: department.categories,
+                      limit: 6,
+                      onSeeAll: () => _selectDepartment(index),
+                      onOpenCategory: _openCategory,
+                    ),
+                  ] else if (activeDepartment.categories.isNotEmpty) ...[
+                    const SizedBox(height: 34),
+                    _CategorySection(
+                      title: 'Browse by category',
+                      subtitle: 'Narrow $tabName down to one shelf',
+                      department: tabName,
+                      categories: activeDepartment.categories,
+                      onOpenCategory: _openCategory,
+                    ),
+                  ],
               if (scopedShops.isNotEmpty) ...[
                 const SizedBox(height: 36),
                 SectionHeading(
@@ -590,41 +612,54 @@ class _DepartmentStrip extends StatelessWidget {
   );
 }
 
-class _CategoryBoard extends StatelessWidget {
-  final int activeTab;
+/// One department's shelves, as a titled grid.
+///
+/// The home screen stacks one of these per department, which is how a dense
+/// marketplace lets somebody scan the whole shop without choosing a
+/// department first: the heading says where you are, the tiles say what is
+/// inside, and the arrow drops you into that department scoped. It is not the
+/// strip repeated — the strip lists departments, these tiles are the shelves
+/// under one, and they carry the shop's own artwork.
+class _CategorySection extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final String department;
+  final List<CategoryNode> categories;
+  final VoidCallback? onSeeAll;
   final void Function(String category, String department) onOpenCategory;
-  const _CategoryBoard({required this.activeTab, required this.onOpenCategory});
+
+  /// How many shelves to draw, or null for all of them.
+  final int? limit;
+  const _CategorySection({
+    required this.title,
+    required this.department,
+    required this.categories,
+    required this.onOpenCategory,
+    this.subtitle,
+    this.onSeeAll,
+    this.limit,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final active = departments[activeTab];
-    // One level below whatever the strip above is showing. The strip already
-    // lists the departments, so a board that listed them again was the same
-    // control drawn twice, half a screen apart, in two sizes. What it can
-    // show that the strip cannot is the shelves inside the chosen department,
-    // which is also the only content here with the shop's own artwork.
-    final entries = <_CategoryEntry>[
-      for (final category in active.categories)
-        _CategoryEntry(category.name, active.name, category.imageUrl),
-    ];
-    if (entries.isEmpty) return const SizedBox.shrink();
+    if (categories.isEmpty) return const SizedBox.shrink();
+    // A department with thirty shelves would push everything under it off the
+    // page, so a section on the home board shows two clean rows and the
+    // heading carries the rest. Scoped to one department there is nothing
+    // below to protect, so it shows the lot.
+    final shown = limit == null ? categories : categories.take(limit!).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Browse by category', style: LamazonTheme.sectionText),
-        const SizedBox(height: 4),
-        Text(
-          'Narrow ${active.name} down to one shelf',
-          style: LamazonTheme.mutedBodyText,
-        ),
-        const SizedBox(height: 16),
+        SectionHeading(title: title, subtitle: subtitle, onAction: onSeeAll),
+        const SizedBox(height: 14),
         LayoutBuilder(
           builder: (context, constraints) {
             final count = constraints.maxWidth >= 1060
-                ? 8
-                : constraints.maxWidth >= 690
                 ? 6
-                : 4;
+                : constraints.maxWidth >= 690
+                ? 5
+                : 3;
             return GridView.builder(
               shrinkWrap: true,
               padding: EdgeInsets.zero,
@@ -635,14 +670,15 @@ class _CategoryBoard extends StatelessWidget {
                 crossAxisSpacing: 12,
                 childAspectRatio: .73,
               ),
-              itemCount: entries.length,
-              itemBuilder: (context, index) {
-                final entry = entries[index];
-                return _CategoryTile(
-                  entry: entry,
-                  onTap: () => onOpenCategory(entry.name, entry.department),
-                );
-              },
+              itemCount: shown.length,
+              itemBuilder: (context, index) => _CategoryTile(
+                entry: _CategoryEntry(
+                  shown[index].name,
+                  department,
+                  shown[index].imageUrl,
+                ),
+                onTap: () => onOpenCategory(shown[index].name, department),
+              ),
             );
           },
         ),

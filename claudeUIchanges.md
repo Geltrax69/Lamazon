@@ -595,3 +595,119 @@ password can be checked before submitting.
 **Remaining**
 The signed-in panel behind it was not exercised — signing in means typing a
 password, which is not something to do on the owner's behalf.
+
+### Home becomes a marketplace board, not a single entry point
+
+**Area:** `HomeScreen` — `_CategorySection` (new), section order; `CategoryVisual`
+
+**Decision:** IMPROVE / MOVE / REPLACE
+
+**Problem**
+Working from a Blinkit home screen supplied as a reference. Lamazon's home
+made you choose a department before it would show you anything below it: the
+strip filtered, and the one category board only appeared once scoped. A dense
+marketplace does the opposite — it lays the whole shop out to scan, one titled
+grid per department, and lets you dive in from any of them.
+
+**Why it mattered**
+Everything below the campaign was either a filter or a product. Nothing
+answered "what does this shop actually sell?" without committing to a
+department first. The shelves — which are the shop's real inventory structure,
+and carry the admin's own uploaded artwork — were reachable only through the
+drawer or after scoping.
+
+**Decision**
+On All, stack one titled grid per department, six shelves each, the heading's
+arrow scoping to that department. Scoped, one grid of that department's
+shelves, uncapped. The deals rail moved above the grids.
+
+**Reasoning**
+This is not the strip repeated. The strip lists departments; these tiles are
+the shelves under one, so each level shows something the level above did not —
+department, shelf, product.
+
+Six per section, in two rows of three, rather than eight in rows of four: at
+four columns a phone tile is ~77px and "Mobile Accessories" truncated to
+"Accessor…". Three columns give the label room and the picture presence, which
+is the whole point of a visual board.
+
+The deals rail moved above the grids because the reference opens with
+something to buy and then shows the aisles. It also means a product is on
+screen before six department sections.
+
+**What was deliberately not copied from the reference**
+- **Ratings** ("4.5 ★ 20k") — `Product` has no rating field and `DESIGN.md`
+  forbids inventing review counts.
+- **"Delivery in 8 minutes"** — there is no delivery-time data, and promising
+  one at the top of the screen is the most consequential thing on the page to
+  get wrong.
+- **Payment-offer strips** ("EXCLUSIVE PAYMENT OFFERS", card logos) — there
+  are no card offers; the app is cash on delivery.
+- **Pack size** ("1 pc", "165 g") — not on the model. `sizes` and `attributes`
+  exist and could carry it later.
+
+Each of these is a data gap, not a styling gap. Adding them as decoration
+would make the screen look more like the reference and less true.
+
+**Change**
+- `_CategoryBoard` generalised into `_CategorySection` with an optional
+  `limit`, used for both the per-department sections and the scoped view.
+- `_openCategory` extracted, now that two call sites open a shelf.
+- Deals rail moved above the sections.
+- `CategoryVisual` renders a plate for a category with no artwork.
+
+**Files**
+- `frontend/lib/screens/home_screen.dart`
+- `frontend/lib/widgets/category_visual.dart`
+
+**Verification**
+- [x] Visual — walked end to end at 375×812 on a profile build
+- [x] Functional — 77 tests pass
+- [x] Regression — analyze clean
+
+**Result**
+Home now scans like a shop: Electronics with its six shelves, Food with its
+six, Beauty with its six, each one tap from the aisle it names.
+
+**Remaining**
+Only Electronics and Food have per-category artwork uploaded. The rest fall
+back to the plate — which is the honest state, and shows the admin exactly
+which shelves still need a photograph, under Admin → Categories.
+
+### A shelf with no photograph stops borrowing its department's
+
+**Area:** `CategoryVisual`
+
+**Decision:** REPLACE
+
+**Problem**
+The bundled atlas holds one picture per department, and `indexFor()` resolves
+any category to its parent's cell. Beauty's six shelves — Bath & Body, Hair,
+Skin & Face and the rest — therefore drew the *same photograph* six times in
+one grid.
+
+**Why it mattered**
+Six identical photographs carry no information, and worse, they imply a
+specificity that is not there: a picture above "Hair" reads as a picture *of*
+that shelf. Side by side they read as a rendering bug. This is the same
+complaint that started this work — images not being consistent — arriving from
+the other direction.
+
+**Decision**
+A category with no artwork of its own gets a quiet plate with its department's
+icon, not its department's photograph.
+
+**Reasoning**
+The removal-first test: the repeated photo was doing negative work, so the
+question was what to replace it with rather than how to style it. A plate is
+visibly a placeholder, so it does not lie about what it depicts, and it makes
+the gap legible to the admin who can fill it. A department tile still gets the
+photograph, because there the atlas cell is genuinely about that department.
+
+**Files**
+- `frontend/lib/widgets/category_visual.dart`
+
+**Verification**
+- [x] Visual — Beauty section at 375×812
+- [x] Accessibility — keeps `Semantics(image: true, label: '$name category')`
+- [x] Functional — 77 tests pass
