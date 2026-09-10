@@ -226,18 +226,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onTap: () => _openSearch(tabName == 'All' ? '' : tabName),
                 ),
-              const SizedBox(height: 34),
-              _CategoryBoard(
-                activeTab: _tab,
-                onSelectDepartment: _selectDepartment,
-                onOpenCategory: (name, department) => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SearchScreen(initialQuery: name, tab: department),
+              if (activeDepartment.categories.isNotEmpty) ...[
+                const SizedBox(height: 34),
+                _CategoryBoard(
+                  activeTab: _tab,
+                  onOpenCategory: (name, department) => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SearchScreen(initialQuery: name, tab: department),
+                    ),
                   ),
                 ),
-              ),
+              ],
               if (offers.isNotEmpty) ...[
                 const SizedBox(height: 34),
                 CollectionShelf(
@@ -591,47 +592,29 @@ class _DepartmentStrip extends StatelessWidget {
 
 class _CategoryBoard extends StatelessWidget {
   final int activeTab;
-  final ValueChanged<int> onSelectDepartment;
   final void Function(String category, String department) onOpenCategory;
-  const _CategoryBoard({
-    required this.activeTab,
-    required this.onSelectDepartment,
-    required this.onOpenCategory,
-  });
+  const _CategoryBoard({required this.activeTab, required this.onOpenCategory});
 
   @override
   Widget build(BuildContext context) {
     final active = departments[activeTab];
-    // "All" is a filter, not a need, and its artwork is another department's —
-    // so the board shows the eight real departments, or, once one is chosen,
-    // that department's own categories.
+    // One level below whatever the strip above is showing. The strip already
+    // lists the departments, so a board that listed them again was the same
+    // control drawn twice, half a screen apart, in two sizes. What it can
+    // show that the strip cannot is the shelves inside the chosen department,
+    // which is also the only content here with the shop's own artwork.
     final entries = <_CategoryEntry>[
-      if (activeTab == 0)
-        for (final (index, department) in departments.indexed)
-          if (index != 0)
-            _CategoryEntry(
-              department.name,
-              department.name,
-              department.imageUrl,
-              departmentIndex: index,
-            )
-          else
-            for (final category in active.categories)
-              _CategoryEntry(category.name, active.name, category.imageUrl),
+      for (final category in active.categories)
+        _CategoryEntry(category.name, active.name, category.imageUrl),
     ];
     if (entries.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          activeTab == 0 ? 'Shop by need' : 'Find your next thing',
-          style: LamazonTheme.sectionText,
-        ),
+        const Text('Browse by category', style: LamazonTheme.sectionText),
         const SizedBox(height: 4),
         Text(
-          activeTab == 0
-              ? 'Every department, one calm visual system'
-              : 'Browse the edit, then choose a real local product',
+          'Narrow ${active.name} down to one shelf',
           style: LamazonTheme.mutedBodyText,
         ),
         const SizedBox(height: 16),
@@ -657,13 +640,7 @@ class _CategoryBoard extends StatelessWidget {
                 final entry = entries[index];
                 return _CategoryTile(
                   entry: entry,
-                  onTap: () {
-                    if (entry.departmentIndex != null) {
-                      onSelectDepartment(entry.departmentIndex!);
-                    } else {
-                      onOpenCategory(entry.name, entry.department);
-                    }
-                  },
+                  onTap: () => onOpenCategory(entry.name, entry.department),
                 );
               },
             );
@@ -678,13 +655,7 @@ class _CategoryEntry {
   final String name;
   final String department;
   final String imageUrl;
-  final int? departmentIndex;
-  const _CategoryEntry(
-    this.name,
-    this.department,
-    this.imageUrl, {
-    this.departmentIndex,
-  });
+  const _CategoryEntry(this.name, this.department, this.imageUrl);
 }
 
 class _CategoryTile extends StatelessWidget {

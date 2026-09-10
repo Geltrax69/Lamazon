@@ -398,3 +398,88 @@ the accessibility tree still read correctly, but clicks no longer register, so
 the cart and details screens could not be walked visually after these edits.
 The changes are colour-token substitutions and one label, all covered by the
 suite, but they have not been seen on screen. Worth a look before release.
+
+### The department board stops repeating the strip above it
+
+**Area:** `HomeScreen` — `_DepartmentStrip` and `_CategoryBoard`
+
+**Decision:** REMOVE (at "All") / MOVE (to a level down)
+
+**Problem**
+Home listed the same eight departments twice. The strip under the search bar
+showed All, Electronics, Food, Gifts, Beauty… and roughly 300px further down,
+"Shop by need" showed Electronics, Food, Gifts, Beauty… — the same
+destinations, the same artwork, and the same action (`onSelectDepartment`),
+drawn twice in two sizes.
+
+**Why it mattered**
+Raised by the user, and correctly: "what's its point?" Two controls that do
+the identical thing do not read as two ways in, they read as a mistake — the
+shopper stops to work out what the difference is, finds none, and trusts the
+page a little less. It also cost roughly 320px, about 40% of a phone viewport,
+before the first product. And it was worse than redundant: the strip carries a
+selected state, the board did not, so the page showed the same list twice with
+only one of them admitting which item was active.
+
+Worth noting this survived my own earlier pass. I applied the removal-first
+test to the "All" tile inside the board and never asked it of the board.
+
+**Before**
+Strip: All · Electronics · Food · Gifts · Beauty · … (horizontal, stateful)
+Board: Electronics · Food · Gifts · Beauty · Household Essentials · … (grid)
+
+**Decision**
+The strip keeps the departments. The board drops to the level below and shows
+only the categories inside the chosen department. At "All" — which has no
+categories, by definition, being the absence of a filter — it renders nothing.
+
+**Reasoning**
+The strip has to stay: it is persistent, compact, shows which department is
+active, and is the only way back out to another department without the drawer.
+Deleting it and keeping the board would have stranded a scoped shopper, since
+the board shows categories once scoped.
+
+That left the question of whether the board earns anything. It does, but only
+one level down. The live API shows departments carry real shelves with the
+shop's own uploaded artwork — Electronics holds Mobile Accessories, Chargers &
+Cables, Earphones, Smart Gadgets, Batteries. Those are content the strip
+cannot show and the shopper cannot otherwise reach except through the drawer.
+So the board became the drill-down it should always have been, and the home
+screen gained a real hierarchy: department in the strip, shelf in the board,
+product in the grid.
+
+Copy was rewritten with it. "Every department, one calm visual system"
+described the design rather than telling anyone what the tiles do.
+
+**Change**
+- `_CategoryBoard` lists `active.categories` only, and hides itself when a
+  department has none.
+- Heading → "Browse by category" / "Narrow {Department} down to one shelf".
+- `_CategoryEntry.departmentIndex`, the `onSelectDepartment` branch in the
+  tile's tap handler, and the board's `onSelectDepartment` parameter are all
+  dead once the board stops selecting departments, and are removed.
+- The 34px spacer moves inside the conditional, so a hidden board does not
+  leave a 68px hole.
+
+**Files**
+- `frontend/lib/screens/home_screen.dart`
+- `frontend/test/smoke_test.dart`
+
+**Verification**
+- [x] Functional — 70 tests pass
+- [x] Regression — analyze clean; no dead parameters left
+- [ ] Visual — browser input is not responding this session, see note
+
+**Result**
+Every department appears once. The default home screen is ~320px shorter, so
+products arrive sooner. Choosing a department now reveals something new rather
+than re-showing what was already on screen.
+
+**Remaining**
+- The strip shows about five of eight departments at 375px; the rest need a
+  horizontal scroll. Acceptable for a learned pattern, and the drawer holds
+  the full tree, but worth watching whether the hidden three get traffic.
+- `smoke_test`'s "every See all opens something" had to scroll further before
+  tapping: the shorter page left that control underneath the floating bottom
+  bar, and a tap there hits the bar. That is inherent to a floating bar rather
+  than a defect, but it is a real thing a thumb can hit too.

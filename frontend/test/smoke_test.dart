@@ -505,6 +505,22 @@ void main() {
       }
       expect(find.text('See all'), findsWidgets);
 
+      // The bottom bar floats over the list, so a control that has only just
+      // scrolled into view can still be underneath it — and a tap there hits
+      // the bar. Push it up into open space first.
+      for (
+        var attempt = 0;
+        attempt < 8 &&
+            tester.getCenter(find.text('See all').first).dy >
+                tester.view.physicalSize.height /
+                    tester.view.devicePixelRatio *
+                    .6;
+        attempt++
+      ) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -120));
+        await tester.pump();
+      }
+
       // Stores near you comes first now and opens the shops list; Shop By
       // Category and New Arrival open search. A pushed route leaves home
       // mounted underneath, so assert on the destination, not on home
