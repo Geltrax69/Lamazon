@@ -233,7 +233,7 @@ class _ItemPhotosState extends State<_ItemPhotos> {
                           style: TextStyle(
                             fontSize: 12,
                             color: _shots.isEmpty
-                                ? const Color(0xFFEF6C00)
+                                ? LamazonTheme.warning
                                 : _muted,
                           ),
                         ),

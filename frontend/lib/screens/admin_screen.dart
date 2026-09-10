@@ -20,10 +20,23 @@ import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
 import 'policy_screen.dart';
 
+// Lucide icons that a widget picks between at runtime.
+//
+// `cond ? LucideIcons.a : LucideIcons.b` reads those statics at runtime, and
+// LucideIcons is a single class holding 27,874 static consts whose lazy
+// initialisation exhausts the stack in a DDC debug build — it is what turned
+// the admin sign-in card into a red "Stack Overflow" box. Hoisted to consts
+// here they are folded at compile time, so the initialiser never runs.
+const _eye = LucideIcons.eye;
+const _eyeOff = LucideIcons.eyeOff;
+const _pencil = LucideIcons.pencil;
+const _chevronUp = LucideIcons.chevronUp;
+const _chevronDown = LucideIcons.chevronDown;
+
 const _ink = LamazonTheme.text;
 const _muted = LamazonTheme.muted;
 const _green = LamazonTheme.strong;
-const _amber = Color(0xFFEF6C00);
+const _amber = LamazonTheme.warning;
 // The system's danger, not Google's. Also: the delete icons below sit at
 // muted weight until hovered or focused — eight red trash cans in a list made
 // destruction the loudest thing on a screen whose primary action is
@@ -2458,7 +2471,9 @@ class _SectionCardState extends State<_SectionCard> {
                   ),
                   if (node.children.isNotEmpty)
                     Icon(
-                      _open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                      // const on both arms: a runtime LucideIcons read is
+                      // what crashes the DDC debug build. See _FieldState.
+                      _open ? _chevronUp : _chevronDown,
                       size: 15,
                       color: _muted,
                     ),
@@ -2869,7 +2884,7 @@ class _ProductRow extends StatelessWidget {
                       : 'Hide ${item.title} from the shop',
                   onPressed: onToggleListing,
                   icon: Icon(
-                    item.delisted ? LucideIcons.eye : LucideIcons.eyeOff,
+                    item.delisted ? _eye : _eyeOff,
                     size: 16,
                     color: _muted,
                   ),
@@ -2996,7 +3011,14 @@ class _StoreCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${store['status']}',
+                  // Not the raw column value. "pending" is what the database
+                  // calls it; an admin wants to know what it means for the
+                  // shop.
+                  switch (store['status']) {
+                    'approved' => 'Live in the shop',
+                    'rejected' => 'Rejected',
+                    _ => 'Waiting for review',
+                  },
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -3008,7 +3030,12 @@ class _StoreCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${store['owner']} · ${store['phone'] ?? ''}',
+            // join, not interpolation: a store with no phone number rendered
+            // as "owner@x.test · " with the separator left hanging.
+            [
+              store['owner'] as String? ?? '',
+              store['phone'] as String? ?? '',
+            ].where((v) => v.trim().isNotEmpty).join(' · '),
             style: const TextStyle(fontSize: 12, color: _muted),
           ),
           Text(
@@ -3024,22 +3051,40 @@ class _StoreCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: _red),
               ),
             ),
-          const SizedBox(height: 10),
-          Row(
+          const SizedBox(height: 12),
+          // A Wrap, not a Row with a Spacer. Four controls and a Spacer needed
+          // 629px and had 307 on a phone, so the store-approval queue — the
+          // first screen an admin sees — overflowed by 322px.
+          //
+          // Splitting it also gives it the hierarchy the single row hid: the
+          // decision this card exists for comes first, and the two upkeep
+          // tools sit below it at lower weight rather than beside it at equal
+          // weight with a Spacer pretending to separate them.
+          if (onApprove != null || onReject != null) ...[
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                if (onApprove != null)
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: _green),
+                    onPressed: onApprove,
+                    child: const Text('Approve'),
+                  ),
+                if (onReject != null)
+                  OutlinedButton(
+                    onPressed: onReject,
+                    child: const Text('Reject', style: TextStyle(color: _red)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (onApprove != null)
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: _green),
-                  onPressed: onApprove,
-                  child: const Text('Approve'),
-                ),
-              const SizedBox(width: 10),
-              if (onReject != null)
-                OutlinedButton(
-                  onPressed: onReject,
-                  child: const Text('Reject', style: TextStyle(color: _red)),
-                ),
-              const Spacer(),
               // Photos are the other thing an admin gets asked to fix, and
               // asking the seller to re-upload is a slower answer than doing
               // it.
@@ -3474,19 +3519,46 @@ class _FieldState extends State<_Field> {
         // The card behind this is already `surface`; white on it left the
         // field with almost no edge, so it did not read as somewhere to type.
         fillColor: LamazonTheme.canvas,
+        // A staff password typed blind into a panel that answers "wrong
+        // username or password" and nothing more is a slow way to find a typo.
         suffixIcon: !widget.obscure
             ? null
-            : IconButton(
-                // A staff password typed blind into a panel that answers
-                // "wrong username or password" and nothing more is a slow way
-                // to find a typo.
-                tooltip: _shown ? 'Hide password' : 'Show password',
-                icon: Icon(
-                  _shown ? LucideIcons.eyeOff : LucideIcons.eye,
-                  size: 18,
-                  color: LamazonTheme.muted,
+            : Semantics(
+                button: true,
+                label: _shown ? 'Hide password' : 'Show password',
+                child: Tooltip(
+                  message: _shown ? 'Hide password' : 'Show password',
+                  excludeFromSemantics: true,
+                  child: IconButton(
+                    onPressed: () => setState(() => _shown = !_shown),
+                    // Two const Icons rather than one Icon holding a
+                    // conditional. That looks like a style choice and is not:
+                    // `_shown ? LucideIcons.eyeOff : LucideIcons.eye` reads
+                    // those statics at runtime, and LucideIcons is one class
+                    // with 27,874 static consts whose lazy initialisation
+                    // exhausts the stack in a DDC debug build. The whole
+                    // sign-in card rendered as a red "Stack Overflow" box, so
+                    // the admin panel could not be opened by anyone
+                    // developing it. Written as const the values are folded at
+                    // compile time and the initialiser never runs — which is
+                    // why the shield above, inside a const subtree, always
+                    // rendered fine while this did not.
+                    //
+                    // Release builds compile with dart2js and were never
+                    // affected. admin_login_test.dart pins the card.
+                    icon: _shown
+                        ? const Icon(
+                            LucideIcons.eyeOff,
+                            size: 18,
+                            color: LamazonTheme.muted,
+                          )
+                        : const Icon(
+                            LucideIcons.eye,
+                            size: 18,
+                            color: LamazonTheme.muted,
+                          ),
+                  ),
                 ),
-                onPressed: () => setState(() => _shown = !_shown),
               ),
       ),
     );
@@ -3608,7 +3680,7 @@ class _PolicyEditorState extends State<_PolicyEditor> {
                   tooltip: _preview ? 'Back to editing' : 'Preview',
                   onPressed: () => setState(() => _preview = !_preview),
                   icon: Icon(
-                    _preview ? LucideIcons.pencil : LucideIcons.eye,
+                    _preview ? _pencil : _eye,
                     size: 17,
                     color: _ink,
                   ),

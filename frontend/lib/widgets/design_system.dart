@@ -16,6 +16,16 @@ abstract final class LamazonTheme {
   static const peach = Color(0xFFF58268);
   static const danger = Color(0xFFB93643);
 
+  /// Attention that is not yet a failure: a store waiting for review, stock
+  /// running low, an order nobody has accepted.
+  ///
+  /// The admin panel used stock Material orange `#EF6C00`, which measured
+  /// **2.85:1 on canvas** — under even the 3:1 floor for large text, on
+  /// precisely the states that most need reading. This measures 5.33:1 on
+  /// canvas and 5.00:1 on surface, and it is a warm ochre rather than a
+  /// safety-cone orange, so it belongs to the same world as forest and ivory.
+  static const warning = Color(0xFF9A5B12);
+
   // Compatibility names for existing routes. New UI should use semantic names.
   static const ink = text;
   static const accent = lime;

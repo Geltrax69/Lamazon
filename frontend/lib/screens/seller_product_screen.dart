@@ -16,7 +16,7 @@ import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 
 const _muted = LamazonTheme.muted;
-const _amber = Color(0xFFEF6C00);
+const _amber = LamazonTheme.warning;
 
 /// Add or edit one inventory line.
 class SellerProductScreen extends StatefulWidget {

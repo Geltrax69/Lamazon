@@ -19,7 +19,7 @@ import 'seller_product_screen.dart';
 const _ink = LamazonTheme.text;
 const _muted = LamazonTheme.muted;
 const _green = LamazonTheme.strong;
-const _amber = Color(0xFFEF6C00);
+const _amber = LamazonTheme.warning;
 const _red = LamazonTheme.danger;
 
 /// The seller's store page: what it's worth, what's running out, and every

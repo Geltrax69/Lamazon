@@ -5,7 +5,7 @@ Every item below is a code change in this repo, verified by a test, a measuremen
 screenshot. Items I did **not** fix are listed in §7 with the reason — the point of this file
 is to be accurate about both halves.
 
-**Verification baseline:** 94 frontend widget tests and the full Go backend suite pass;
+**Verification baseline:** 102 frontend widget tests and the full Go backend suite pass;
 `flutter analyze` reports no issues; the release web bundle builds, renders, and was measured.
 
 ---
@@ -274,6 +274,63 @@ What is left is what a shop header is for: who you are shopping with, and where 
 going. The location gets the full width as a side effect, so a long saved address no longer
 ellipses. `test/header_test.dart` pins the absences, because a removed duplicate is exactly the
 kind of thing that grows back.
+
+
+---
+
+## 7f. Admin QA pass, and the Stack Overflow
+
+### The crash (C2-046, re-diagnosed)
+
+A debug build rendered the admin sign-in card as a red **"Stack Overflow"** box where the
+password field should be. The release gate blamed "the Lucide icon library, 571 scripts". That
+was directionally right and mechanically wrong, and the wrong mechanism sent me down two dead
+ends before I found it.
+
+What it actually is: `_shown ? LucideIcons.eyeOff : LucideIcons.eye` reads those statics **at
+runtime**. `LucideIcons` is one class holding **27,874 static consts**, and DDC initialises them
+lazily on first runtime access — which exhausts the stack. The shield icon at the top of the
+same card always rendered fine because it sits inside a `const` subtree and is folded at compile
+time. Written as two `const Icon(...)` arms instead of one `Icon` holding a conditional, the
+initialiser never runs.
+
+Release builds compile with dart2js and were never affected, which is why this survived: it was
+broken only for whoever was developing the panel.
+
+Two dead ends worth recording, because the measurements looked convincing:
+- **Widget depth.** The reveal icon sat at element depth 255 against the field's 186, and
+  `InputDecorator`'s suffix slot costs 19 levels on its own. Flattening it to 220, then 211, then
+  187 via a `Stack` — all still crashed, while the username field at 186 rendered. A one-level
+  difference is not a threshold, which is what finally ruled depth out.
+- **The suffix slot.** Removing `suffixIcon` entirely did fix it, which looked like proof. It was
+  a coincidence: removing the slot also removed the only runtime Lucide read on the screen.
+
+The decisive test was swapping `LucideIcons.eye` for `Icons.visibility` and watching the card
+render. Three more conditional Lucide reads in the same library (`_ProductRow`'s hide toggle, a
+disclosure chevron, the policy preview toggle) are hoisted to file-level consts for the same
+reason.
+
+### The QA harness
+
+`test/admin_qa_test.dart` drives the real `AdminScreen` against a mocked API — the only way to
+exercise the panel without typing a password into a login form. Every one of its twelve sections,
+at 375, 834 and 1440.
+
+| Found | Fix |
+|---|---|
+| **`_StoreCard` overflowed by 322px at 375** — the store-approval queue, the first thing an admin sees. Four controls and a `Spacer` needed 629px in 307. | The actions are a `Wrap`. Splitting it also gave the card the hierarchy the single row hid: the approve/reject decision the card exists for, then the two upkeep tools below it at lower weight rather than beside it at equal weight. |
+| **`_amber` `#EF6C00` measured 2.85:1 on canvas** — below even the 3:1 floor for large text, on "waiting for review", "needs restock" and the low-stock badge. Stock Material orange, the last off-system colour in admin. | `LamazonTheme.warning` `#9A5B12`: 5.33:1 on canvas, 5.00:1 on surface, and a warm ochre rather than a safety cone. Replaced in three other files carrying the same value. |
+| Status pills printed the raw column value — "pending", "approved". | "Waiting for review", "Live in the shop". |
+| A store with no phone rendered `owner@x.test · ` with the separator dangling. | Joined, not interpolated. |
+
+The harness also asserts every icon-only control has a tooltip and meets the 44px floor, that the
+panel keeps heading semantics, and that the products section shows all three stock numbers. A
+contrast case checks every ink against both grounds — verified by putting the old orange back and
+watching it fail.
+
+**Also cleared 4.1 GB of disk**: the machine was down to 125 MiB free, which was breaking builds.
+Removed `frontend/build` (3.7 GB of repeated web builds) and `.playwright-mcp` (415 MB) — both
+git-ignored and regenerable. Nothing tracked was touched.
 
 
 ---
