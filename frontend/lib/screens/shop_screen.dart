@@ -36,7 +36,7 @@ class _ShopScreenState extends State<ShopScreen> {
   Widget _build(BuildContext context, Shop shop, List<Product>? loaded) {
     final items = loaded ?? const <Product>[];
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 1400,
         child: SafeArea(
@@ -57,7 +57,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       child: const Icon(
                         LucideIcons.arrowLeft,
                         size: 18,
-                        color: Color(0xFF1A1A1A),
+                        color: LamazonTheme.text,
                       ),
                     ),
                   ),
@@ -77,7 +77,7 @@ class _ShopScreenState extends State<ShopScreen> {
               const SizedBox(height: 4),
               Text(
                 shop.tagline,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
+                style: const TextStyle(fontSize: 13, color: LamazonTheme.muted),
               ),
               const SizedBox(height: 10),
               Row(
@@ -107,7 +107,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   child: Center(
                     child: Text(
                       'No products listed yet',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                      style: TextStyle(fontSize: 14, color: LamazonTheme.muted),
                     ),
                   ),
                 )
@@ -158,7 +158,7 @@ class _InfoChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 13, color: const Color(0xFF1A1A1A)),
+          Icon(icon, size: 13, color: LamazonTheme.text),
           const SizedBox(width: 5),
           Text(
             label,

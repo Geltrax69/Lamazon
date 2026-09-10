@@ -313,6 +313,12 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
 		SELECT id, title, description, category, price, mrp, options,
 		       compare_group, attributes, stock, delisted,
+		       -- Units already spoken for by live orders. The shop shows
+		       -- stock minus this, so without it a seller reading "1 left"
+		       -- had no way to know shoppers were seeing "Out of stock".
+		       COALESCE((SELECT sum(o.units) FROM orders o
+		                 WHERE o.item_id = inventory_items.id
+		                   AND o.stage NOT IN ('delivered','rejected')), 0)::int,
 		       array_to_string(image_urls, E'\n')
 		FROM inventory_items WHERE owner = $1 ORDER BY id DESC`, owner)
 	if err != nil {
@@ -327,7 +333,7 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 		var options, attributes []byte
 		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
 			&i.Price, &i.MRP, &options, &i.CompareGroup, &attributes,
-			&i.Stock, &i.Delisted, &urls); err != nil {
+			&i.Stock, &i.Delisted, &i.Reserved, &urls); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(options, &i.Options); err != nil {

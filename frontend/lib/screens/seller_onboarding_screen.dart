@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -13,9 +14,9 @@ import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 import 'seller_dashboard_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
 
 /// Opens a seller's store, or edits the one they have: business name, photo,
 /// location, what they sell.
@@ -112,7 +113,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
             onPressed: () => Navigator.pop(dialog, false),
             child: const Text(
               'Discard',
-              style: TextStyle(color: Color(0xFFD32F2F)),
+              style: TextStyle(color: LamazonTheme.danger),
             ),
           ),
           FilledButton(
@@ -171,7 +172,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
         if (await _confirmLeave() && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF1F1EF),
+        backgroundColor: LamazonTheme.canvas,
         body: ReadableBody(
           maxWidth: 620,
           child: SafeArea(
@@ -240,7 +241,7 @@ class _SellerOnboardingScreenState extends State<SellerOnboardingScreen> {
                           'We only deliver around ${serviceableCities.first} today.',
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFD32F2F),
+                            color: LamazonTheme.danger,
                           ),
                         ),
                       ],

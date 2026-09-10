@@ -357,6 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     _Step.code => 'Verify code',
                                     _Step.password => 'Sign in',
                                   },
+                            loading: _busy,
                             onPressed: _valid && !_busy ? _submit : null,
                           ),
                           const SizedBox(height: 12),

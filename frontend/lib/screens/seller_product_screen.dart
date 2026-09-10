@@ -2,6 +2,7 @@ import '../data/money.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -14,7 +15,7 @@ import '../widgets/photo_manager.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 
-const _muted = Color(0xFF6B6B6B);
+const _muted = LamazonTheme.muted;
 const _amber = Color(0xFFEF6C00);
 
 /// Add or edit one inventory line.
@@ -302,7 +303,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     final categories = _categoryOptions;
     final sections = _categorySections;
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 620,
         child: SafeArea(
@@ -844,7 +845,7 @@ class _ValueChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F1EF),
+        color: LamazonTheme.canvas,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

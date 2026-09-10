@@ -16,11 +16,11 @@ import '../widgets/screen_header.dart';
 import 'seller_onboarding_screen.dart';
 import 'seller_product_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
 const _amber = Color(0xFFEF6C00);
-const _red = Color(0xFFD32F2F);
+const _red = LamazonTheme.danger;
 
 /// The seller's store page: what it's worth, what's running out, and every
 /// line of stock they can edit.
@@ -75,7 +75,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.saved),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 760,
         child: SafeArea(
@@ -351,7 +351,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                                     'Add your first one to start selling',
                                     style: TextStyle(
                                       fontSize: 12.5,
-                                      color: Color(0xFF62645E),
+                                      color: LamazonTheme.muted,
                                     ),
                                   ),
                                 ],
@@ -608,7 +608,7 @@ class _OrderRow extends StatelessWidget {
                       orderRef(order.id),
                       style: const TextStyle(
                         fontSize: 11.5,
-                        color: Color(0xFF62645E),
+                        color: LamazonTheme.muted,
                       ),
                     ),
                   ],
@@ -951,8 +951,14 @@ class _ItemRow extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        // What the shop will actually sell, and why it differs
+                        // from the shelf count when it does. "1 left" beside a
+                        // shopper-facing "Out of stock" was the mismatch.
                         Text(
-                          '${item.stock} left',
+                          item.reserved > 0
+                              ? '${item.available} to sell · '
+                                    '${item.reserved} in orders'
+                              : '${item.stock} left',
                           style: const TextStyle(fontSize: 11.5, color: _muted),
                         ),
                         if (item.delisted) ...[

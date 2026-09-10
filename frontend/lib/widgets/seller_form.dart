@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
 
 /// Section heading with an optional line of guidance under it.
 class SellerSection extends StatelessWidget {
@@ -95,7 +96,7 @@ class SellerField extends StatelessWidget {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF1D4A3C), width: 2),
+                  borderSide: BorderSide(color: LamazonTheme.strong, width: 2),
                 ),
                 labelText: hint,
                 hintText: hint,
@@ -133,7 +134,7 @@ class SellerSubmitBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F1EF),
+        color: LamazonTheme.canvas,
         border: Border(
           top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
         ),

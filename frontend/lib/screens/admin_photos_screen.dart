@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/api.dart';
@@ -8,8 +9,8 @@ import '../widgets/photo_manager.dart';
 import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
 
 /// One store's listings, so an admin can fix the pictures on any of them.
 ///
@@ -63,7 +64,7 @@ class _AdminPhotosScreenState extends State<AdminPhotosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 760,
         child: SafeArea(
@@ -83,7 +84,7 @@ class _AdminPhotosScreenState extends State<AdminPhotosScreen> {
                                 _error!,
                                 style: const TextStyle(
                                   fontSize: 12.5,
-                                  color: Color(0xFFD32F2F),
+                                  color: LamazonTheme.danger,
                                 ),
                               ),
                             ),

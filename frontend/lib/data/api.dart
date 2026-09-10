@@ -879,6 +879,7 @@ class Api {
           attributes: _attributes(r),
           stock: (r['stock'] as num?)?.toInt() ?? 0,
           delisted: r['delisted'] as bool? ?? false,
+          reserved: (r['reserved'] as num?)?.toInt() ?? 0,
         )
         ..serverId = r['id'] as String
         ..imageUrls = (r['imageUrls'] as List<dynamic>? ?? const [])

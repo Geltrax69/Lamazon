@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 
 /// Breakpoints. Phone is the base design; the rest widen it.
 const _tablet = 700.0;
@@ -21,7 +22,7 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: const Color(0xFFF1F1EF),
+      color: LamazonTheme.canvas,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1400),

@@ -563,6 +563,16 @@ class ActionButton extends StatelessWidget {
   final IconData? icon;
   final bool primary;
   final bool expand;
+
+  /// Shows a spinner in place of the icon and marks the control busy to
+  /// assistive technology. Async actions changed only their label ("Placing
+  /// your order…"), which is nothing to look at during the seconds that
+  /// matter most — and nothing at all if you are not reading the button.
+  ///
+  /// Setting this does not disable the button; pass `onPressed: null` too.
+  /// Keeping them separate means a caller can show progress on a control
+  /// that is still legitimately pressable.
+  final bool loading;
   const ActionButton({
     super.key,
     required this.label,
@@ -570,6 +580,7 @@ class ActionButton extends StatelessWidget {
     this.icon,
     this.primary = true,
     this.expand = false,
+    this.loading = false,
   });
 
   @override
@@ -593,8 +604,20 @@ class ActionButton extends StatelessWidget {
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        if (loading) ...[
+          SizedBox(
+            width: 15,
+            height: 15,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(foreground),
+            ),
+          ),
+          const SizedBox(width: 9),
+        ],
         Flexible(fit: FlexFit.loose, child: labelText),
-        if (icon != null) ...[
+        // The spinner replaces the icon rather than crowding in beside it.
+        if (icon != null && !loading) ...[
           const SizedBox(width: 8),
           Icon(icon, size: 18, color: foreground),
         ],
@@ -603,6 +626,8 @@ class ActionButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onPressed != null,
+      // Announced as busy, so the wait is not silent to a screen reader.
+      liveRegion: loading,
       child: Opacity(
         opacity: onPressed == null ? .5 : 1,
         child: FocusRing(

@@ -312,6 +312,7 @@ class _LocationScreenState extends State<LocationScreen> {
                 child: ActionButton(
                   label: _saving ? 'Saving…' : 'Save address',
                   expand: true,
+                  loading: _saving,
                   onPressed: _saving || !_complete ? null : _save,
                 ),
               ),

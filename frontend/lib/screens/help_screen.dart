@@ -1,5 +1,6 @@
 import '../data/app_info.dart';
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,8 +8,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../widgets/screen_header.dart';
 import 'policy_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
 
 const _faqs = [
   (
@@ -41,7 +42,7 @@ class HelpScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 620,
         child: SafeArea(
@@ -93,7 +94,7 @@ class HelpScreen extends StatelessWidget {
                                 const Divider(
                                   height: 1,
                                   indent: 20,
-                                  color: Color(0xFFF1F1EF),
+                                  color: LamazonTheme.canvas,
                                 ),
                               ExpansionTile(
                                 title: Text(
@@ -104,7 +105,7 @@ class HelpScreen extends StatelessWidget {
                                   ),
                                 ),
                                 iconColor: _ink,
-                                collapsedIconColor: const Color(0xFF62645E),
+                                collapsedIconColor: LamazonTheme.muted,
                                 childrenPadding: const EdgeInsets.fromLTRB(
                                   20,
                                   0,
@@ -147,7 +148,7 @@ class HelpScreen extends StatelessWidget {
                         'Lamazon · ${AppInfo.version}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF62645E),
+                          color: LamazonTheme.muted,
                         ),
                       ),
                     ),
@@ -187,7 +188,7 @@ class _ContactTile extends StatelessWidget {
       trailing: const Icon(
         LucideIcons.chevronRight,
         size: 16,
-        color: Color(0xFF62645E),
+        color: LamazonTheme.muted,
       ),
       onTap: () => Navigator.push(
         context,

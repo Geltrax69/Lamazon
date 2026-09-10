@@ -71,7 +71,11 @@ type InventoryItem struct {
 	// Hidden from the shop but kept whole. A product with orders against it
 	// cannot be deleted — the orders are the record of a sale — so this is
 	// how a seller retires one without destroying its history.
-	Delisted  bool     `json:"delisted"`
+	Delisted bool `json:"delisted"`
+	// Units held by orders that have not been delivered or rejected. What a
+	// shopper can buy is Stock - Reserved, and the seller needs to see the
+	// same arithmetic the shop does.
+	Reserved  int      `json:"reserved"`
 	Status    string   `json:"status"`    // derived from stock, never stored
 	ImageURLs []string `json:"imageUrls"` // Cloudinary, in upload order
 }

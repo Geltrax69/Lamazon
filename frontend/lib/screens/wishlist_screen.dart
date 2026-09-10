@@ -23,7 +23,7 @@ class WishlistScreen extends StatelessWidget {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.saved),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 820,
         child: SafeArea(
@@ -52,7 +52,7 @@ class WishlistScreen extends StatelessWidget {
                             child: const Icon(
                               LucideIcons.arrowLeft,
                               size: 18,
-                              color: Color(0xFF1A1A1A),
+                              color: LamazonTheme.text,
                             ),
                           ),
                         ),
@@ -77,7 +77,7 @@ class WishlistScreen extends StatelessWidget {
                             action: 'Explore products',
                             onAction: () => Navigator.of(
                               context,
-                            ).popUntil((r) => r.isFirst),
+                            ).pushNamedAndRemoveUntil('/', (r) => false),
                           )
                         : GridView.builder(
                             padding: EdgeInsets.fromLTRB(20, 8, 20, bottomNavInset(context) + 16),

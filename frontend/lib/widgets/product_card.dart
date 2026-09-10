@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/cart.dart';
+import '../data/seller.dart';
 import '../data/catalog.dart';
 import '../data/wishlist.dart';
 import '../models/product.dart';
@@ -96,7 +97,7 @@ class ProductCard extends StatelessWidget {
               child: Text(
                 product.availableStock == 0
                     ? 'Out of stock'
-                    : product.availableStock! <= 5
+                    : product.availableStock! <= scarceAt
                     ? 'Only ${product.availableStock} left'
                     : 'In stock',
                 maxLines: 1,

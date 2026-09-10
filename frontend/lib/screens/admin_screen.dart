@@ -19,11 +19,15 @@ import '../widgets/product_card.dart';
 import '../widgets/screen_header.dart';
 import 'policy_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
 const _amber = Color(0xFFEF6C00);
-const _red = Color(0xFFD32F2F);
+// The system's danger, not Google's. Also: the delete icons below sit at
+// muted weight until hovered or focused — eight red trash cans in a list made
+// destruction the loudest thing on a screen whose primary action is
+// "+ Department".
+const _red = LamazonTheme.danger;
 
 /// The admin panel, at /admin/log_IN. Password in, and then the three things
 /// an admin actually does: see who is here, decide which stores go live, and
@@ -421,7 +425,7 @@ class _AdminHomeState extends State<_AdminHome> {
                                     enabledBorder: InputBorder.none,
                                     focusedBorder: UnderlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: Color(0xFF1D4A3C),
+                                        color: LamazonTheme.strong,
                                         width: 2,
                                       ),
                                     ),
@@ -1076,8 +1080,27 @@ class _AdminHomeState extends State<_AdminHome> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text('Admin', style: LamazonTheme.titleText),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Semantics(
+                            headingLevel: 1,
+                            child: const Text(
+                              'Admin',
+                              style: LamazonTheme.titleText,
+                            ),
+                          ),
+                          // Who is about to approve a store or delete a
+                          // department. The panel offered "Sign out" without
+                          // ever saying who was being signed out.
+                          if (StaffSession.admin.subject.isNotEmpty)
+                            Text(
+                              'Signed in as ${StaffSession.admin.subject}',
+                              style: LamazonTheme.mutedBodyText,
+                            ),
+                        ],
+                      ),
                     ),
                     TactileIconButton(
                       label: 'Refresh',
@@ -1840,11 +1863,7 @@ class _GroupCard extends StatelessWidget {
                 onPressed: onEdit,
                 icon: const Icon(LucideIcons.pencil, size: 15),
               ),
-              IconButton(
-                tooltip: 'Remove ${group.name}',
-                onPressed: onDelete,
-                icon: const Icon(LucideIcons.trash2, size: 15, color: _red),
-              ),
+              _QuietDelete(tooltip: 'Remove ${group.name}', onDelete: onDelete),
             ],
           ),
           if (group.attributes.isNotEmpty) ...[
@@ -1860,7 +1879,7 @@ class _GroupCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F1EF),
+                      color: LamazonTheme.canvas,
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Text(
@@ -2028,10 +2047,9 @@ class _DepartmentTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
+                _QuietDelete(
                   tooltip: 'Remove ${department.name}',
-                  onPressed: onDelete,
-                  icon: const Icon(LucideIcons.trash2, size: 15, color: _red),
+                  onDelete: onDelete,
                 ),
                 const Icon(LucideIcons.chevronRight, size: 16, color: _muted),
               ],
@@ -2050,7 +2068,7 @@ class _DepartmentTile extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   height: 1.4,
-                  color: Color(0xFF62645E),
+                  color: LamazonTheme.muted,
                 ),
               ),
             ],
@@ -2220,7 +2238,7 @@ class _SectionCardState extends State<_SectionCard> {
                     Container(
                       padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F1EF),
+                        color: LamazonTheme.canvas,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
@@ -3069,7 +3087,7 @@ class _PolicyEditorState extends State<_PolicyEditor> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 760,
         child: SafeArea(
@@ -3183,6 +3201,39 @@ class _PolicyEditorState extends State<_PolicyEditor> {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide.none,
+    ),
+  );
+}
+
+
+/// A delete that waits to be looked for.
+///
+/// It reads as muted until pointed at or focused, then turns red. The action
+/// is exactly as available as before — same tooltip, same target size, same
+/// place — but a list of eight of them no longer outshouts the one primary
+/// button on the screen.
+class _QuietDelete extends StatefulWidget {
+  final String tooltip;
+  final VoidCallback? onDelete;
+  const _QuietDelete({required this.tooltip, required this.onDelete});
+
+  @override
+  State<_QuietDelete> createState() => _QuietDeleteState();
+}
+
+class _QuietDeleteState extends State<_QuietDelete> {
+  bool _lit = false;
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onFocusChange: (has) => setState(() => _lit = has),
+    child: IconButton(
+      tooltip: widget.tooltip,
+      onPressed: widget.onDelete,
+      onHover: (over) => setState(() => _lit = over),
+      icon: Icon(LucideIcons.trash2, size: 15, color: _lit ? _red : _muted),
     ),
   );
 }

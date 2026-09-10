@@ -1,5 +1,6 @@
 import '../data/money.dart';
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../data/orders.dart';
 import 'package:flutter/services.dart';
@@ -9,10 +10,10 @@ import '../data/api.dart';
 import '../data/staff.dart';
 import '../widgets/app_shell.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
 const _green = Color(0xFF1B7F3B);
-const _red = Color(0xFFD32F2F);
+const _red = LamazonTheme.danger;
 
 /// The rider's panel, at /delivery. Sign in with the number an admin approved
 /// and the PIN they were given; then: what is ready to collect, what is on
@@ -69,7 +70,7 @@ class _RiderLoginState extends State<_RiderLogin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 460,
         child: SafeArea(
@@ -335,7 +336,7 @@ class _DeliveryHomeState extends State<_DeliveryHome> {
     final waiting = orders.where((o) => o['stage'] == 'accepted').toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 720,
         child: SafeArea(

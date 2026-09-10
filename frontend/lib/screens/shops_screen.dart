@@ -1,5 +1,6 @@
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/catalog.dart';
@@ -30,7 +31,7 @@ class ShopsScreen extends StatelessWidget {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.none),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 760,
         child: SafeArea(
@@ -55,7 +56,7 @@ class ShopsScreen extends StatelessWidget {
                           child: Text(
                             'No stores in this category yet.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF6B6B6B)),
+                            style: TextStyle(color: LamazonTheme.muted),
                           ),
                         ),
                       ),
@@ -129,7 +130,7 @@ class _ShopRow extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       height: 1.3,
-                      color: Color(0xFF6B6B6B),
+                      color: LamazonTheme.muted,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -138,14 +139,14 @@ class _ShopRow extends StatelessWidget {
                       Icon(
                         LucideIcons.timer,
                         size: 12,
-                        color: Color(0xFF6B6B6B),
+                        color: LamazonTheme.muted,
                       ),
                       SizedBox(width: 4),
                       Text(
                         '12 mins',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: Color(0xFF6B6B6B),
+                          color: LamazonTheme.muted,
                         ),
                       ),
                     ],
@@ -156,7 +157,7 @@ class _ShopRow extends StatelessWidget {
             const Icon(
               LucideIcons.chevronRight,
               size: 18,
-              color: Color(0xFF62645E),
+              color: LamazonTheme.muted,
             ),
           ],
         ),

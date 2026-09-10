@@ -2,16 +2,17 @@ import '../data/money.dart';
 import 'order_detail_screen.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/orders.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/screen_header.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
-const _red = Color(0xFFD32F2F);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
+const _red = LamazonTheme.danger;
 const _amber = Color(0xFFE07B00);
 const _blue = Color(0xFF2F6FED);
 
@@ -55,7 +56,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.none),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 700,
         child: SafeArea(
@@ -209,7 +210,7 @@ class _OrderCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F1EF),
+                color: LamazonTheme.canvas,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(

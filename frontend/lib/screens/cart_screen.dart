@@ -214,7 +214,12 @@ class _EmptyCart extends StatelessWidget {
       title: 'Your cart is empty',
       message: 'Find something you love from stores near you.',
       action: 'Start shopping',
-      onAction: () => Navigator.of(context).popUntil((r) => r.isFirst),
+      // pushNamedAndRemoveUntil, not popUntil: popping left the browser
+      // address bar reading /cart while home was on screen, and dropped the
+      // shopper back at whatever mid-page scroll position they had left. From
+      // an empty cart, "Start shopping" should mean the top of the shop.
+      onAction: () =>
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (r) => false),
     );
   }
 }
@@ -599,6 +604,7 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
               child: ActionButton(
                 onPressed: _placing ? null : _placeOrder,
                 expand: true,
+                loading: _placing,
                 label: _placing
                     ? 'Placing your order…'
                     : Session.instance.loggedIn

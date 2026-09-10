@@ -8,10 +8,12 @@ import '../data/api.dart';
 import '../data/campaigns.dart';
 import '../data/catalog.dart';
 import '../data/categories.dart';
+import '../data/orders.dart';
 import '../data/session.dart';
 import '../data/wishlist.dart';
 import '../models/product.dart';
 import '../widgets/app_nav.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/category_visual.dart';
 import '../widgets/design_system.dart';
 import '../widgets/notify_banner.dart';
@@ -216,10 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               _DepartmentStrip(active: _tab, onSelect: _selectDepartment),
-              if (Session.instance.loggedIn) ...[
-                const SizedBox(height: 12),
-                const NotifyBanner(),
-              ],
               const SizedBox(height: 22),
               if (campaigns.isNotEmpty)
                 CampaignDeck(key: ValueKey(tabName), campaigns: campaigns)
@@ -235,6 +233,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onTap: () => _openSearch(tabName == 'All' ? '' : tabName),
                 ),
+              // Below the hero, and only for somebody who has actually
+              // ordered something. This used to sit above the campaign on
+              // first paint, asking for a browser permission before the
+              // person had done anything — which is the reliable way to get
+              // it denied, permanently, before it could ever be useful.
+              // Someone with a live order has something to be notified about.
+              if (Session.instance.loggedIn &&
+                  MyOrders.instance.orders.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                const NotifyBanner(),
+              ],
               if (offers.isNotEmpty) ...[
                 const SizedBox(height: 34),
                 CollectionShelf(
@@ -332,7 +341,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: EdgeInsets.zero,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 240,
+                    // productTileMax, like every other product grid. Home was
+                    // the one screen with its own number, so the same card
+                    // measured 232px here and 193px in search.
+                    maxCrossAxisExtent: productTileMax,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
                     childAspectRatio: .60,
@@ -538,8 +550,10 @@ class _DepartmentStrip extends StatelessWidget {
   const _DepartmentStrip({required this.active, required this.onSelect});
 
   @override
+  // 104 rather than 92: the labels below the tiles get two lines now, and a
+  // strip sized for one clipped the second.
   Widget build(BuildContext context) => SizedBox(
-    height: 92,
+    height: 104,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
@@ -556,7 +570,9 @@ class _DepartmentStrip extends StatelessWidget {
           // Otherwise: "Electronics, Electronics category, Electronics".
           excludeSemantics: true,
           child: SizedBox(
-            width: 66,
+            // 74, so "Stationery & Games" and "Household Essentials" fit on
+            // two lines instead of ellipsing on both.
+            width: 74,
             child: InkWell(
               onTap: () => onSelect(index),
               borderRadius: BorderRadius.circular(14),
@@ -591,15 +607,19 @@ class _DepartmentStrip extends StatelessWidget {
                           ),
                   ),
                   const SizedBox(height: 6),
+                  // Two lines. At 66px and one line, four of the nine names
+                  // truncated — "Household…", "Grocery & …", "Snacks & …",
+                  // "Stationery …" — which is navigation you cannot read.
                   Text(
                     department.name,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'InterTight',
-                      fontSize: 11.5,
-                      letterSpacing: .15,
+                      fontSize: 11,
+                      height: 1.15,
+                      letterSpacing: .1,
                       color: selected ? LamazonTheme.strong : LamazonTheme.text,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     ),

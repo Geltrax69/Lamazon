@@ -1,5 +1,6 @@
 import '../data/money.dart';
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -10,8 +11,8 @@ import '../models/product.dart';
 import '../widgets/product_card.dart';
 import '../widgets/status_views.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _green = LamazonTheme.strong;
 
 /// Full price comparison for one product across every local vendor that
 /// stocks it, cheapest first.
@@ -31,7 +32,7 @@ class CompareScreen extends StatelessWidget {
     final saving = worst.price - best.price;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 700,
         child: SafeArea(
@@ -98,7 +99,7 @@ class CompareScreen extends StatelessWidget {
                           product.category,
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF6B6B6B),
+                            color: LamazonTheme.muted,
                           ),
                         ),
                       ],
@@ -200,7 +201,7 @@ class _VendorRow extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF1F1EF),
+                  color: LamazonTheme.canvas,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(LucideIcons.store, size: 18, color: _ink),
@@ -252,28 +253,28 @@ class _VendorRow extends StatelessWidget {
                         const Icon(
                           LucideIcons.mapPin,
                           size: 11,
-                          color: Color(0xFF62645E),
+                          color: LamazonTheme.muted,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           distance,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF62645E),
+                            color: LamazonTheme.muted,
                           ),
                         ),
                         const SizedBox(width: 10),
                         const Icon(
                           LucideIcons.timer,
                           size: 11,
-                          color: Color(0xFF62645E),
+                          color: LamazonTheme.muted,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           eta,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF62645E),
+                            color: LamazonTheme.muted,
                           ),
                         ),
                       ],
@@ -313,7 +314,7 @@ class _VendorRow extends StatelessWidget {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isBest ? _green : const Color(0xFFF1F1EF),
+                color: isBest ? _green : LamazonTheme.canvas,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -382,7 +383,7 @@ class _RivalsState extends State<_Rivals> {
             const SizedBox(height: 2),
             const Text(
               'Same job, side by side. Cheapest first.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+              style: TextStyle(fontSize: 12, color: LamazonTheme.muted),
             ),
             // The findings go above the table: the answer should arrive before
             // the detail, and they are plural on purpose — the cheapest pack
@@ -446,7 +447,7 @@ class _RivalsState extends State<_Rivals> {
                                     '${row['store']}',
                                     style: const TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF62645E),
+                                      color: LamazonTheme.muted,
                                     ),
                                   ),
                                 ],
@@ -507,7 +508,7 @@ class _RivalsState extends State<_Rivals> {
                             'Price',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF62645E),
+                              color: LamazonTheme.muted,
                             ),
                           ),
                         ),
@@ -518,7 +519,7 @@ class _RivalsState extends State<_Rivals> {
                               f.name,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF62645E),
+                                color: LamazonTheme.muted,
                               ),
                             ),
                           ),
@@ -529,7 +530,7 @@ class _RivalsState extends State<_Rivals> {
                               d.name,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF62645E),
+                                color: LamazonTheme.muted,
                               ),
                             ),
                           ),

@@ -5,8 +5,8 @@ Every item below is a code change in this repo, verified by a test, a measuremen
 screenshot. Items I did **not** fix are listed in §7 with the reason — the point of this file
 is to be accurate about both halves.
 
-**Verification baseline:** 84 frontend widget tests and the full Go backend suite pass;
-`flutter analyze` reports no issues; the release web bundle builds and renders.
+**Verification baseline:** 85 frontend widget tests and the full Go backend suite pass;
+`flutter analyze` reports no issues; the release web bundle builds, renders, and was measured.
 
 ---
 
@@ -113,7 +113,7 @@ three times.
 | C2-025 | The search screen's pastel blue / peach / lilac / pink department blocks were exactly the "rainbow-department dashboard" `DESIGN.md` opens by refusing. Re-skinned onto ivory with a `track` border; the department's colour survives as the icon. |
 | C2-026 | Search had no result count, no clear control, no sort. Added a live-region result count ("3 results for …"), an × clear button, and a sort control (best match / price / discount). |
 | C2-027 | "Skip login" is developer language for what a shopper wants. Renamed to "Browse the shop". |
-| C2-035 / PAT-002 | Off-system colours replaced with tokens on the screens touched: `#1A1A1A`→`text`, `#6B6B6B`/`#62645E`→`muted`, `#F1F1EF`→`canvas`, `Colors.white`→`surface`, `#2E7D32`→`strong`, `#D32F2F`→`danger` across the address, addresses, search and policy screens. This is a dent in the 229 literals, not a completed migration — see §7. |
+| C2-024 / C2-035 / PAT-002 | Off-system colours replaced with tokens across 24 files: `#1A1A1A`→`text`, `#6B6B6B`/`#62645E`→`muted`, `#F1F1EF`→`canvas`, `#2E7D32`/`#1D4A3C`→`strong`, `#D32F2F`→`danger`. **229 literals → 83; theme references 200 → 389; distinct hex values 62 → 52.** The ratio the report called out is now inverted. `test/palette_ratchet_test.dart` is the lint it asked for — a new `Color(0xFF…)` fails CI and the failure names the worst files. Verified by planting a regression and watching it fail. |
 | C2-036 | Admin showed "0 records" with Previous/Next beside it, under an empty state that had already said the list was empty. Pagination is hidden entirely at zero rows, and the buttons are hidden when there is only one page — the count line stays, because it is how you tell a search worked. |
 | C2-044 | Four back-button positions. The address and addresses screens now use the shared `ScreenHeader`, and search uses `TactileIconButton`, so the control is in one place with one appearance. |
 
@@ -160,18 +160,38 @@ Being explicit so this file is not read as a clean sweep.
   Mobile Accessories). This is data, not code, and the admin delete guard already works — four
   clicks in the admin panel. I did not reach into a database to delete rows I cannot see the
   provenance of.
-- **C2-024, the full palette migration.** I converted the screens I was already editing. The
-  remaining literals across `compare_screen.dart`, `admin_screen.dart` and others are real debt
-  but make the app inconsistent rather than wrong — and the report's own §17.5 says not to gate
-  the release on it. Worth a dedicated pass plus a lint against raw `Color(0xFF`.
+- **C2-024, the last 83 colour literals.** The systematic substitutions are done and ratcheted;
+  what remains is one-off accent colours on individual screens, which need design decisions
+  rather than a find-and-replace.
 - **C2-043, legacy `POST /api/orders` idempotency.** The web client uses the idempotent
   `/api/orders/checkout`; this affects other clients only. Left as booked work.
 - **C2-046, the debug-build stack overflow.** Blocks local development, not users; the release
   build is unaffected.
 - **C2-042 verification and end-to-end browser QA of the address form.** The in-app browser pane
-  was hidden for part of this session, which blocks synthetic click and type — the same
-  limitation the original report declared. The address form is covered by a widget test that
-  asserts its live semantics instead.
+  was hidden for this session, which blocks synthetic click and type — the same limitation the
+  original report declared. The address form is covered by a widget test that asserts its live
+  semantics instead.
+
+---
+
+## 7b. Second pass — the rest of the register
+
+| ID | Fix |
+|---|---|
+| **Order detail screen** | Rebuilt. The report never tested it, and it held two of the most important things in the app behind bare `Text` widgets: the delivery code and order cancellation. It now has a four-step progress track, the code set large and spaced so it can be read aloud at a door, a proper cancel dialog naming what is being cancelled and what it costs, and the ETA. Cancellation was already wired to `POST /api/orders/{id}/cancel` — the report listed it as missing because that screen was out of scope. |
+| C2-013 | The seller saw "1 left" while shoppers saw "Out of stock". `db.items()` now returns `reserved` (units held by live orders), the dashboard shows "N to sell · M in orders", and `StockStatus` keys on **available** rather than raw stock — so a line whose entire stock is spoken for reads as out of stock to its seller too. |
+| C2-031 | "Start shopping" from the empty cart popped the stack, leaving the browser address bar reading `/cart` and dumping the shopper at their old mid-page scroll position. Now `pushNamedAndRemoveUntil('/')`. Same fix applied to the empty wishlist and the order confirmation's "Continue shopping". |
+| C2-037 | Eight red trash icons outshouted the single "+ Department" primary action. `_QuietDelete` renders them muted until hovered or focused, then red — same tooltip, same target, same place, no longer the loudest thing on screen. |
+| C2-041 | The push-permission banner appeared above the hero on first paint, asking for a browser permission before the person had done anything — the reliable way to get it denied permanently. Moved below the campaign and gated on the shopper actually having an order, which is when there is something to notify them about. |
+| C2-045 | Four of nine department labels truncated ("Household…", "Grocery & …"). Tiles widened 66→74 px and labels given two lines. |
+| C2-047 | Product cards measured 232 px on home and 193 px in search, because home was the one grid with its own `maxCrossAxisExtent` instead of `productTileMax`. |
+| C2-048 | The "Only N left" scarcity badge and the seller's "Low stock" both fired at 5, so scarcity sat on nearly everything. Split: `scarceAt = 3` for shoppers, `lowStockAt = 5` for the seller, who wants earlier warning. |
+| C2-035 | "Your information" / "Other Information" — sentence case both. |
+| Loading states | The report found none on any async action. `ActionButton` gained a `loading` flag that shows a spinner and announces the control busy; wired into place-order, save-address, sign-in, refresh-status and cancel-order. |
+| Missing info | App version now in the account footer (`AppInfo.load()` already ran at startup and only Settings showed it). The admin panel says which admin is signed in, next to the Sign out it previously offered anonymously. |
+
+**Palette, measured:** 229 literals → **83**; theme references 200 → **389**; distinct hex 62 → **52**.
+`test/palette_ratchet_test.dart` holds the line.
 
 ---
 

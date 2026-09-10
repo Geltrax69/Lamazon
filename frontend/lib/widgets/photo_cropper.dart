@@ -2,9 +2,10 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-const _ink = Color(0xFF1A1A1A);
+const _ink = LamazonTheme.text;
 
 /// Opens the cropper on [bytes] and returns the cropped photo, or null if the
 /// person backed out. The picture they framed is the picture that is saved:

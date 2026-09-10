@@ -127,7 +127,9 @@ class OrderConfirmationScreen extends StatelessWidget {
               ),
             const SizedBox(height: 24),
             ActionButton(
-              onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              onPressed: () => Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/', (r) => false),
               label: 'Continue shopping',
               expand: true,
             ),

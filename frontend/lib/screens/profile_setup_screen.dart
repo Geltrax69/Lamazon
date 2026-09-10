@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
@@ -8,8 +9,8 @@ import '../widgets/app_shell.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/seller_form.dart';
 
-const _muted = Color(0xFF6B6B6B);
-const _ink = Color(0xFF1A1A1A);
+const _muted = LamazonTheme.muted;
+const _ink = LamazonTheme.text;
 
 /// Asked once, right after the first sign-in: who you are, how to reach you,
 /// and where to bring things. Everything an order needs and nothing else — a
@@ -98,7 +99,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 560,
         child: SafeArea(
@@ -207,7 +208,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         _error!,
                         style: const TextStyle(
                           fontSize: 12.5,
-                          color: Color(0xFFD32F2F),
+                          color: LamazonTheme.danger,
                         ),
                       ),
                     ],

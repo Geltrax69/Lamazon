@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/product.dart';
@@ -40,7 +41,7 @@ void showAddedToast(
                 decoration: BoxDecoration(
                   color: basket
                       ? const Color(0xFF43A047)
-                      : const Color(0xFF1A1A1A),
+                      : LamazonTheme.text,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -62,7 +63,7 @@ void showAddedToast(
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
+                        color: LamazonTheme.text,
                       ),
                     ),
                     Text(
@@ -71,7 +72,7 @@ void showAddedToast(
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF6B6B6B),
+                        color: LamazonTheme.muted,
                       ),
                     ),
                   ],
@@ -92,7 +93,7 @@ class LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Center(
-      child: CircularProgressIndicator(color: Color(0xFF1A1A1A)),
+      child: CircularProgressIndicator(color: LamazonTheme.text),
     );
   }
 }
@@ -117,12 +118,12 @@ class ErrorView extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(fontSize: 15, color: Color(0xFF6B6B6B)),
+            style: const TextStyle(fontSize: 15, color: LamazonTheme.muted),
           ),
           const SizedBox(height: 16),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1A1A1A),
+              backgroundColor: LamazonTheme.text,
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             ),
             onPressed: onRetry,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/push.dart';
@@ -143,7 +144,7 @@ class _NotifyBannerState extends State<NotifyBanner> {
           Icon(
             done ? LucideIcons.circleCheck : LucideIcons.bell,
             size: 18,
-            color: done ? const Color(0xFF1D4A3C) : null,
+            color: done ? LamazonTheme.strong : null,
           ),
           const SizedBox(width: 10),
           Expanded(

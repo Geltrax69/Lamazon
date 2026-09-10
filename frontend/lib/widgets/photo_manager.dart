@@ -1,15 +1,16 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'photo_cropper.dart';
 import 'photo_picker.dart';
 import 'product_card.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _red = Color(0xFFD32F2F);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _red = LamazonTheme.danger;
 
 /// Every product photo goes in at this shape, so a grid of them lines up
 /// instead of each tile cropping its own way. Square, because a product tile

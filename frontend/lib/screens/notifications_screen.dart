@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import '../widgets/design_system.dart';
 
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../widgets/screen_header.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
 
 class AppNotification {
   final IconData icon;
@@ -42,7 +43,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     final unread = notifications.where((n) => !n.read).length;
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 620,
         child: SafeArea(
@@ -170,7 +171,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             n.time,
                                             style: const TextStyle(
                                               fontSize: 11,
-                                              color: Color(0xFF62645E),
+                                              color: LamazonTheme.muted,
                                             ),
                                           ),
                                         ],

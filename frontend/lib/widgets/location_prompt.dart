@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
 import '../data/geo.dart';
 import '../screens/location_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _green = LamazonTheme.strong;
 
 /// Asks for a delivery location when the app has none: enable the device's
 /// location, or type an address instead.
@@ -114,7 +115,7 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
                 style: const TextStyle(
                   fontSize: 13.5,
                   height: 1.45,
-                  color: Color(0xFF6B6B6B),
+                  color: LamazonTheme.muted,
                 ),
               ),
             ),
@@ -191,7 +192,7 @@ class _LocationPromptDialogState extends State<_LocationPromptDialog> {
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.4,
-                  color: Color(0xFF6B6B6B),
+                  color: LamazonTheme.muted,
                 ),
               ),
             ),

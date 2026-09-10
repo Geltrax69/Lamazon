@@ -10,6 +10,14 @@ import 'api.dart';
 /// Below this many units an item is flagged for restocking.
 const lowStockAt = 5;
 
+/// When a shopper is told how few are left.
+///
+/// Lower than [lowStockAt] on purpose. The seller wants warning early enough
+/// to restock; a shopper wants scarcity to mean something. Firing both at 5
+/// meant "Only 5 left" sat on almost everything in a campus shop, which is
+/// how a scarcity signal stops being read at all.
+const scarceAt = 3;
+
 enum StockStatus { inStock, low, out }
 
 extension StockStatusInfo on StockStatus {
@@ -78,6 +86,11 @@ class InventoryItem {
   /// orders against it cannot be deleted — the orders are the record of the
   /// sale — so this is how it is retired without destroying that history.
   bool delisted;
+
+  /// Units held by live orders. What a shopper can actually buy is
+  /// [available], not [stock] — the seller dashboard showed the raw number
+  /// and so told a seller "1 left" while the shop said "Out of stock".
+  int reserved;
   List<Uint8List> photos; // first one is the cover
 
   /// Set once the backend has a row for this item, and the Cloudinary URLs
@@ -97,18 +110,25 @@ class InventoryItem {
     this.attributes = const {},
     required this.stock,
     this.delisted = false,
+    this.reserved = 0,
     this.photos = const [],
   });
 
   Uint8List? get cover => photos.isEmpty ? null : photos.first;
 
+  /// What the shop will sell right now. Never negative.
+  int get available => (stock - reserved).clamp(0, 1 << 30);
+
   bool get discounted => mrp > price;
   int get discountPercent =>
       discounted ? (((mrp - price) / mrp) * 100).round() : 0;
 
-  StockStatus get status => stock <= 0
+  /// Keyed on [available], because that is the number the shop acts on. A
+  /// line whose whole stock is spoken for is out of stock to every shopper,
+  /// and saying "In stock" to its seller is the mismatch this fixes.
+  StockStatus get status => available <= 0
       ? StockStatus.out
-      : stock <= lowStockAt
+      : available <= lowStockAt
       ? StockStatus.low
       : StockStatus.inStock;
 

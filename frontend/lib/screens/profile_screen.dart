@@ -4,8 +4,10 @@ import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_shell.dart';
+import '../widgets/design_system.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../data/app_info.dart';
 import '../data/seller.dart';
 import '../data/session.dart';
 import 'addresses_screen.dart';
@@ -18,9 +20,9 @@ import 'seller_onboarding_screen.dart';
 import 'settings_screen.dart';
 import 'wishlist_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
-const _green = Color(0xFF2E7D32);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
+const _green = LamazonTheme.strong;
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -35,7 +37,7 @@ class ProfileScreen extends StatelessWidget {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.account),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 620,
         child: SafeArea(
@@ -88,7 +90,7 @@ class ProfileScreen extends StatelessWidget {
                               color: role == 'seller'
                                   ? const Color(0xFFDCEBD2)
                                   : const Color(0xFFE3ECF6),
-                              text: const Color(0xFF1A1A1A),
+                              text: LamazonTheme.text,
                             ),
                         ],
                       ),
@@ -240,7 +242,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const _SectionTitle('Other Information'),
+                  const _SectionTitle('Other information'),
                   _Card(
                     children: [
                       _Row(
@@ -283,7 +285,7 @@ class ProfileScreen extends StatelessWidget {
                         _Row(
                           icon: LucideIcons.logOut,
                           label: 'Log out',
-                          color: const Color(0xFFD32F2F),
+                          color: LamazonTheme.danger,
                           onTap: () {
                             Session.instance.signOut();
                             ScaffoldMessenger.of(context)
@@ -301,16 +303,30 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 26),
-                  const Center(
+                  Center(
                     child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'Lamazon',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1A1A),
-                        ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Lamazon',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: LamazonTheme.text,
+                            ),
+                          ),
+                          // AppInfo.load() has always run at startup and only
+                          // Settings and Help showed the result. This is where
+                          // somebody looks before reporting a problem.
+                          if (AppInfo.version.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Version ${AppInfo.version}',
+                              style: LamazonTheme.mutedBodyText,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -420,7 +436,7 @@ class _Card extends StatelessWidget {
         children: [
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0)
-              const Divider(height: 1, indent: 52, color: Color(0xFFF1F1EF)),
+              const Divider(height: 1, indent: 52, color: LamazonTheme.canvas),
             children[i],
           ],
         ],
@@ -456,7 +472,7 @@ class _Row extends StatelessWidget {
       trailing: const Icon(
         LucideIcons.chevronRight,
         size: 16,
-        color: Color(0xFF62645E),
+        color: LamazonTheme.muted,
       ),
       onTap: onTap,
     );

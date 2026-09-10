@@ -1,14 +1,15 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'photo_cropper.dart';
 import 'product_card.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+const _muted = LamazonTheme.muted;
 
 /// ponytail: images live in memory as bytes, which is all a device-picked
 /// file is before an upload API exists. Swap _pick() for the upload call
