@@ -41,7 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<(List<Product>, List<Shop>)> _future = _loadWithFallback();
   final _scroll = ScrollController();
   List<Campaign> _campaigns = const [];
-  List<Product> _all = const [];
   int _tab = 0;
   int _shownCount = _productPage;
 
@@ -79,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadCampaigns(),
     ).wait;
     _campaigns = campaigns;
-    _all = items;
     if (_tab >= departments.length) _tab = 0;
     return (items, liveShops);
   }
@@ -89,7 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
       const Duration(seconds: 2),
       onTimeout: () {
         _campaigns = [starterCampaign];
-        _all = products;
         return (products, shops);
       },
     );
@@ -128,11 +125,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LamazonTheme.canvas,
-      drawer: _BrowseDrawer(
-        products: _all,
-        activeTab: _tab,
-        onSelectDepartment: _selectDepartment,
-      ),
       body: SafeArea(
         bottom: false,
         child: Stack(
@@ -416,14 +408,23 @@ class _ServiceHeader extends StatelessWidget {
     ),
     child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 15),
+      // Two controls came out of this header, both of them duplicates.
+      //
+      // The hamburger opened a drawer listing departments and their
+      // categories — the fourth way to reach a department on this one screen,
+      // after the strip 60px below it, the titled grid per department further
+      // down, and "Shop by department" on search. It added nothing that was
+      // not already on screen.
+      //
+      // The avatar on the right went to AppRoutes.account. So does the
+      // Account tab in the bottom bar, which is always visible and carries a
+      // label. The same destination twice, 40px apart vertically.
+      //
+      // What is left is what the header is actually for: who you are shopping
+      // with, and where it is going. The location now gets the full width,
+      // which is why a long address no longer ellipses.
       child: Row(
         children: [
-          ActionIcon(
-            icon: LucideIcons.menu,
-            label: 'Browse departments',
-            onPressed: Scaffold.of(context).openDrawer,
-          ),
-          const SizedBox(width: 13),
           Expanded(
             child: ListenableBuilder(
               listenable: AddressBook.instance,
@@ -460,7 +461,13 @@ class _ServiceHeader extends StatelessWidget {
                               color: LamazonTheme.lime,
                             ),
                             const SizedBox(width: 5),
-                            Expanded(
+                            // Flexible, not Expanded: the chevron follows the
+                            // text instead of being pushed to the far right
+                            // edge. Pinned right it sat flush against the
+                            // account avatar and read as that button's
+                            // dropdown, when it has always belonged to the
+                            // location it now sits beside.
+                            Flexible(
                               child: Text(
                                 address == null
                                     ? 'Choose delivery location'
@@ -476,11 +483,11 @@ class _ServiceHeader extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 4),
                             const Icon(
                               LucideIcons.chevronDown,
                               size: 16,
-                              color: Colors.white,
+                              color: LamazonTheme.lime,
                             ),
                           ],
                         ),
@@ -491,26 +498,12 @@ class _ServiceHeader extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(width: 8),
-          const _AccountShortcut(),
         ],
       ),
     ),
   );
 }
 
-class _AccountShortcut extends StatelessWidget {
-  const _AccountShortcut();
-  @override
-  // Named, not constructed: importing ProfileScreen here closes a
-  // home -> profile -> login -> home cycle that DDC cannot link.
-  Widget build(BuildContext context) => TactileIconButton(
-    icon: LucideIcons.userRound,
-    label: 'Open account',
-    background: Colors.white.withValues(alpha: .96),
-    onPressed: () => Navigator.pushNamed(context, AppRoutes.account),
-  );
-}
 
 class _SearchLaunch extends StatelessWidget {
   final VoidCallback onTap;
@@ -970,147 +963,5 @@ class _HomeClose extends StatelessWidget {
   );
 }
 
-class _BrowseDrawer extends StatelessWidget {
-  final List<Product> products;
-  final int activeTab;
-  final ValueChanged<int> onSelectDepartment;
-  const _BrowseDrawer({
-    required this.products,
-    required this.activeTab,
-    required this.onSelectDepartment,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    final stocked = <String>{
-      for (final product in products)
-        if (product.category.isNotEmpty) product.category,
-    };
-    return Drawer(
-      backgroundColor: LamazonTheme.canvas,
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Browse', style: LamazonTheme.titleText),
-                ),
-                TactileIconButton(
-                  icon: LucideIcons.x,
-                  label: 'Close browse menu',
-                  size: 40,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            for (final (index, department) in departments.indexed) ...[
-              _DrawerDepartment(
-                department: department,
-                selected: index == activeTab,
-                onTap: () {
-                  onSelectDepartment(index);
-                  Navigator.pop(context);
-                },
-              ),
-              if (index != 0)
-                for (final category in department.categories)
-                  if (stocked.isEmpty || stocked.contains(category.name))
-                    _DrawerCategory(
-                      category: category,
-                      department: department.name,
-                    ),
-              const SizedBox(height: 8),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
 
-class _DrawerDepartment extends StatelessWidget {
-  final Department department;
-  final bool selected;
-  final VoidCallback onTap;
-  const _DrawerDepartment({
-    required this.department,
-    required this.selected,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) => ElevatedSurface(
-    radius: LamazonTheme.smallRadius,
-    color: selected ? LamazonTheme.lime : LamazonTheme.surface,
-    onTap: onTap,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    child: Row(
-      children: [
-        Icon(department.icon, size: 19, color: LamazonTheme.strong),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Text(
-            department.name,
-            style: const TextStyle(
-              fontFamily: 'InterTight',
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const Icon(
-          LucideIcons.chevronRight,
-          size: 17,
-          color: LamazonTheme.strong,
-        ),
-      ],
-    ),
-  );
-}
-
-class _DrawerCategory extends StatelessWidget {
-  final CategoryNode category;
-  final String department;
-  const _DrawerCategory({required this.category, required this.department});
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () {
-      Navigator.pop(context);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              SearchScreen(initialQuery: category.name, tab: department),
-        ),
-      );
-    },
-    borderRadius: BorderRadius.circular(10),
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(42, 9, 8, 9),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.dot, size: 16, color: LamazonTheme.muted),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              category.name,
-              style: const TextStyle(
-                fontFamily: 'InterTight',
-                fontSize: 13.5,
-                letterSpacing: .2,
-                color: LamazonTheme.text,
-              ),
-            ),
-          ),
-          const Icon(
-            LucideIcons.arrowUpRight,
-            size: 14,
-            color: LamazonTheme.muted,
-          ),
-        ],
-      ),
-    ),
-  );
-}

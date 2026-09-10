@@ -5,7 +5,7 @@ Every item below is a code change in this repo, verified by a test, a measuremen
 screenshot. Items I did **not** fix are listed in §7 with the reason — the point of this file
 is to be accurate about both halves.
 
-**Verification baseline:** 87 frontend widget tests and the full Go backend suite pass;
+**Verification baseline:** 94 frontend widget tests and the full Go backend suite pass;
 `flutter analyze` reports no issues; the release web bundle builds, renders, and was measured.
 
 ---
@@ -245,6 +245,35 @@ seller's stock ±) is fixed at once. `test/disabled_control_test.dart` pins both
 | Product images | No letterbox bands. |
 | Unpublished policy | Still renders the placeholder, and the sign-in line still reads "Read our". |
 | Accessibility tree | Every control carries a role and `tabindex="0"`; labels announce once. |
+
+
+---
+
+## 7e. The home header: three controls that did not earn their place
+
+Raised by the user looking at the header, not by the register. All three turned out to be real.
+
+**The hamburger (top left).** It opened a drawer listing departments and their categories. But
+the department strip sits 60 px below it, a titled grid per department sits below that, and
+search has "Shop by department" as well — **four routes to the same destination on one screen.**
+The drill-down it added was already provided by the home category tiles, with artwork. Removed,
+along with `_BrowseDrawer`, `_DrawerDepartment`, `_DrawerCategory` and the `_all` field that
+existed only to feed it.
+
+**The account avatar (top right).** `Navigator.pushNamed(context, AppRoutes.account)` — the
+exact route the bottom bar's Account tab already goes to, and that tab is always visible and
+carries a label. The same destination twice, 40 px apart. Removed.
+
+**The chevron beside it.** This one was not a duplicate, it was mis-placed. It has always
+belonged to the delivery location — it lives inside that row's `InkWell` — but the location text
+was `Expanded`, which pushed the chevron to the far right edge, flush against the avatar. So it
+read as the avatar's dropdown. It is `Flexible` now, so the chevron follows the text it belongs
+to, and it is lime like the pin at the other end of the line.
+
+What is left is what a shop header is for: who you are shopping with, and where the order is
+going. The location gets the full width as a side effect, so a long saved address no longer
+ellipses. `test/header_test.dart` pins the absences, because a removed duplicate is exactly the
+kind of thing that grows back.
 
 
 ---
