@@ -27,6 +27,21 @@ abstract final class LamazonTheme {
   static const featuredRadius = 18.0;
   static const touch = 44.0;
 
+  /// Focus is an outline, not only a wash. The lime background alone measured
+  /// 1.10:1 against the surface behind it, where WCAG 1.4.11 asks for 3:1 —
+  /// and controls outside the handful that set focusColor painted nothing at
+  /// all. `strong` on `surface` measures about 8:1.
+  static const focusOutline = 2.0;
+  static const focusColour = strong;
+  static BorderSide get focusBorder =>
+      const BorderSide(color: focusColour, width: focusOutline);
+
+  /// Wrap anything focusable that does not inherit a themed focus ring.
+  static WidgetStateProperty<BorderSide?> focusSide(BorderSide? rest) =>
+      WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused) ? focusBorder : rest,
+      );
+
   static const surfaceShadows = <BoxShadow>[
     BoxShadow(
       color: Color(0x120D2119),
@@ -222,7 +237,7 @@ abstract final class LamazonTheme {
             letterSpacing: .15,
           ),
           shape: rounded,
-        ),
+        ).copyWith(side: focusSide(null)),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
@@ -234,7 +249,7 @@ abstract final class LamazonTheme {
             fontWeight: FontWeight.w600,
           ),
           shape: rounded,
-        ),
+        ).copyWith(side: focusSide(BorderSide.none)),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
@@ -244,12 +259,34 @@ abstract final class LamazonTheme {
             fontFamily: 'InterTight',
             fontWeight: FontWeight.w600,
           ),
-        ),
+        ).copyWith(side: focusSide(null)),
       ),
       iconButtonTheme: IconButtonThemeData(
+        // touch x touch is the WCAG 2.5.8 minimum, applied here once rather
+        // than per icon.
         style: IconButton.styleFrom(
           minimumSize: const Size(touch, touch),
           foregroundColor: strong,
+        ).copyWith(side: focusSide(null)),
+      ),
+      // Chips are used as single-select choices in several places, so they
+      // get the same visible focus as everything else.
+      chipTheme: ChipThemeData(
+        // WidgetStateBorderSide, because ChipThemeData.side is a BorderSide
+        // rather than a property — this is the state-aware BorderSide.
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => states.contains(WidgetState.focused)
+              ? focusBorder
+              : const BorderSide(color: track),
+        ),
+        showCheckmark: false,
+        backgroundColor: surface,
+        selectedColor: lime,
+        labelStyle: const TextStyle(
+          fontFamily: 'InterTight',
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: text,
         ),
       ),
       cardTheme: CardThemeData(elevation: 0, color: surface, shape: rounded),
@@ -375,6 +412,11 @@ class ElevatedSurface extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       label: semanticLabel,
+      // A label plus the labelled subtree is two announcements of the same
+      // control. Only exclude when this surface actually carries a label —
+      // an unlabelled one is just a container, and hiding its contents would
+      // silence them.
+      excludeSemantics: semanticLabel != null,
       child: surface,
     );
   }
@@ -413,30 +455,37 @@ class TactileIconButton extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color.alphaBlend(Colors.white.withValues(alpha: .52), base),
-                base,
-              ],
+        child: FocusRing(
+          shape: BoxShape.circle,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.alphaBlend(Colors.white.withValues(alpha: .52), base),
+                  base,
+                ],
+              ),
+              boxShadow: LamazonTheme.tactileShadows,
             ),
-            boxShadow: LamazonTheme.tactileShadows,
-          ),
-          child: Material(
-            color: Colors.transparent,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: Tooltip(
-              message: label,
-              child: InkWell(
-                onTap: onPressed,
-                customBorder: const CircleBorder(),
-                focusColor: LamazonTheme.lime.withValues(alpha: .42),
-                child: Center(child: Icon(icon, size: 20, color: color)),
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              // excludeFromSemantics because the Semantics above already
+              // names this control. Without it every icon button announced
+              // its label twice — "Back Back", "Open account Open account".
+              child: Tooltip(
+                message: label,
+                excludeFromSemantics: true,
+                child: InkWell(
+                  onTap: onPressed,
+                  customBorder: const CircleBorder(),
+                  focusColor: LamazonTheme.lime.withValues(alpha: .42),
+                  child: Center(child: Icon(icon, size: 20, color: color)),
+                ),
               ),
             ),
           ),
@@ -447,6 +496,67 @@ class TactileIconButton extends StatelessWidget {
 }
 
 /// A text action that shares the highlight and shadow language of icon actions.
+/// Paints the focus outline WCAG 1.4.11 asks for around whatever is focused
+/// inside it.
+///
+/// The app's focus state was a lime background wash and nothing else, which
+/// measured 1.10:1 against the surface behind it against a 3:1 requirement —
+/// and only five code paths set it at all, so most controls showed no focus
+/// whatsoever. This draws over the top of the child rather than around it, so
+/// nothing moves when focus arrives.
+class FocusRing extends StatefulWidget {
+  final Widget child;
+  final BorderRadius? borderRadius;
+  final BoxShape shape;
+  const FocusRing({
+    super.key,
+    required this.child,
+    this.borderRadius,
+    this.shape = BoxShape.rectangle,
+  });
+
+  @override
+  State<FocusRing> createState() => _FocusRingState();
+}
+
+class _FocusRingState extends State<FocusRing> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // canRequestFocus: false keeps this node out of the tab order; hasFocus
+    // is still true whenever a descendant holds focus, which is the whole
+    // point — the ring belongs to whatever the InkWell inside is doing.
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (has) {
+        if (has != _focused) setState(() => _focused = has);
+      },
+      child: Stack(
+        children: [
+          widget.child,
+          if (_focused)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: widget.shape,
+                    borderRadius: widget.shape == BoxShape.circle
+                        ? null
+                        : widget.borderRadius ??
+                              BorderRadius.circular(LamazonTheme.radius),
+                    border: Border.fromBorderSide(LamazonTheme.focusBorder),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class ActionButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -495,7 +605,10 @@ class ActionButton extends StatelessWidget {
       enabled: onPressed != null,
       child: Opacity(
         opacity: onPressed == null ? .5 : 1,
-        child: _material(body, base),
+        child: FocusRing(
+          borderRadius: BorderRadius.circular(23),
+          child: _material(body, base),
+        ),
       ),
     );
   }
@@ -587,7 +700,13 @@ class SectionHeading extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: LamazonTheme.sectionText),
+            // headingLevel 2: this is the widget every screen uses for its
+            // section titles, so one change gives the whole app a heading
+            // outline a screen reader can navigate.
+            Semantics(
+              headingLevel: 2,
+              child: Text(title, style: LamazonTheme.sectionText),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 3),
               Text(subtitle!, style: LamazonTheme.mutedBodyText),

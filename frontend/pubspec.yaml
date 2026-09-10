@@ -65,13 +65,18 @@ flutter:
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
+  # Listed file by file, not by directory. Shipping assets/categories/
+  # wholesale put 4.3 MB of unreferenced artwork into every build —
+  # category-atlas.png (superseded by v2) and everyday-campaign.png, neither
+  # named anywhere in lib/. A directory entry cannot tell the difference; this
+  # list can.
   assets:
     - pubspec.yaml
     - shorebird.yaml
     - assets/logo.png
-    - assets/banner.png
-    - assets/categories/
-    - assets/fonts/
+    - assets/categories/category-atlas-v2.png
+    - assets/categories/campaign-forest.png
+    - assets/fonts/InterTight-Variable.ttf
   uses-material-design: true
 
   fonts:

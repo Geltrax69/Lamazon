@@ -30,13 +30,34 @@ class _DetailsScreenState extends State<DetailsScreen> {
   /// choice the shop did not make on their behalf.
   final Map<String, String> _picked = {};
 
+  /// The cart takes only what the shop actually has, so say when it took
+  /// less than was asked for rather than letting the shortfall surface at
+  /// checkout.
+  bool _added(int wanted) {
+    final got = Cart.instance.add(widget.product, wanted);
+    if (got == wanted) return true;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            got == 0
+                ? 'Your cart already holds every one the shop has.'
+                : 'Only $got left — we added that many.',
+          ),
+        ),
+      );
+    return got > 0;
+  }
+
   void _addToCart() {
-    Cart.instance.add(widget.product, _qty);
+    if (!_added(_qty)) return;
     showAddedToast(context, widget.product, messenger: _messenger.currentState);
   }
 
   void _buyNow() {
-    Cart.instance.add(widget.product, _qty);
+    if (!_added(_qty)) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CartScreen()),
@@ -174,6 +195,8 @@ class _DetailsScreenState extends State<DetailsScreen> {
               ),
               _QtyStepper(
                 qty: _qty,
+                // Never offers more than the shop can supply.
+                max: p.availableStock,
                 onChanged: (q) => setState(() => _qty = q),
               ),
             ],
@@ -548,7 +571,16 @@ class _RoundIcon extends StatelessWidget {
 class _QtyStepper extends StatelessWidget {
   final int qty;
   final ValueChanged<int> onChanged;
-  const _QtyStepper({required this.qty, required this.onChanged});
+
+  /// What the shop has. Null for the seed catalogue, which tracks no stock.
+  final int? max;
+  const _QtyStepper({
+    required this.qty,
+    required this.onChanged,
+    this.max,
+  });
+
+  bool get _atCap => max != null && qty >= max!;
 
   @override
   Widget build(BuildContext context) {
@@ -563,24 +595,37 @@ class _QtyStepper extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              qty.toString().padLeft(2, '0'),
+              // A count, not a zero-padded code.
+              '$qty',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),
-          _step(LucideIcons.plus, () => onChanged(qty + 1), filled: true),
+          _step(
+            LucideIcons.plus,
+            () => onChanged(qty + 1),
+            filled: true,
+            label: _atCap ? 'That is all the shop has' : 'Increase quantity',
+          ),
         ],
       ),
     );
   }
 
-  Widget _step(IconData icon, VoidCallback onTap, {required bool filled}) {
+  Widget _step(
+    IconData icon,
+    VoidCallback onTap, {
+    required bool filled,
+    String? label,
+  }) {
+    final off = filled ? _atCap : qty <= 1;
     return TactileIconButton(
       icon: icon,
-      label: filled ? 'Increase quantity' : 'Decrease quantity',
-      onPressed: !filled && qty <= 1 ? null : onTap,
+      label: label ?? (filled ? 'Increase quantity' : 'Decrease quantity'),
+      onPressed: off ? null : onTap,
       background: filled ? LamazonTheme.lime : LamazonTheme.surface,
       foreground: LamazonTheme.strong,
-      size: 38,
+      // The WCAG 2.5.8 minimum, not 38.
+      size: LamazonTheme.touch,
     );
   }
 }

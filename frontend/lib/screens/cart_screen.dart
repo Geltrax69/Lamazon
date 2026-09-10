@@ -15,8 +15,36 @@ import '../data/session.dart';
 import '../widgets/product_card.dart';
 import 'location_screen.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // A basket left open in a background tab can outlive the stock it holds.
+    // Correcting it here means the shopper sees the change with the items in
+    // front of them, rather than being refused at "Place order".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final trimmed = Cart.instance.reconcile();
+      if (trimmed.isEmpty || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            trimmed.length == 1
+                ? 'Only some of "${trimmed.first}" is left — '
+                      'we reduced it to what the shop has.'
+                : 'Some items ran low. We reduced them to what the shop has.',
+          ),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +230,7 @@ class _CartRow extends StatelessWidget {
     return Dismissible(
       key: ValueKey(p.id),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => Cart.instance.remove(p.id),
+      onDismissed: (_) => _removeWithUndo(context, p.id),
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -318,27 +346,37 @@ class _QtyControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final last = item.qty <= 1;
+    final atCap = Cart.instance.atCap(item.product);
     return Row(
       children: [
         // Going below one removes the line, so at one the button says so —
         // swiping the row away is not discoverable with a mouse.
         _qtyBtn(
           last ? LucideIcons.trash2 : LucideIcons.minus,
-          () => Cart.instance.setQty(item.product.id, item.qty - 1),
+          () => last
+              ? _removeWithUndo(context, item.product.id)
+              : Cart.instance.setQty(item.product.id, item.qty - 1),
           filled: false,
           danger: last,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            item.qty.toString().padLeft(2, '0'),
+            // Not padLeft(2, '0'): "05" reads as a code, not a count.
+            '${item.qty}',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
         _qtyBtn(
           LucideIcons.plus,
-          () => Cart.instance.setQty(item.product.id, item.qty + 1),
+          atCap
+              ? null
+              : () => Cart.instance.setQty(item.product.id, item.qty + 1),
           filled: true,
+          // Says why, rather than leaving a dead grey button.
+          label: atCap
+              ? 'That is all the shop has'
+              : 'Increase quantity',
         ),
       ],
     );
@@ -346,23 +384,48 @@ class _QtyControls extends StatelessWidget {
 
   Widget _qtyBtn(
     IconData icon,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     required bool filled,
     bool danger = false,
+    String? label,
   }) {
     return TactileIconButton(
-      label: danger
-          ? 'Remove item'
-          : filled
-          ? 'Increase quantity'
-          : 'Decrease quantity',
+      label:
+          label ??
+          (danger
+              ? 'Remove item'
+              : filled
+              ? 'Increase quantity'
+              : 'Decrease quantity'),
       onPressed: onTap,
       icon: icon,
-      size: 38,
+      // LamazonTheme.touch, not 38: WCAG 2.5.8 and Material both put the
+      // floor at 44, and these are the most-tapped controls in the app.
+      size: LamazonTheme.touch,
       selected: filled,
       foreground: danger ? LamazonTheme.danger : LamazonTheme.strong,
     );
   }
+}
+
+/// Removing a line is one tap and used to be unrecoverable — the last item
+/// took the whole basket with it. Undo costs nothing and is worth more here
+/// than a confirmation dialog would be.
+void _removeWithUndo(BuildContext context, String id) {
+  final gone = Cart.instance.remove(id);
+  if (gone == null) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('Removed ${gone.product.name}'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => Cart.instance.putBack(gone),
+        ),
+      ),
+    );
 }
 
 class _CheckoutPanel extends StatefulWidget {
@@ -472,6 +535,27 @@ class _CheckoutPanelState extends State<_CheckoutPanel> {
           ),
           const SizedBox(height: 4),
           _summaryRow('Delivery', cart.shipping),
+          const SizedBox(height: 2),
+          // The number people actually want, which the API has been
+          // returning all along while no screen showed it.
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.clock,
+                size: 13,
+                color: LamazonTheme.muted,
+              ),
+              const SizedBox(width: 6),
+              // Flexible: at 320px with text scaled to 1.3 an unconstrained
+              // Text in a Row runs straight off the edge.
+              Flexible(
+                child: Text(
+                  'Arrives in about $deliveryEta',
+                  style: LamazonTheme.mutedBodyText,
+                ),
+              ),
+            ],
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: TrackDivider(),

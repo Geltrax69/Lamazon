@@ -34,17 +34,23 @@ class ScreenHeader extends StatelessWidget {
           ),
           // Flexible, so a long title or a wide action shortens the title
           // rather than running off the edge of a narrow phone.
+          // headingLevel 1: the app had no heading semantics anywhere, so a
+          // screen-reader user had no way to jump between sections or tell
+          // where a screen began. Every title was announced as a generic.
           Flexible(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+              child: Semantics(
+                headingLevel: 1,
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),

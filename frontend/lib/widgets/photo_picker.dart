@@ -283,13 +283,19 @@ class PhotoStrip extends StatelessWidget {
 
 /// Renders a seller photo, falling back to a neutral placeholder so a row
 /// never collapses when there is no picture yet.
+///
+/// [url] is the photo as the server holds it. Local bytes only exist during
+/// the session that uploaded them, so without this a seller saw a grey square
+/// where their own product photo should be from the next reload onwards.
 class PhotoOrPlaceholder extends StatelessWidget {
   final Uint8List? photo;
+  final String? url;
   final double size;
   final double radius;
   const PhotoOrPlaceholder({
     super.key,
     required this.photo,
+    this.url,
     required this.size,
     this.radius = 12,
   });
@@ -301,7 +307,7 @@ class PhotoOrPlaceholder extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: photo == null
+        child: photo == null && (url == null || url!.trim().isEmpty)
             ? Container(
                 color: const Color(0xFFE8E8E4),
                 alignment: Alignment.center,
@@ -311,7 +317,9 @@ class PhotoOrPlaceholder extends StatelessWidget {
                   color: Colors.grey,
                 ),
               )
-            : Image.memory(photo!, fit: BoxFit.contain),
+            : photo != null
+            ? Image.memory(photo!, fit: BoxFit.contain)
+            : NetImage(url: url!, sourceWidth: 256),
       ),
     );
   }

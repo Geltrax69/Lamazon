@@ -517,6 +517,42 @@ class Api {
     return _inventoryItem(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  /// Moves stock on the server. The backend floors at zero in SQL, so a
+  /// racing update cannot drive it negative; the row it returns is the truth.
+  Future<InventoryItem> patchStock(String itemId, {required int delta}) async {
+    final res = await http
+        .patch(
+          _url('/api/seller/items/$itemId/stock'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode({'delta': delta}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) throw http.ClientException(_reason(res));
+    return _inventoryItem(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// Takes a product off the shop, or puts it back. Every order for it is
+  /// untouched, which is what makes this the safe half of "remove".
+  Future<void> setDelisted(String itemId, bool delisted) async {
+    final res = await http
+        .patch(
+          _url('/api/seller/items/$itemId/listing'),
+          headers: {...await _authHeader(), 'Content-Type': 'application/json'},
+          body: jsonEncode({'delisted': delisted}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 204) throw http.ClientException(_reason(res));
+  }
+
+  /// Refused with 409 while any order references the item — the message says
+  /// how many, and delisting is the way past it.
+  Future<void> deleteItem(String itemId) async {
+    final res = await http
+        .delete(_url('/api/seller/items/$itemId'), headers: await _authHeader())
+        .timeout(_timeout);
+    if (res.statusCode != 204) throw http.ClientException(_reason(res));
+  }
+
   Future<List<InventoryItem>> sellerItems() async {
     final res = await http
         .get(_url('/api/seller/items'), headers: await _authHeader())
@@ -842,6 +878,7 @@ class Api {
           compareGroup: r['compareGroup'] as String? ?? '',
           attributes: _attributes(r),
           stock: (r['stock'] as num?)?.toInt() ?? 0,
+          delisted: r['delisted'] as bool? ?? false,
         )
         ..serverId = r['id'] as String
         ..imageUrls = (r['imageUrls'] as List<dynamic>? ?? const [])

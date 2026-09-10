@@ -68,8 +68,12 @@ type InventoryItem struct {
 	CompareGroup string            `json:"compareGroup"`
 	Attributes   map[string]string `json:"attributes,omitempty"`
 	Stock        int               `json:"stock"`
-	Status       string            `json:"status"`    // derived from stock, never stored
-	ImageURLs    []string          `json:"imageUrls"` // Cloudinary, in upload order
+	// Hidden from the shop but kept whole. A product with orders against it
+	// cannot be deleted — the orders are the record of a sale — so this is
+	// how a seller retires one without destroying its history.
+	Delisted  bool     `json:"delisted"`
+	Status    string   `json:"status"`    // derived from stock, never stored
+	ImageURLs []string `json:"imageUrls"` // Cloudinary, in upload order
 }
 
 // ItemOption is one thing a buyer picks, with the choices the shop offers.

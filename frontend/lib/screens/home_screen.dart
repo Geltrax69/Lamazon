@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
               LamazonTheme.gutter(context);
           return ListView(
             controller: _scroll,
-            padding: EdgeInsets.fromLTRB(side, 8, side, 112),
+            padding: EdgeInsets.fromLTRB(side, 8, side, bottomNavInset(context) + 24),
             children: [
               const _ServiceHeader(),
               const SizedBox(height: 12),
@@ -553,6 +553,8 @@ class _DepartmentStrip extends StatelessWidget {
           selected: selected,
           button: true,
           label: department.name,
+          // Otherwise: "Electronics, Electronics category, Electronics".
+          excludeSemantics: true,
           child: SizedBox(
             width: 66,
             child: InkWell(
@@ -702,6 +704,9 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     label: 'Browse ${entry.name}',
+    // The artwork and the caption below it both name the category too, so
+    // without this the tile announced itself three times over.
+    excludeSemantics: true,
     child: DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),

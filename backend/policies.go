@@ -11,9 +11,14 @@ import (
 
 // Policy is one written document — terms, privacy, and the rest.
 type Policy struct {
-	Slug      string    `json:"slug"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
+	Slug  string `json:"slug"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	// False while the draft still has bracketed blanks in it. The app needs
+	// to know: asking somebody to agree to a document that renders as "not
+	// published yet" is collecting consent against nothing, so the sign-in
+	// screen drops the consent line until this is true.
+	Published bool      `json:"published"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -37,7 +42,8 @@ func (a *API) handlePolicies(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/admin/") && policyHasBlanks(p.Body) {
+		p.Published = !policyHasBlanks(p.Body)
+		if !strings.HasPrefix(r.URL.Path, "/api/admin/") && !p.Published {
 			p.Body = "This policy is not published yet. Please check back before placing an order."
 		}
 		out = append(out, p)

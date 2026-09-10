@@ -73,6 +73,11 @@ class InventoryItem {
   String compareGroup;
   Map<String, String> attributes;
   int stock;
+
+  /// Hidden from the shop, kept in the seller's own list. A product with
+  /// orders against it cannot be deleted — the orders are the record of the
+  /// sale — so this is how it is retired without destroying that history.
+  bool delisted;
   List<Uint8List> photos; // first one is the cover
 
   /// Set once the backend has a row for this item, and the Cloudinary URLs
@@ -91,6 +96,7 @@ class InventoryItem {
     this.compareGroup = '',
     this.attributes = const {},
     required this.stock,
+    this.delisted = false,
     this.photos = const [],
   });
 
@@ -393,15 +399,75 @@ class Seller extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeItem(String id) {
-    _items.removeWhere((i) => i.id == id);
+  /// Deletes on the server, not just on screen. Both of these used to be
+  /// synchronous and local: the row left the seller's list while the product
+  /// stayed live and purchasable in the shop, and every counter on the
+  /// dashboard agreed with a stock level that did not exist.
+  ///
+  /// Returns the failure to show, or null when it worked. The server refuses
+  /// with 409 while any order references the item; [setDelisted] is the way
+  /// past that, and the dashboard offers it in the same breath.
+  Future<String?> removeItem(String id) async {
+    final item = _items.firstWhere((i) => i.id == id);
+    final serverId = item.serverId;
+    // Never saved: there is nothing on the server to delete.
+    if (serverId == null) {
+      _items.remove(item);
+      notifyListeners();
+      return null;
+    }
+    try {
+      await Api.instance.deleteItem(serverId);
+      _items.remove(item);
+      notifyListeners();
+      return null;
+    } catch (e) {
+      logApiFailure('item delete $id', e);
+      return e.toString().replaceFirst('ClientException: ', '');
+    }
+  }
+
+  /// Off the shop, still in this list, history intact.
+  Future<String?> setDelisted(String id, bool delisted) async {
+    final item = _items.firstWhere((i) => i.id == id);
+    final serverId = item.serverId;
+    if (serverId == null) return 'Save this product before hiding it.';
+    final before = item.delisted;
+    // Optimistic, then put it back if the server disagrees — the same shape
+    // acceptOrder and rejectOrder use.
+    item.delisted = delisted;
     notifyListeners();
+    try {
+      await Api.instance.setDelisted(serverId, delisted);
+      return null;
+    } catch (e) {
+      logApiFailure('item listing $id', e);
+      item.delisted = before;
+      notifyListeners();
+      return e.toString().replaceFirst('ClientException: ', '');
+    }
   }
 
   /// Stock never goes negative — a sale below zero is a data bug, not a state.
-  void adjustStock(String id, int delta) {
+  /// The server floors it in SQL too, and its answer wins over the guess made
+  /// here, so the badge cannot drift away from what the shop is selling.
+  Future<String?> adjustStock(String id, int delta) async {
     final item = _items.firstWhere((i) => i.id == id);
+    final serverId = item.serverId;
+    final before = item.stock;
     item.stock = (item.stock + delta).clamp(0, 1 << 30);
     notifyListeners();
+    if (serverId == null) return null;
+    try {
+      final saved = await Api.instance.patchStock(serverId, delta: delta);
+      item.stock = saved.stock;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      logApiFailure('item stock $id', e);
+      item.stock = before;
+      notifyListeners();
+      return e.toString().replaceFirst('ClientException: ', '');
+    }
   }
 }

@@ -1,5 +1,7 @@
 import '../data/money.dart';
 import 'package:flutter/material.dart';
+
+import '../data/orders.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -477,7 +479,7 @@ class _OrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Order No. #${(order['id'] as String).toUpperCase()}',
+                  'Order No. ${orderRef(order['id'] as String)}',
                   style: const TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,

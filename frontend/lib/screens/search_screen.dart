@@ -40,6 +40,25 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Product> _hits = const [];
   bool _busy = false;
   Timer? _debounce;
+  _Sort _sort = _Sort.relevance;
+
+  /// What the grid actually shows. Relevance is the server's own order, so
+  /// that branch returns the list untouched rather than re-ranking it here.
+  List<Product> get _sorted {
+    if (_sort == _Sort.relevance) return _hits;
+    final out = [..._hits];
+    switch (_sort) {
+      case _Sort.priceLow:
+        out.sort((a, b) => a.price.compareTo(b.price));
+      case _Sort.priceHigh:
+        out.sort((a, b) => b.price.compareTo(a.price));
+      case _Sort.discount:
+        out.sort((a, b) => b.discountPercent.compareTo(a.discountPercent));
+      case _Sort.relevance:
+        break;
+    }
+    return out;
+  }
 
   bool get _scoped => _tab.isNotEmpty && _tab != 'All';
 
@@ -109,7 +128,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final q = _query.trim();
-    final results = _hits;
+    final results = _sorted;
     return Scaffold(
       // The bar floats over the content rather than reserving a strip, which
       // is how it sits on home — bottomNavigationBar would push every screen
@@ -118,7 +137,7 @@ class _SearchScreenState extends State<SearchScreen> {
       bottomNavigationBar: const SafeArea(
         child: AppBottomNav(current: AppTab.none),
       ),
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 1400,
         child: SafeArea(
@@ -128,21 +147,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          LucideIcons.arrowLeft,
-                          size: 18,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                      ),
+                    TactileIconButton(
+                      icon: LucideIcons.arrowLeft,
+                      label: 'Back',
+                      onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -150,15 +158,17 @@ class _SearchScreenState extends State<SearchScreen> {
                         height: 56,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: LamazonTheme.surface,
                           borderRadius: BorderRadius.circular(24),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              LucideIcons.search,
-                              size: 18,
-                              color: Colors.grey,
+                            const ExcludeSemantics(
+                              child: Icon(
+                                LucideIcons.search,
+                                size: 18,
+                                color: LamazonTheme.muted,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -169,29 +179,45 @@ class _SearchScreenState extends State<SearchScreen> {
                                 textInputAction: TextInputAction.search,
                                 onSubmitted: _run,
                                 decoration: InputDecoration(
-                                  // The scope is in the hint rather than
-                                  // silent: a search that quietly ignores
-                                  // half the catalogue reads as broken.
-                                  labelText: 'Search products',
-                                  hintText: _scoped
-                                      ? 'Search in $_tab...'
-                                      : 'Search products, shops...',
-                                  hintStyle: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
-                                  ),
+                                  // labelText only. Setting hintText to the
+                                  // same thing printed the label twice,
+                                  // stacked, the moment the field focused.
+                                  // The scope belongs in the label, because a
+                                  // search that quietly ignores half the
+                                  // catalogue reads as broken.
+                                  labelText: _scoped
+                                      ? 'Search in $_tab'
+                                      : 'Search products, shops',
                                   filled: false,
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
                                   focusedBorder: const UnderlineInputBorder(
                                     borderSide: BorderSide(
-                                      color: Color(0xFF1D4A3C),
+                                      color: LamazonTheme.strong,
                                       width: 2,
                                     ),
                                   ),
                                 ),
                               ),
                             ),
+                            // Clearing a query took selecting the text and
+                            // deleting it; every search field on the web has
+                            // had this control for twenty years.
+                            if (q.isNotEmpty)
+                              TactileIconButton(
+                                icon: LucideIcons.x,
+                                label: 'Clear search',
+                                size: 36,
+                                onPressed: () {
+                                  _debounce?.cancel();
+                                  _controller.clear();
+                                  setState(() {
+                                    _query = '';
+                                    _hits = const [];
+                                    _busy = false;
+                                  });
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -212,6 +238,47 @@ class _SearchScreenState extends State<SearchScreen> {
                         _run(_query);
                       },
                     ),
+                  ),
+                ),
+              // How many, and in what order. Without a count there is no way
+              // to tell "nothing matched" from "still loading", and no way to
+              // trust that the six cards on screen are all there is.
+              if (q.isNotEmpty && !_busy && results.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            results.length == 1
+                                ? '1 result for "$q"'
+                                : '${results.length} results for "$q"',
+                            style: LamazonTheme.mutedBodyText,
+                          ),
+                        ),
+                      ),
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<_Sort>(
+                          value: _sort,
+                          isDense: true,
+                          borderRadius: BorderRadius.circular(
+                            LamazonTheme.smallRadius,
+                          ),
+                          style: LamazonTheme.mutedBodyText,
+                          onChanged: (next) =>
+                              setState(() => _sort = next ?? _sort),
+                          items: [
+                            for (final option in _Sort.values)
+                              DropdownMenuItem(
+                                value: option,
+                                child: Text(option.label),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               Expanded(
@@ -237,7 +304,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         },
                       )
                     : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                        padding: EdgeInsets.fromLTRB(20, 8, 20, bottomNavInset(context) + 16),
                         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: productTileMax,
                           mainAxisSpacing: 16,
@@ -302,7 +369,7 @@ class _SearchHint extends StatelessWidget {
     ].take(6).toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 108),
+      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 24),
       children: [
         if (!scoped) ...[
           const _HintHeading('Shop by department'),
@@ -407,11 +474,15 @@ class _SearchHint extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 60),
             child: Column(
               children: [
-                Icon(LucideIcons.search, size: 40, color: Colors.grey),
+                Icon(
+                  LucideIcons.search,
+                  size: 40,
+                  color: LamazonTheme.muted,
+                ),
                 SizedBox(height: 12),
                 Text(
                   'Search across all shops and products',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                  style: LamazonTheme.mutedBodyText,
                 ),
               ],
             ),
@@ -421,8 +492,13 @@ class _SearchHint extends StatelessWidget {
   }
 }
 
-/// A department as something you can see rather than read: its own colour
-/// behind its own icon.
+/// A department, on the same ivory as everything else.
+///
+/// These were pastel blue, peach, lilac and pink blocks — precisely the
+/// "rainbow-department dashboard" DESIGN.md opens by refusing, and the reason
+/// this screen read as a different product from home. The department's own
+/// colour survives as the icon, where it identifies without shouting; the
+/// surface stays in the system.
 class _DepartmentTile extends StatelessWidget {
   final Department department;
   final VoidCallback onTap;
@@ -430,41 +506,53 @@ class _DepartmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = department.colour ?? const Color(0xFF1A1A1A);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(department.icon, size: 17, color: accent),
+    final accent = department.colour ?? LamazonTheme.strong;
+    return Semantics(
+      button: true,
+      label: department.name,
+      child: Material(
+        color: LamazonTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: LamazonTheme.track),
+              borderRadius: BorderRadius.circular(18),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                department.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.2,
-                  fontWeight: FontWeight.w700,
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(department.icon, size: 17, color: accent),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ExcludeSemantics(
+                    child: Text(
+                      department.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        color: LamazonTheme.text,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -499,4 +587,17 @@ class _NoResults extends StatelessWidget {
       onAction: onReset,
     );
   }
+}
+
+
+/// How the results are ordered. Relevance is whatever the server ranked;
+/// the rest are client-side because the result set is already in hand.
+enum _Sort {
+  relevance('Best match'),
+  priceLow('Price: low to high'),
+  priceHigh('Price: high to low'),
+  discount('Biggest discount');
+
+  final String label;
+  const _Sort(this.label);
 }

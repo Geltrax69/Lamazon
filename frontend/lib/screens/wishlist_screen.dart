@@ -80,7 +80,7 @@ class WishlistScreen extends StatelessWidget {
                             ).popUntil((r) => r.isFirst),
                           )
                         : GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomNavInset(context) + 16),
                             gridDelegate:
                                 SliverGridDelegateWithMaxCrossAxisExtent(
                                   maxCrossAxisExtent: productTileMax,

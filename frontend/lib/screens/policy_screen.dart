@@ -4,10 +4,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../data/api.dart';
 import '../data/policy_text.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/design_system.dart';
 import '../widgets/screen_header.dart';
 
-const _ink = Color(0xFF1A1A1A);
-const _muted = Color(0xFF6B6B6B);
+const _ink = LamazonTheme.text;
+// The system's muted, not a cool grey of this screen's own.
+const _muted = LamazonTheme.muted;
 
 /// One written document. The text lives in the database so an admin can change
 /// it without a deploy — a refund policy that needs an engineer is a refund
@@ -16,16 +18,29 @@ class PolicyDoc {
   final String slug;
   final String title;
   final String body;
+
+  /// False while the draft still has blanks in it, in which case the server
+  /// sends a placeholder rather than a half-written contract. The sign-in
+  /// screen reads this before deciding whether it can ask anyone to agree.
+  final bool published;
+
+  /// When it last changed. Null for the bundled offline copies, which have
+  /// no date to claim.
+  final DateTime? updatedAt;
   const PolicyDoc({
     required this.slug,
     required this.title,
     required this.body,
+    this.published = false,
+    this.updatedAt,
   });
 
   factory PolicyDoc.fromJson(Map<String, dynamic> r) => PolicyDoc(
     slug: r['slug'] as String? ?? '',
     title: r['title'] as String? ?? '',
     body: r['body'] as String? ?? '',
+    published: r['published'] as bool? ?? false,
+    updatedAt: DateTime.tryParse(r['updatedAt'] as String? ?? ''),
   );
 
   IconData get icon => switch (slug) {
@@ -93,7 +108,7 @@ class _PolicyScreenState extends State<PolicyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 700,
         child: SafeArea(
@@ -118,7 +133,19 @@ class _PolicyScreenState extends State<PolicyScreen> {
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-                      children: [PolicyBody(text: doc.body)],
+                      children: [
+                        // A policy with no date is a policy you cannot tell
+                        // is current. The API has always returned it.
+                        if (doc.published && doc.updatedAt != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Text(
+                              'Last updated ${_asDate(doc.updatedAt!)}',
+                              style: LamazonTheme.mutedBodyText,
+                            ),
+                          ),
+                        PolicyBody(text: doc.body),
+                      ],
                     ),
                   ),
                 ],
@@ -223,4 +250,15 @@ class PolicyLinks extends StatelessWidget {
       },
     );
   }
+}
+
+
+/// "3 September 2026". No intl dependency for one date on one screen.
+String _asDate(DateTime d) {
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  final local = d.toLocal();
+  return '${local.day} ${months[local.month - 1]} ${local.year}';
 }

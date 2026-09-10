@@ -9,6 +9,7 @@ import 'package:lamazon/data/orders.dart';
 import 'package:lamazon/data/seller.dart';
 import 'package:lamazon/data/session.dart';
 import 'package:lamazon/data/wishlist.dart';
+import 'package:lamazon/widgets/design_system.dart';
 import 'package:lamazon/screens/location_screen.dart';
 import 'package:lamazon/screens/orders_screen.dart';
 import 'package:lamazon/screens/cart_screen.dart';
@@ -35,7 +36,7 @@ void main() {
       expect(find.text('Local choice. Global experience.'), findsOneWidget);
 
       // Not pumpAndSettle: the login backdrop animates forever.
-      await tester.tap(find.text('Skip login'));
+      await tester.tap(find.text('Browse the shop'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(Session.instance.onboarded, isTrue);
@@ -356,10 +357,53 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('Check availability'));
-      await tester.pump();
+      // One press, not two. The serviceability answer is shown from the
+      // start, because the city is chosen from a list rather than typed —
+      // gating submit behind a separate "Check availability" press bought
+      // nothing and cost everyone a tap.
+      expect(find.text('Check availability'), findsNothing);
       expect(find.text('We deliver here'), findsOneWidget);
       expect(find.text('Save address'), findsOneWidget);
+    });
+  });
+
+  testWidgets('the address form can be completed without a pointer', (
+    tester,
+  ) async {
+    await mockNetworkImagesFor(() async {
+      await tester.pumpWidget(const MaterialApp(home: LocationScreen()));
+
+      // The submit used to be a bare GestureDetector: no role, not in the
+      // tab order, deaf to Enter and Space. A delivery address is required
+      // to place any order, so that closed the whole purchase funnel to
+      // anyone not using a mouse.
+      final save = find.ancestor(
+        of: find.text('Save address'),
+        matching: find.byType(ActionButton),
+      );
+      expect(save, findsOneWidget);
+      expect(
+        tester.getSemantics(save),
+        matchesSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          label: 'Save address',
+        ),
+        reason: 'the submit has to be a button to assistive technology',
+      );
+
+      // And so do the Home / Office / Other chips, which are a single-select
+      // group rather than three unrelated checkboxes.
+      for (final label in ['Home', 'Office', 'Other']) {
+        expect(
+          find.descendant(
+            of: find.byType(LocationScreen),
+            matching: find.text(label),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(find.byType(InkWell), findsWidgets);
     });
   });
 

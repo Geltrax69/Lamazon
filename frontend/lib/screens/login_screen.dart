@@ -36,6 +36,32 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _error;
 
+  /// Whether the terms and privacy policies are actually written. Consent
+  /// against a page that reads "This policy is not published yet" is consent
+  /// against nothing, so the line below the button waits for a real document
+  /// rather than pointing at an empty one.
+  bool _policiesPublished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPolicies();
+  }
+
+  Future<void> _checkPolicies() async {
+    try {
+      final docs = await loadPolicies();
+      final needed = {'terms', 'privacy'};
+      final live = docs
+          .where((d) => needed.contains(d.slug) && d.published)
+          .length;
+      if (mounted) setState(() => _policiesPublished = live == needed.length);
+    } catch (e) {
+      // Offline is not proof they are published, so the line stays off.
+      logApiFailure('policies', e);
+    }
+  }
+
   @override
   void dispose() {
     _email.dispose();
@@ -78,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(
         () => _error =
             'Could not reach the server, so no code went out. Try again, or '
-            'use Skip login to browse.',
+            'use Browse the shop to look around.',
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -177,13 +203,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The categories the app sells, drifting past behind the sign-in card.
+    // What the shop actually sells, drifting past behind the sign-in card.
+    //
+    // shownCatalog, not the bundled `products` list: this used to advertise
+    // about a dozen sample photographs — bread, pizza, a teddy bear — that
+    // are not in the catalogue and cannot be bought. A first impression
+    // built out of stock that does not exist is the worst possible one for
+    // a shop to make.
     final urls = [
       for (final tab in ['Electronics', 'Grocery', 'Food', 'Gifts', 'Beauty'])
         // Thumbnails: the backdrop tiles are ~104px, so full photos would
         // burn megabytes on first paint for no visible gain.
-        ...products
-            .where((p) => p.tab == tab)
+        ...shownCatalog
+            .where((p) => p.tab == tab && p.imageUrl.trim().isNotEmpty)
             .map((p) => thumb(p.imageUrl, 200)),
     ];
     return Scaffold(
@@ -217,8 +249,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(0, 8, 16, 0),
+                    // "Skip login" describes what the code does. "Browse
+                    // the shop" describes what the person gets, which is the
+                    // whole reason they opened a shopping app.
                     child: ActionButton(
-                      label: 'Skip login',
+                      label: 'Browse the shop',
                       primary: false,
                       onPressed: () => _enter(skip: true),
                     ),
@@ -379,10 +414,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 // open is not agreeing to anything — and these used to be bare
                 // GestureDetectors, which a keyboard could not reach and a
                 // screen reader announced as ordinary text.
-                const Text(
-                  'By continuing, you agree to our',
+                //
+                // The claim itself is now conditional: until both documents
+                // are actually written, the app links to them without
+                // asserting that anyone has agreed to them.
+                Text(
+                  _policiesPublished
+                      ? 'By continuing, you agree to our'
+                      : 'Read our',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'InterTight',
                     fontSize: 12.5,
                     letterSpacing: 0.2,
@@ -407,12 +448,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// Used only if the catalog ever ships without these categories.
-const _fallback = [
-  'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=300',
-  'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300',
-  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=300',
-];
+// Empty on purpose. When the shop has nothing photographed yet, the backdrop
+// shows nothing rather than three stock photographs of groceries the shop
+// does not stock — an empty backdrop is honest, a fake one is an advert for
+// products nobody can buy.
+const _fallback = <String>[];
 
 /// One policy name in the sign-in footer. A real button, so it takes keyboard
 /// focus, announces itself as a control and carries a 44px target.

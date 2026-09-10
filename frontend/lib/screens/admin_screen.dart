@@ -1181,27 +1181,41 @@ class _AdminHomeState extends State<_AdminHome> {
                     },
                   )
                 else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final tab in _Tab.values)
-                        ChoiceChip(
-                          label: Text(
-                            tab == _Tab.banners
+                  Semantics(
+                    container: true,
+                    label: 'Admin section',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tab in _Tab.values)
+                          Semantics(
+                            // ChoiceChip announces role=checkbox, which says
+                            // "tick any of these". These are eleven
+                            // destinations and exactly one is current.
+                            inMutuallyExclusiveGroup: true,
+                            selected: _tab == tab,
+                            label: tab == _Tab.banners
                                 ? tab.label
-                                : '${tab.label} (${counts[tab]})',
+                                : '${tab.label}, ${counts[tab]}',
+                            excludeSemantics: true,
+                            child: ChoiceChip(
+                              label: Text(
+                                tab == _Tab.banners
+                                    ? tab.label
+                                    : '${tab.label} (${counts[tab]})',
+                              ),
+                              selected: _tab == tab,
+                              onSelected: (_) => _show(tab),
+                              selectedColor: LamazonTheme.accent,
+                              backgroundColor: LamazonTheme.surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
                           ),
-                          selected: _tab == tab,
-                          onSelected: (_) => _show(tab),
-                          selectedColor: LamazonTheme.accent,
-                          backgroundColor: LamazonTheme.surface,
-                          side: BorderSide.none,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 const SizedBox(height: 20),
                 if (_hasTable) ..._tableControls(),
@@ -1392,7 +1406,14 @@ class _AdminHomeState extends State<_AdminHome> {
   ];
   Widget _pagination() {
     final total = _filtered(_activeRows).length;
-    final page = _page.clamp(0, total == 0 ? 0 : (total - 1) ~/ _pageSize);
+    // Nothing at all: the empty state above has already said so, and
+    // "0 records" under it was the third message in a stack of three.
+    if (total == 0) return const SizedBox.shrink();
+    final page = _page.clamp(0, (total - 1) ~/ _pageSize);
+    // The count is worth showing on any result set — it is how you tell a
+    // search worked. The buttons are not: Previous and Next beside a single
+    // page are two controls that can never do anything.
+    final paged = total > _pageSize;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Wrap(
@@ -1400,24 +1421,24 @@ class _AdminHomeState extends State<_AdminHome> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
-            total == 0
-                ? '0 records'
-                : '${page * _pageSize + 1}–${((page + 1) * _pageSize).clamp(0, total)} of $total',
+            '${page * _pageSize + 1}–${((page + 1) * _pageSize).clamp(0, total)} of $total',
           ),
-          ActionButton(
-            onPressed: page == 0
-                ? null
-                : () => setState(() => _page = page - 1),
-            label: 'Previous',
-            primary: false,
-          ),
-          ActionButton(
-            onPressed: (page + 1) * _pageSize >= total
-                ? null
-                : () => setState(() => _page = page + 1),
-            label: 'Next',
-            primary: false,
-          ),
+          if (paged) ...[
+            ActionButton(
+              onPressed: page == 0
+                  ? null
+                  : () => setState(() => _page = page - 1),
+              label: 'Previous',
+              primary: false,
+            ),
+            ActionButton(
+              onPressed: (page + 1) * _pageSize >= total
+                  ? null
+                  : () => setState(() => _page = page + 1),
+              label: 'Next',
+              primary: false,
+            ),
+          ],
         ],
       ),
     );
@@ -2833,27 +2854,35 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: ElevatedSurface(
-        onTap: onTap,
-        radius: LamazonTheme.featuredRadius,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: color ?? LamazonTheme.text,
+      // One node saying "Orders 4", not two saying "4" and "Orders" — and
+      // definitely not the six bare digits these used to announce, which
+      // told a screen-reader user nothing at all.
+      child: Semantics(
+        label: '$label: $value',
+        button: onTap != null,
+        excludeSemantics: true,
+        child: ElevatedSurface(
+          onTap: onTap,
+          radius: LamazonTheme.featuredRadius,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: color ?? LamazonTheme.text,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
+              ),
+            ],
+          ),
         ),
       ),
     );

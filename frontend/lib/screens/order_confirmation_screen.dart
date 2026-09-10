@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../data/addresses.dart';
 import '../data/orders.dart';
 import '../data/money.dart';
 import '../widgets/design_system.dart';
@@ -61,6 +62,29 @@ class OrderConfirmationScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   if (orders.isNotEmpty) Text(orders.first.address),
+                  const SizedBox(height: 8),
+                  // "When will it get here" is the first thing anyone thinks
+                  // after ordering, and this screen never answered it.
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        LucideIcons.clock,
+                        size: 15,
+                        color: LamazonTheme.strong,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Arriving in about $deliveryEta',
+                          style: const TextStyle(
+                            color: LamazonTheme.strong,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -74,7 +98,7 @@ class OrderConfirmationScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SelectableText(
-                        'Order ${order.id}',
+                        'Order ${orderRef(order.id)}',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 4),

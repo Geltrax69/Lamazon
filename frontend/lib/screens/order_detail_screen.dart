@@ -87,7 +87,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 widget.order;
             return Column(
               children: [
-                ScreenHeader(title: order.id),
+                ScreenHeader(title: 'Order ${orderRef(order.id)}'),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: MyOrders.instance.load,

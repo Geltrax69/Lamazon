@@ -63,7 +63,7 @@ class ShopsScreen extends StatelessWidget {
                   else
                     Expanded(
                       child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 16),
                         itemCount: list.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (_, i) => _ShopRow(shop: list[i]),

@@ -57,6 +57,14 @@ class Address {
 /// widen this list as coverage grows, nothing else changes.
 const serviceableCities = ['Lovely Professional University'];
 
+/// How long a porter takes, as /api/locations reports it. The API has always
+/// returned this and nothing ever showed it — the single most-wanted number
+/// on a delivery app was missing from the cart and the confirmation both.
+///
+/// ponytail: a constant, because the endpoint returns one figure for the one
+/// campus we serve. Read it per-address the day that stops being true.
+const deliveryEta = '12 mins';
+
 /// Accepted shorthands for the places above, so "LPU" or "lpu, phagwara"
 /// still resolves.
 const _aliases = {

@@ -3,6 +3,8 @@ import '../data/money.dart';
 import '../widgets/app_nav.dart';
 import 'package:flutter/material.dart';
 
+import '../data/orders.dart';
+
 import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -117,7 +119,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                   ),
                   Expanded(
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 90),
+                      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 16),
                       children: [
                         const _SyncBanner(),
                         _ReviewBanner(store: store),
@@ -603,7 +605,7 @@ class _OrderRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '#${order.id.toUpperCase()}',
+                      orderRef(order.id),
                       style: const TextStyle(
                         fontSize: 11.5,
                         color: Color(0xFF62645E),
@@ -790,6 +792,95 @@ class _ItemRow extends StatelessWidget {
   final InventoryItem item;
   const _ItemRow({required this.item});
 
+  /// Shows whatever the server said went wrong, and stays quiet when nothing
+  /// did. Silence on success is deliberate — the row already redraws.
+  static Future<void> _report(
+    BuildContext context,
+    Future<String?> work,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final failure = await work;
+    if (failure == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(failure),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  Future<void> _toggleListing(BuildContext context) async {
+    final hiding = !item.delisted;
+    final messenger = ScaffoldMessenger.of(context);
+    final failure = await Seller.instance.setDelisted(item.id, hiding);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          failure ??
+              (hiding
+                  ? '"${item.title}" is hidden from the shop.'
+                  : '"${item.title}" is back on sale.'),
+        ),
+        // Undo rather than a second confirmation: hiding is reversible, and
+        // making it one tap to reverse is worth more than a dialog.
+        action: failure != null
+            ? null
+            : SnackBarAction(
+                label: 'Undo',
+                onPressed: () =>
+                    Seller.instance.setDelisted(item.id, !hiding),
+              ),
+      ),
+    );
+  }
+
+  /// Deleting is not reversible and it is refused outright once the product
+  /// has been ordered, so it asks first and names what it is about to take.
+  Future<void> _confirmRemove(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Delete this product?'),
+        content: Text(
+          '"${item.title}" and its photos are removed for good. '
+          'If anyone has ordered it, the delete is refused — '
+          'hide it from the shop instead.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            style: TextButton.styleFrom(foregroundColor: _red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    final failure = await Seller.instance.removeItem(item.id);
+    if (failure == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(failure),
+          action: SnackBarAction(
+            label: 'Hide instead',
+            onPressed: () => Seller.instance.setDelisted(item.id, true),
+          ),
+        ),
+      );
+  }
+
   Color get _statusColor => switch (item.status) {
     StockStatus.inStock => _green,
     StockStatus.low => _amber,
@@ -813,7 +904,11 @@ class _ItemRow extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              PhotoOrPlaceholder(photo: item.cover, size: 64),
+              PhotoOrPlaceholder(
+                photo: item.cover,
+                url: item.imageUrls.isEmpty ? null : item.imageUrls.first,
+                size: 64,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -860,29 +955,71 @@ class _ItemRow extends StatelessWidget {
                           '${item.stock} left',
                           style: const TextStyle(fontSize: 11.5, color: _muted),
                         ),
+                        if (item.delisted) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: LamazonTheme.track,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'Hidden',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _muted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
                 ),
               ),
-              // Quick restock without opening the form.
+              // Quick restock without opening the form. Both buttons go to the
+              // server and show what it says — they used to move a number on
+              // screen and nothing else.
               Column(
                 children: [
                   _StockButton(
                     icon: LucideIcons.plus,
-                    onTap: () => Seller.instance.adjustStock(item.id, 1),
+                    label: 'Add one to stock',
+                    onTap: () => _report(
+                      context,
+                      Seller.instance.adjustStock(item.id, 1),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   _StockButton(
                     icon: LucideIcons.minus,
-                    onTap: () => Seller.instance.adjustStock(item.id, -1),
+                    label: 'Take one off stock',
+                    onTap: item.stock == 0
+                        ? null
+                        : () => _report(
+                            context,
+                            Seller.instance.adjustStock(item.id, -1),
+                          ),
                   ),
                 ],
               ),
               IconButton(
+                tooltip: item.delisted ? 'Put back on sale' : 'Hide from shop',
+                icon: Icon(
+                  item.delisted ? LucideIcons.eye : LucideIcons.eyeOff,
+                  size: 17,
+                  color: _muted,
+                ),
+                onPressed: () => _toggleListing(context),
+              ),
+              IconButton(
                 tooltip: 'Remove',
                 icon: const Icon(LucideIcons.trash2, size: 17, color: _red),
-                onPressed: () => Seller.instance.removeItem(item.id),
+                onPressed: () => _confirmRemove(context),
               ),
             ],
           ),
@@ -894,22 +1031,49 @@ class _ItemRow extends StatelessWidget {
 
 class _StockButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
-  const _StockButton({required this.icon, required this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+  const _StockButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(9),
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F1EF),
-          borderRadius: BorderRadius.circular(9),
+    final enabled = onTap != null;
+    // The visual stays 28px so the row keeps its density; the tap target
+    // around it is the 44px WCAG 2.5.8 asks for.
+    return Tooltip(
+      message: label,
+      excludeFromSemantics: true,
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: label,
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: Center(
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: LamazonTheme.canvas,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  icon,
+                  size: 15,
+                  color: enabled ? _ink : LamazonTheme.muted,
+                ),
+              ),
+            ),
+          ),
         ),
-        child: Icon(icon, size: 15, color: _ink),
       ),
     );
   }

@@ -39,6 +39,18 @@ OrderStage stageFrom(String? stage) => switch (stage) {
 };
 
 /// One order as the person who placed it sees it.
+/// How an order id is shown to a person.
+///
+/// The ids are `order-6` in the database, and the screens printed them raw —
+/// "Order order-6" on the confirmation, "ORDER-6" in the list. That leaks a
+/// storage detail and reads as a bug. A shopper quotes this number at
+/// support, so it wants to look like a reference: `#0006`.
+String orderRef(String id) {
+  final digits = id.split('-').last;
+  final n = int.tryParse(digits);
+  return n == null ? '#$id' : '#${n.toString().padLeft(4, '0')}';
+}
+
 class MyOrder {
   final String id;
   final String itemTitle;

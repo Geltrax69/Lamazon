@@ -18,6 +18,19 @@ abstract final class AppRoutes {
   static const account = '/account';
 }
 
+/// How much room the floating bar takes at the bottom of the screen.
+///
+/// The bar is drawn over the content, not beside it, so every scroll view
+/// behind it has to end above it. Without this the first row of every
+/// department grid sat underneath the bar at both 1280x800 and 375x812 —
+/// permanently, with no way to scroll it clear.
+///
+/// 72 is the NavigationBar height set in the theme, 12 the padding under it,
+/// and viewPadding.bottom the home indicator on a phone. The last of those is
+/// why a fixed number was never going to work.
+double bottomNavInset(BuildContext context) =>
+    72 + 12 + MediaQuery.viewPaddingOf(context).bottom;
+
 class AppBottomNav extends StatelessWidget {
   final Color? theme;
   final AppTab current;

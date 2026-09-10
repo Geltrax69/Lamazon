@@ -261,6 +261,25 @@ ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_mrp_check;
 ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_mrp_check
     CHECK (mrp = 0 OR mrp >= price);
 
+-- An order is a financial record, not a detail of the product it names. An
+-- item delete used to take every order for it with it — including delivered
+-- ones — so the constraint now refuses instead. handleDeleteItem counts the
+-- referencing orders first and says so, the way handleDeleteCategory does.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_item_id_fkey;
+ALTER TABLE orders ADD CONSTRAINT orders_item_id_fkey
+    FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE RESTRICT;
+
+-- The store cascade reached orders the same way, one table further out.
+ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_owner_fkey;
+ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_owner_fkey
+    FOREIGN KEY (owner) REFERENCES seller_stores (owner) ON DELETE RESTRICT;
+
+-- Refusing the delete leaves a seller with no way to retire a product, so
+-- this is the way out: the row stays, its history stays, and the shop stops
+-- listing it. Delisting is what the trash icon does once orders exist.
+ALTER TABLE inventory_items
+    ADD COLUMN IF NOT EXISTS delisted BOOLEAN NOT NULL DEFAULT false;
+
 -- The departments across the top of the shop, and the categories under each.
 -- One table: a department is a row with no parent, a category is a row whose
 -- parent names one. Two tables would duplicate the name, the ordering and

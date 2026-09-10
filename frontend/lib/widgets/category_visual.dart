@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'design_system.dart';
 import 'product_card.dart';
 import '../data/catalog.dart';
@@ -119,7 +120,11 @@ class _Plate extends StatelessWidget {
         ),
         child: Center(
           child: Icon(
-            department.icon,
+            // The category's own glyph, not its department's. Keying on the
+            // department gave every shelf under one the same picture, so
+            // "Toys & Games" and "Glue & Tape" both showed a book — forty
+            // tiles carrying no information and actively misleading.
+            glyphFor(name, fallback: department.icon),
             size: 28,
             color: LamazonTheme.lime.withValues(alpha: .82),
           ),
@@ -128,3 +133,71 @@ class _Plate extends StatelessWidget {
     );
   }
 }
+
+
+/// A glyph for one category, chosen from its name.
+///
+/// Keyword matching rather than a fixed table: categories are created by
+/// admins at runtime, so any table would be stale the first time somebody
+/// adds a shelf. [fallback] is the department's icon, used when nothing in
+/// the name is recognisable — which is honest, where showing a book for
+/// adhesive tape was not.
+IconData glyphFor(String category, {required IconData fallback}) {
+  final n = category.toLowerCase();
+  for (final (pattern, icon) in _glyphs) {
+    if (RegExp(pattern).hasMatch(n)) return icon;
+  }
+  return fallback;
+}
+
+/// Ordered: the first match wins, so put the specific before the general.
+/// "Baby food" should be a baby, not a plate.
+const _glyphs = <(String, IconData)>[
+  (r'baby|infant|diaper', LucideIcons.baby),
+  (r'toy|game|puzzle|play', LucideIcons.gamepad2),
+  (r'glue|tape|adhesive|stapler|scissor', LucideIcons.paperclip),
+  (r'pen|pencil|marker|ink', LucideIcons.penLine),
+  (r'notebook|book|diary|paper|register', LucideIcons.bookOpen),
+  (r'station|office|craft', LucideIcons.pencilRuler),
+  (r'tea|coffee|chai', LucideIcons.coffee),
+  (r'juice|drink|beverage|soda|water|cola', LucideIcons.cupSoda),
+  (r'snack|chips|namkeen|biscuit|cookie|wafer', LucideIcons.cookie),
+  (r'chocolate|candy|sweet|dessert|ice ?cream', LucideIcons.candy),
+  (r'bread|bakery|cake|pastry|bun', LucideIcons.croissant),
+  (r'milk|dairy|curd|cheese|butter|paneer|yog', LucideIcons.milk),
+  (r'egg', LucideIcons.egg),
+  (r'fruit|apple|banana|mango', LucideIcons.apple),
+  (r'vegetable|veggie|sabzi|salad|green', LucideIcons.carrot),
+  (r'rice|atta|flour|grain|pulse|dal|masala|spice|oil', LucideIcons.wheat),
+  (r'meat|chicken|fish|egg|seafood', LucideIcons.drumstick),
+  (r'pizza', LucideIcons.pizza),
+  (r'burger|sandwich|roll|wrap', LucideIcons.sandwich),
+  (r'biryani|meal|thali|lunch|dinner|food|restaurant', LucideIcons.utensils),
+  (r'groc|kirana|essential|store cupboard', LucideIcons.shoppingBasket),
+  (r'headphone|earphone|audio|speaker|sound', LucideIcons.headphones),
+  (r'charger|cable|power ?bank|adapter|batter', LucideIcons.cable),
+  (r'mobile|phone|smartphone', LucideIcons.smartphone),
+  (r'laptop|computer|pc', LucideIcons.laptop),
+  (r'watch|wearable|band|fitness', LucideIcons.watch),
+  (r'camera|photo', LucideIcons.camera),
+  (r'electro|gadget|tech|accessor', LucideIcons.plug),
+  (r'skin|face|cream|lotion|moistur', LucideIcons.sparkles),
+  (r'hair|shampoo|oil ?hair', LucideIcons.scissors),
+  (r'makeup|lipstick|cosmetic|nail', LucideIcons.brush),
+  (r'soap|bath|hygiene|dental|tooth|razor|shav', LucideIcons.droplets),
+  (r'beauty|fragrance|perfume|deo', LucideIcons.flower2),
+  (r'clean|detergent|wash|mop|broom|dish', LucideIcons.sprayCan),
+  (r'kitchen|utensil|cookware|pan|bottle|container', LucideIcons.cookingPot),
+  (r'house|home|furnish|decor ?home|storage', LucideIcons.house),
+  (r'light|bulb|lamp|candle', LucideIcons.lightbulb),
+  (r'gift|hamper|card|wrap ?gift', LucideIcons.gift),
+  (r'flower|plant|bouquet|garden', LucideIcons.flower),
+  (r'decor|party|balloon|festive', LucideIcons.partyPopper),
+  (r'cloth|shirt|outfit|apparel|wear|dress|fashion', LucideIcons.shirt),
+  (r'shoe|footwear|sandal|slipper|sneaker', LucideIcons.footprints),
+  (r'bag|backpack|luggage|wallet', LucideIcons.backpack),
+  (r'medicine|pharma|health|first ?aid|tablet', LucideIcons.pill),
+  (r'pet|dog|cat', LucideIcons.pawPrint),
+  (r'sport|gym|fitness|cricket|ball', LucideIcons.dumbbell),
+  (r'stap|hardware|tool|repair', LucideIcons.wrench),
+];

@@ -147,7 +147,7 @@ class _OrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Order No. #${order.id.toUpperCase()}',
+                  'Order No. ${orderRef(order.id)}',
                   style: const TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,

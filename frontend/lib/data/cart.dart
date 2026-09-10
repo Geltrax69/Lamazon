@@ -105,25 +105,84 @@ class Cart extends ChangeNotifier {
         (i.product.discounted ? (i.product.mrp - i.product.price) * i.qty : 0),
   );
 
-  void add(Product p, [int qty = 1]) {
-    if (qty <= 0) return;
-    _items.update(p.id, (i) => i..qty += qty, ifAbsent: () => CartItem(p, qty));
+  /// The most of this product the basket may hold. Null availableStock means
+  /// the seed catalogue, which does not track stock — those stay uncapped.
+  static int? capFor(Product p) => p.availableStock;
+
+  /// True when the basket already holds everything the shop has.
+  bool atCap(Product p) {
+    final cap = capFor(p);
+    return cap != null && qtyOf(p.id) >= cap;
+  }
+
+  int qtyOf(String id) => _items[id]?.qty ?? 0;
+
+  /// Adds up to what is actually in stock and returns how many went in, so a
+  /// caller can say "only 1 left" rather than promising five.
+  ///
+  /// The cap lives here rather than in each of the five call sites: the cart
+  /// used to accept five units of an item with one in stock, quote a total for
+  /// them, and fail at "Place order" — the last step of the funnel and the
+  /// worst place to find out.
+  int add(Product p, [int qty = 1]) {
+    if (qty <= 0) return 0;
+    final cap = capFor(p);
+    final room = cap == null ? qty : (cap - qtyOf(p.id)).clamp(0, qty);
+    if (room <= 0) return 0;
+    _items.update(
+      p.id,
+      (i) => i..qty += room,
+      ifAbsent: () => CartItem(p, room),
+    );
     _save();
     notifyListeners();
+    return room;
   }
 
   void setQty(String id, int qty) {
+    final line = _items[id];
     if (qty <= 0) {
       _items.remove(id);
-    } else {
-      _items[id]?.qty = qty;
+    } else if (line != null) {
+      final cap = capFor(line.product);
+      line.qty = cap == null ? qty : qty.clamp(1, cap < 1 ? 1 : cap);
     }
     _save();
     notifyListeners();
   }
 
-  void remove(String id) {
-    _items.remove(id);
+  /// Trims every line back to what the shop can actually supply, and reports
+  /// what it had to change. Called when the cart screen opens, so a basket
+  /// that went stale in a background tab corrects itself before checkout
+  /// rather than during it.
+  List<String> reconcile() {
+    final trimmed = <String>[];
+    for (final line in _items.values) {
+      final cap = capFor(line.product);
+      if (cap == null || line.qty <= cap) continue;
+      trimmed.add(line.product.name);
+      line.qty = cap;
+    }
+    _items.removeWhere((_, line) => line.qty <= 0);
+    if (trimmed.isEmpty) return const [];
+    _save();
+    notifyListeners();
+    return trimmed;
+  }
+
+  /// Returns the line it took out, so the caller can offer an undo instead of
+  /// making a mis-tap cost the whole basket.
+  CartItem? remove(String id) {
+    final gone = _items.remove(id);
+    _save();
+    notifyListeners();
+    return gone;
+  }
+
+  /// Puts a removed line back exactly as it was, undo's other half.
+  /// (`restore` above is the one that reads the basket back off disk.)
+  void putBack(CartItem line) {
+    _items[line.product.id] = line;
     _save();
     notifyListeners();
   }

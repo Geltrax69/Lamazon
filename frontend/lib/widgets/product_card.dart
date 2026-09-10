@@ -232,18 +232,33 @@ class _CartButtonState extends State<CartButton> {
   bool _added = false;
 
   void _add() {
-    if (_added || widget.product.availableStock == 0) return;
+    if (_added || _disabled) return;
+    // add returns what it could actually fit, so a basket that is already
+    // holding the shop's whole stock says so instead of silently doing
+    // nothing and flashing a tick.
+    if (Cart.instance.add(widget.product) == 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Your cart already holds every one the shop has.'),
+          ),
+        );
+      return;
+    }
     setState(() => _added = true);
-    Cart.instance.add(widget.product);
     showAddedToast(context, widget.product);
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (mounted) setState(() => _added = false);
     });
   }
 
+  bool get _disabled => widget.product.availableStock == 0;
+
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.product.availableStock == 0;
+    final disabled = _disabled;
     return AnimatedScale(
       duration: Duration(
         milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 180,
@@ -255,6 +270,8 @@ class _CartButtonState extends State<CartButton> {
             ? 'Out of stock'
             : _added
             ? 'Added to cart'
+            : Cart.instance.atCap(widget.product)
+            ? 'Your cart holds all of them'
             : 'Add ${widget.product.name} to cart',
         onPressed: _added || disabled ? null : _add,
         background: disabled ? LamazonTheme.track : LamazonTheme.lime,

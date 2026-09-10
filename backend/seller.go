@@ -268,13 +268,13 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 		query = `UPDATE inventory_items SET stock = GREATEST($2, 0)
 		         WHERE id = $1 AND owner = $3
 		         RETURNING id, title, description, category, price, mrp,
-		         options, stock, array_to_string(image_urls, E'\n')`
+		         options, stock, delisted, array_to_string(image_urls, E'\n')`
 		arg = *in.Stock
 	case in.Delta != nil:
 		query = `UPDATE inventory_items SET stock = GREATEST(stock + $2, 0)
 		         WHERE id = $1 AND owner = $3
 		         RETURNING id, title, description, category, price, mrp,
-		         options, stock, array_to_string(image_urls, E'\n')`
+		         options, stock, delisted, array_to_string(image_urls, E'\n')`
 		arg = *in.Delta
 	default:
 		writeError(w, http.StatusBadRequest, "send delta or stock")
@@ -286,7 +286,7 @@ func (a *API) handlePatchStock(w http.ResponseWriter, r *http.Request) {
 	var options []byte
 	err := a.db.sql.QueryRowContext(r.Context(), query, id, arg, a.owner(r)).Scan(
 		&it.ID, &it.Title, &it.Description, &it.Category, &it.Price, &it.MRP,
-		&options, &it.Stock, &urls)
+		&options, &it.Stock, &it.Delisted, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+id)
 		return
@@ -363,14 +363,14 @@ func (a *API) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		    stock = $10
 		WHERE id = $1 AND owner = $11
 		RETURNING id, title, description, category, price, mrp, options,
-		          compare_group, attributes, stock,
+		          compare_group, attributes, stock, delisted,
 		          array_to_string(image_urls, E'\n')`,
 		r.PathValue("id"), in.Title, in.Description, in.Category, in.Price,
 		in.MRP, optionsJSON(in.Options), strings.TrimSpace(in.CompareGroup),
 		attributesJSON(in.Attributes), in.Stock, a.owner(r)).
 		Scan(&it.ID, &it.Title, &it.Description, &it.Category, &it.Price,
 			&it.MRP, &options, &it.CompareGroup, &attributes, &it.Stock,
-			&urls)
+			&it.Delisted, &urls)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "no item with id "+r.PathValue("id"))
 		return
@@ -420,10 +420,55 @@ func optionsJSON(in []ItemOption) []byte {
 }
 
 // DELETE /api/seller/items/{id}
+//
+// Refuses while any order references the item. An order is the record of a
+// sale — the buyer's proof of purchase, the seller's history, the admin's
+// audit trail — and deleting the product used to take all of it, silently,
+// including orders already delivered. handleDeleteCategory has always worked
+// this way; this is the same guard, one table over.
 func (a *API) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
+	// idx_orders_item makes this a cheap count.
+	var placed int
+	a.db.sql.QueryRowContext(r.Context(),
+		`SELECT count(*) FROM orders WHERE item_id = $1`, id).Scan(&placed)
+	if placed > 0 {
+		writeError(w, http.StatusConflict, plural(placed, "order")+
+			" placed for this product. Hide it from the shop instead — "+
+			"deleting it would take the orders with it.")
+		return
+	}
+
 	res, err := a.db.sql.ExecContext(r.Context(),
 		`DELETE FROM inventory_items WHERE id = $1 AND owner = $2`, id, a.owner(r))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeError(w, http.StatusNotFound, "no item with id "+id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/seller/items/{id}/listing — {"delisted": true|false}
+//
+// The way out of the delete guard: hiding a product takes it off the shop
+// without touching a single order.
+func (a *API) handlePatchListing(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Delisted *bool `json:"delisted"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Delisted == nil {
+		writeError(w, http.StatusBadRequest, "send delisted: true or false")
+		return
+	}
+	id := r.PathValue("id")
+	res, err := a.db.sql.ExecContext(r.Context(),
+		`UPDATE inventory_items SET delisted = $2 WHERE id = $1 AND owner = $3`,
+		id, *in.Delisted, a.owner(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not save or load store data — try again")
 		return

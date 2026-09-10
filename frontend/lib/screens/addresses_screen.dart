@@ -4,9 +4,14 @@ import '../widgets/app_shell.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/addresses.dart';
+import '../widgets/design_system.dart';
+import '../widgets/screen_header.dart';
 import 'location_screen.dart';
 
-const _ink = Color(0xFF1A1A1A);
+// The system's ink, not this screen's. #1A1A1A and #6B6B6B are cool neutrals
+// in a warm palette, and between them accounted for 62 of the app's off-system
+// colour uses.
+const _ink = LamazonTheme.text;
 
 class AddressesScreen extends StatelessWidget {
   const AddressesScreen({super.key});
@@ -20,7 +25,7 @@ class AddressesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F1EF),
+      backgroundColor: LamazonTheme.canvas,
       body: ReadableBody(
         maxWidth: 620,
         child: SafeArea(
@@ -31,38 +36,11 @@ class AddressesScreen extends StatelessWidget {
               final selected = AddressBook.instance.selected;
               return Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            width: 46,
-                            height: 46,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              LucideIcons.arrowLeft,
-                              size: 18,
-                              color: _ink,
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          'Saved Addresses',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(width: 46),
-                      ],
-                    ),
-                  ),
+                  // The same header every other sub-screen uses: a real,
+                  // focusable back button in the one place users look for it.
+                  // "Delivery addresses" rather than "Saved Addresses" —
+                  // the app called this one thing three different names.
+                  const ScreenHeader(title: 'Delivery addresses'),
                   Expanded(
                     child: list.isEmpty
                         ? const Center(
@@ -79,7 +57,7 @@ class AddressesScreen extends StatelessWidget {
                                   'No saved addresses',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF6B6B6B),
+                                    color: LamazonTheme.muted,
                                   ),
                                 ),
                               ],
@@ -93,7 +71,9 @@ class AddressesScreen extends StatelessWidget {
                             itemBuilder: (_, i) {
                               final a = list[i];
                               final isSelected = a.id == selected?.id;
-                              return GestureDetector(
+                              return _SelectableCard(
+                                selected: isSelected,
+                                label: '${a.label.title}, ${a.full}',
                                 onTap: () => _change(
                                   context,
                                   () => AddressBook.instance.select(a.id),
@@ -115,7 +95,7 @@ class AddressesScreen extends StatelessWidget {
                                         width: 40,
                                         height: 40,
                                         decoration: const BoxDecoration(
-                                          color: Color(0xFFF1F1EF),
+                                          color: LamazonTheme.canvas,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -175,7 +155,7 @@ class AddressesScreen extends StatelessWidget {
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 height: 1.4,
-                                                color: Color(0xFF6B6B6B),
+                                                color: LamazonTheme.muted,
                                               ),
                                             ),
                                           ],
@@ -195,16 +175,14 @@ class AddressesScreen extends StatelessWidget {
                                           ),
                                         ),
                                       ),
-                                      GestureDetector(
-                                        onTap: () => _delete(context, a),
-                                        child: const Padding(
-                                          padding: EdgeInsets.only(left: 8),
-                                          child: Icon(
-                                            LucideIcons.trash2,
-                                            size: 16,
-                                            color: Color(0xFF62645E),
-                                          ),
+                                      IconButton(
+                                        tooltip: 'Delete address',
+                                        icon: const Icon(
+                                          LucideIcons.trash2,
+                                          size: 16,
+                                          color: LamazonTheme.muted,
                                         ),
+                                        onPressed: () => _delete(context, a),
                                       ),
                                     ],
                                   ),
@@ -215,38 +193,17 @@ class AddressesScreen extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    child: GestureDetector(
-                      onTap: () => Navigator.push(
+                    // ActionButton: the old control had role=button but no
+                    // tabindex, so the primary action of this screen could
+                    // not be reached from a keyboard at all.
+                    child: ActionButton(
+                      label: 'Add new address',
+                      icon: LucideIcons.plus,
+                      expand: true,
+                      onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const LocationScreen(),
-                        ),
-                      ),
-                      child: Container(
-                        height: 54,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _ink,
-                          borderRadius: BorderRadius.circular(27),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              LucideIcons.plus,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Add new address',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -299,4 +256,34 @@ Future<void> _delete(BuildContext context, Address address) async {
   if (confirmed == true && context.mounted) {
     await _change(context, () => AddressBook.instance.remove(address.id));
   }
+}
+
+
+/// One address in the list. A radio option, not a plain tappable box: exactly
+/// one of them is the delivery address at any time, and as a GestureDetector
+/// none of them were focusable or announced as choosable.
+class _SelectableCard extends StatelessWidget {
+  final bool selected;
+  final String label;
+  final VoidCallback onTap;
+  final Widget child;
+  const _SelectableCard({
+    required this.selected,
+    required this.label,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    inMutuallyExclusiveGroup: true,
+    selected: selected,
+    label: label,
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: child),
+    ),
+  );
 }

@@ -172,6 +172,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/seller/items", s.handleAddItem)
 	mux.HandleFunc("PATCH /api/seller/items/{id}", s.handleUpdateItem)
 	mux.HandleFunc("PATCH /api/seller/items/{id}/stock", s.handlePatchStock)
+	mux.HandleFunc("PATCH /api/seller/items/{id}/listing", s.handlePatchListing)
 	mux.HandleFunc("POST /api/seller/items/{id}/photos", s.handleItemPhotos)
 	mux.HandleFunc("PUT /api/seller/items/{id}/photos", s.handleReorderItemPhotos)
 	mux.HandleFunc("DELETE /api/seller/items/{id}", s.handleDeleteItem)
@@ -291,14 +292,18 @@ func (s *API) withAuth(next http.Handler) http.Handler {
 		}
 		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok {
-			writeError(w, http.StatusUnauthorized, "sign in to manage your store")
+			// This guards orders and addresses as well as the seller routes,
+			// so it cannot talk about a store: a shopper reading their own
+			// order history has never opened one.
+			writeError(w, http.StatusUnauthorized, "sign in to see this")
 			return
 		}
 		email, err := s.db.sessionEmail(r.Context(), strings.TrimSpace(token))
 		if err != nil {
 			// Expired and forged look the same from here; the app answers both
-			// by refreshing, and signs in again if that fails too.
-			writeError(w, http.StatusUnauthorized, "session expired — sign in again")
+			// by refreshing, and signs in again if that fails too. "Expired"
+			// would be a guess — and wrong for the forged half.
+			writeError(w, http.StatusUnauthorized, "sign in again to continue")
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, email)))

@@ -192,7 +192,7 @@ const productQuery = `
 		LEFT JOIN tree t ON t.name = i.category
 		-- Only approved stores reach shoppers: a store still under review is
 		-- real to its owner and to the admin, and to nobody else.
-		WHERE i.stock > 0 AND s.status = 'approved'
+		WHERE i.stock > 0 AND s.status = 'approved' AND NOT i.delisted
 	)
 	SELECT p.id, p.name, p.category, p.tab, p.price, p.mrp, p.options,
 	       p.image_url, p.store, p.description, p.photos,
@@ -312,7 +312,7 @@ func (d *DB) store(ctx context.Context, owner string) (SellerStore, error) {
 func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 	rows, err := d.sql.QueryContext(ctx, `
 		SELECT id, title, description, category, price, mrp, options,
-		       compare_group, attributes, stock,
+		       compare_group, attributes, stock, delisted,
 		       array_to_string(image_urls, E'\n')
 		FROM inventory_items WHERE owner = $1 ORDER BY id DESC`, owner)
 	if err != nil {
@@ -327,7 +327,7 @@ func (d *DB) items(ctx context.Context, owner string) ([]InventoryItem, error) {
 		var options, attributes []byte
 		if err := rows.Scan(&i.ID, &i.Title, &i.Description, &i.Category,
 			&i.Price, &i.MRP, &options, &i.CompareGroup, &attributes,
-			&i.Stock, &urls); err != nil {
+			&i.Stock, &i.Delisted, &urls); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(options, &i.Options); err != nil {
