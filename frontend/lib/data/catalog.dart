@@ -640,3 +640,87 @@ String optimizedImage(String url, [int width = 1024]) {
     '/image/upload/f_auto,q_auto,c_limit,w_$width/',
   );
 }
+
+/// What a banner's artwork is, worked out from the URL alone.
+///
+/// Nothing stores the kind. Cloudinary files a clip under `/video/upload/`
+/// exactly the way it files a picture under `/image/upload/`, so the URL
+/// already knows — and a column holding it separately is a column that can
+/// end up disagreeing with the asset it points at.
+enum BannerKind { picture, animation, video }
+
+BannerKind bannerKind(String url) {
+  final path = (Uri.tryParse(url)?.path ?? url).toLowerCase();
+  if (url.contains('/video/upload/') ||
+      const ['.mp4', '.webm', '.mov', '.m4v'].any(path.endsWith)) {
+    return BannerKind.video;
+  }
+  // A still WebP read as an animation costs nothing: the two are delivered by
+  // the same transform, and the first frame of a still is the still.
+  if (path.endsWith('.gif') || path.endsWith('.webp')) {
+    return BannerKind.animation;
+  }
+  return BannerKind.picture;
+}
+
+/// The banner as a picture: the artwork itself, or the first frame of
+/// something that moves.
+///
+/// Anything with frames is asked for as a JPEG rather than through `f_auto`.
+/// That is not a style choice — `f_auto` reads the browser's Accept header to
+/// pick a format, and Flutter fetches images over XHR, which sends `*/*`.
+/// Cloudinary then falls back to the original format, and one 400px GIF came
+/// back at 6.2 MB in exactly this app. A format that is chosen, not
+/// negotiated, is a size that can be relied on.
+String bannerArtwork(String url, {int width = 1600, bool still = false}) {
+  const image = '/image/upload/';
+  const video = '/video/upload/';
+  if (url.contains(video)) {
+    // so_0 is the frame at second zero.
+    return _insert(url, video, 'so_0,c_limit,w_$width,f_jpg,q_auto');
+  }
+  // Already transformed, or not ours to transform.
+  if (!url.contains(image) ||
+      url.contains('c_limit') ||
+      url.contains('c_pad') ||
+      url.contains('c_fill')) {
+    return url;
+  }
+  if (bannerKind(url) == BannerKind.animation) {
+    // pg_1 is one page of an animation, which is its first frame.
+    return _insert(url, image, 'pg_1,c_limit,w_$width,f_jpg,q_auto');
+  }
+  return _insert(url, image, 'c_limit,w_$width,f_auto,q_auto');
+}
+
+/// The banner as something that moves — always a video, even when staff
+/// uploaded a GIF.
+///
+/// GIF is a 1987 format that stores every frame as its own image, and it
+/// shows: the demo animation this was measured against is 6.2 MB as a GIF and
+/// 134 KB as an H.264 clip of the same thing at the same width. Handing a
+/// shopper on mobile data the first one, as the backdrop to a headline, is
+/// not a trade worth making. Cloudinary will re-encode on delivery, so this
+/// costs an extra `f_mp4` in a URL and nothing else.
+///
+/// `ac_none` drops the audio track rather than muting it at the player: a
+/// shop that makes a noise when the page loads is a shop people close.
+///
+/// Returns [url] unchanged when it cannot be delivered as a clip, which is
+/// how a GIF hosted somewhere else stays a GIF — [BannerMedia] checks for
+/// that and leaves it to Image.network, which animates one natively.
+String bannerVideo(String url, [int width = 1280]) {
+  const image = '/image/upload/';
+  const video = '/video/upload/';
+  if (url.contains('c_limit')) return url;
+  if (url.contains(video)) {
+    return _insert(url, video, 'c_limit,w_$width,q_auto,ac_none');
+  }
+  if (url.contains(image) && bannerKind(url) == BannerKind.animation) {
+    return _insert(url, image, 'f_mp4,c_limit,w_$width,q_auto,ac_none');
+  }
+  return url;
+}
+
+String _insert(String url, String marker, String spec) =>
+    url.replaceFirst(marker, '$marker$spec/');

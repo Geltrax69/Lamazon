@@ -170,16 +170,17 @@ class Api {
     'DELETE',
     '/api/admin/campaigns/${Uri.encodeComponent(id)}',
   );
-  Future<String> uploadCampaignPhoto(Uint8List photo) async {
+  Future<String> uploadCampaignPhoto(
+    Uint8List photo, {
+    String filename = 'banner',
+  }) async {
     final req =
         http.MultipartRequest('POST', _url('/api/admin/campaign-photos'))
           ..headers.addAll(_staffHeader(StaffSession.admin))
           ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              photo,
-              filename: 'campaign.jpg',
-            ),
+            // The real filename, not a hardcoded .jpg: Cloudinary files an
+            // upload by what it is, and a clip labelled .jpg is a coin toss.
+            http.MultipartFile.fromBytes('file', photo, filename: filename),
           );
     final res = await http.Response.fromStream(
       await req.send().timeout(_uploadTimeout),

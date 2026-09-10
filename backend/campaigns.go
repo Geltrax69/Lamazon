@@ -76,7 +76,7 @@ func (a *API) handleSaveCampaign(w http.ResponseWriter, r *http.Request) {
 	if c.ImageURL != "" {
 		u, err := url.Parse(c.ImageURL)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || len(c.ImageURL) > 2048 {
-			writeError(w, 400, "Image must be an HTTPS URL.")
+			writeError(w, 400, "Artwork must be an HTTPS URL.")
 			return
 		}
 	}
@@ -129,7 +129,7 @@ func (a *API) handleCampaignPhoto(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "photo storage is not configured")
 		return
 	}
-	photos, err := uploadedPhotos(r)
+	photos, err := uploadedBanner(r)
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
@@ -141,7 +141,7 @@ func (a *API) handleCampaignPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	url, err := a.cloud.upload(r.Context(), "Lamazon/Campaigns", hex.EncodeToString(id[:]), photos[0])
 	if err != nil {
-		writeError(w, 502, "could not upload banner image")
+		writeError(w, 502, "could not upload banner artwork")
 		return
 	}
 	writeJSON(w, 200, map[string]string{"imageUrl": url})

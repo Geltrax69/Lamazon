@@ -335,6 +335,106 @@ git-ignored and regenerable. Nothing tracked was touched.
 
 ---
 
+## 7g. Banners that move: GIFs and video on the home screen
+
+Asked for: *"in banner i want to add gifs, Videos, that will be displayed on
+homepage so fix the code."*
+
+A banner already had one field for artwork, `image_url`, holding an HTTPS URL.
+Nothing about that field had to change — Cloudinary files a clip under
+`/video/upload/` exactly the way it files a picture under `/image/upload/`, so
+the URL already says which it is. Reading the kind back off the URL means no
+new column, no migration, and no row that can end up disagreeing with the
+asset it points at.
+
+**A GIF is delivered as video, not as a GIF.** This is the part worth writing
+down, because the obvious implementation is wrong and looks right.
+
+Flutter's `Image.network` plays animated GIF and WebP natively, so the first
+version simply asked Cloudinary for `c_limit,w_1600,f_auto,q_auto` and let it
+animate. It worked. It also pulled **6.13 MB** for one banner, measured in the
+release build in a browser.
+
+Two things caused that, and both are worth knowing:
+
+  * `f_auto` picks a format from the browser's `Accept` header. Flutter fetches
+    images over XHR, which sends `*/*`, so Cloudinary cannot tell that the
+    browser supports WebP or AVIF and falls back to the original format. The
+    same URL fetched with a real browser `Accept` returns 61 KB of AVIF; fetched
+    the way Flutter fetches it, 6.13 MB of GIF. **A format that is chosen is a
+    size that can be relied on; a format that is negotiated is not.**
+  * GIF stores every frame as its own image. It is a 1987 format and it shows.
+
+So anything with frames now goes through the video path, GIF included —
+`f_mp4` on delivery, which Cloudinary does server-side with the original left
+untouched. Measured on the same animation, end to end in the release build:
+
+| | before | after |
+|---|---|---|
+| animated banner, first paint | 6,130 KB (GIF) | 11 KB (JPEG poster) |
+| animated banner, the motion | — | 131 KB (H.264) |
+| **total** | **6,130 KB** | **142 KB** |
+
+**What was built**
+
+  * `bannerKind()`, `bannerArtwork()` and `bannerVideo()` in `data/catalog.dart`
+    — three string inserts, no image pipeline, in the style of the transforms
+    already there. Every transform in them was measured against Cloudinary
+    before it was written, not assumed.
+  * `widgets/banner_media.dart` — `BannerMedia` picks the branch: a picture is
+    drawn, anything with frames that can be delivered as a clip is played
+    muted, looped and without controls. A GIF hosted somewhere we cannot
+    transform stays a GIF and `Image.network` animates it, which is the one
+    case the video path cannot improve.
+  * `CampaignBanner` uses it, so the admin banner list and the live draft
+    preview play the artwork too — one change, three places.
+  * The deck gives a clip a 12-second dwell instead of 6. Six seconds of a
+    fifteen-second film is a banner whose ending nobody ever sees. The timer
+    became one-shot rather than periodic so each slide gets its own dwell.
+
+**Accessibility.** WCAG 2.2.2 asks for a way to stop anything that moves by
+itself for more than five seconds. Reduced motion is that person having
+answered in advance, so under it no player is constructed at all: the banner
+is the first frame — `so_0` for a clip, `pg_1` for an animation — which is the
+same picture without the movement. The deck already stopped advancing under
+the same setting.
+
+**Failure.** A banner is not worth a broken home screen. If the clip will not
+initialise — a dead URL, a codec nobody has, autoplay refused — the poster
+stays up and the page carries on. That path is covered by a test, because it
+is the one that runs when something is wrong and nobody is watching.
+
+**Backend.** `POST /api/admin/campaign-photos` now accepts MP4, WebM and
+QuickTime alongside the four image types, at 25 MB rather than 10, and the
+Cloudinary endpoint moved from `/image/upload` to `/auto/upload` so a clip is
+filed as a video. Product photos deliberately did **not** get this: a video in
+a product grid is a different app, and one seller uploading a 20 MB film would
+slow the grid down for everyone. `photoBytes` now takes its allow-list as a
+parameter, so the difference lives at the route that knows about it.
+
+`ImagePicker.pickImage(imageQuality: 80)` re-encodes, which turns a GIF into a
+single frame — silently, and only for the one person who wanted the animation.
+Banner uploads use `pickMedia()` instead, and pass the real filename through so
+Cloudinary files the upload by what it is rather than by a hardcoded `.jpg`.
+
+**Cost.** `video_player` (the Flutter team's own plugin, all platforms) added
+**61 KB** to `main.dart.js` — 3.30 MB to 3.36 MB. That is less than half of one
+banner clip, and 1% of the GIF it replaces.
+
+**Covered by** `test/banner_media_test.dart` — 8 tests: the kind read off the
+URL, GIF delivered as a clip, the still of anything with frames being a chosen
+JPEG rather than `f_auto`, clips capped and silent, foreign and
+already-transformed URLs left alone, a hosted GIF played while a foreign one is
+drawn, reduced motion getting a frame and never a player, and a clip that will
+not play leaving the poster up.
+
+**Known hole.** A GIF pasted from a host we cannot transform keeps moving under
+reduced motion, because nothing client-side can extract a frame from it.
+Everything staff upload goes through Cloudinary, so it takes a pasted foreign
+URL to reach.
+
+---
+
 ## 8. Files changed
 
 **Backend (Go/SQL):** `schema.sql`, `seller.go`, `db.go`, `types.go`, `main.go`, `policies.go`,
@@ -352,6 +452,13 @@ git-ignored and regenerable. Nothing tracked was touched.
 
 **Build/packaging:** `pubspec.yaml`, `tool/prune_fonts.py` (new), `web/index.html`,
 `web/manifest.json`, `web/icons/Icon-maskable-*.png`, `vercel.json`.
+
+**Banner media (§7g):** `lib/widgets/banner_media.dart` (new),
+`test/banner_media_test.dart` (new), `lib/data/catalog.dart`,
+`lib/widgets/storefront.dart`, `lib/widgets/photo_picker.dart`,
+`lib/data/api.dart`, `lib/screens/campaign_manager.dart`,
+`backend/campaigns.go`, `backend/photos.go`, `backend/forms.go`,
+`backend/cloudinary.go`.
 
 ---
 

@@ -213,19 +213,22 @@ class _CampaignEditorState extends State<CampaignEditor> {
   );
   Future<void> _upload() async {
     try {
-      final photos = await pickPhotos(multiple: false);
-      if (photos.isEmpty || !mounted) return;
+      final picked = await pickBannerMedia();
+      if (picked == null || !mounted) return;
       setState(() {
         _busy = true;
         _error = null;
       });
-      final url = await Api.instance.uploadCampaignPhoto(photos.first);
+      final url = await Api.instance.uploadCampaignPhoto(
+        picked.bytes,
+        filename: picked.name,
+      );
       if (mounted) setState(() => _image.text = url);
     } catch (_) {
       if (mounted) {
         setState(
           () => _error =
-              'Image upload failed. Your other edits are still here; try again.',
+              'Artwork upload failed. Your other edits are still here; try again.',
         );
       }
     } finally {
@@ -382,7 +385,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
                                 icon: Icons.file_upload_outlined,
                                 label: _busy
                                     ? 'Please wait…'
-                                    : 'Upload campaign image',
+                                    : 'Upload banner artwork',
                                 primary: false,
                                 expand: true,
                               ),
@@ -390,12 +393,12 @@ class _CampaignEditorState extends State<CampaignEditor> {
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 10),
                               child: Text(
-                                'Use a 16:9 photo with the subject on the right. The template keeps the headline and action legible on the left.',
+                                'A 16:9 photo, GIF or short clip, with the subject on the right — the template keeps the headline and action legible on the left. Clips play muted and on a loop, so keep them under about ten seconds and let the picture carry the message.',
                                 style: LamazonTheme.mutedBodyText,
                               ),
                             ),
                             _field(
-                              'Image URL (optional)',
+                              'Artwork URL (optional)',
                               _image,
                               validate: (s) {
                                 final u = Uri.tryParse(s!.trim());
@@ -405,7 +408,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
                                             u.host.isNotEmpty &&
                                             u.userInfo.isEmpty)
                                     ? null
-                                    : 'Use a valid HTTPS image URL';
+                                    : 'Use a valid HTTPS URL';
                               },
                             ),
                             const Text(

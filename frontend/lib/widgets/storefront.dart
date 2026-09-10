@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/campaigns.dart';
+import '../data/catalog.dart';
 import '../data/categories.dart';
 import '../models/product.dart';
 import '../screens/details_screen.dart';
 import '../screens/search_screen.dart';
+import 'banner_media.dart';
 import 'design_system.dart';
 import 'product_card.dart';
 
@@ -100,12 +102,7 @@ class CampaignBanner extends StatelessWidget {
               alignment: Alignment.centerRight,
               excludeFromSemantics: true,
             )
-          : NetImage(
-              url: campaign.imageUrl,
-              fit: BoxFit.cover,
-              padTo: null,
-              sourceWidth: 1600,
-            );
+          : BannerMedia(url: campaign.imageUrl);
       return Semantics(
         button: onTap != null,
         label: '${campaign.title}. ${campaign.cta}',
@@ -309,7 +306,12 @@ class _CampaignDeckState extends State<CampaignDeck> {
 
   /// Long enough to read the copy and decide, short enough that a second
   /// campaign is seen at all. Blinkit's festival deck sits at about this.
-  static const _dwell = Duration(seconds: 6);
+  ///
+  /// A clip gets twice as long: six seconds of a fifteen-second film is a
+  /// banner whose ending nobody ever sees.
+  static Duration _dwell(Campaign c) => Duration(
+    seconds: bannerKind(c.imageUrl) == BannerKind.video ? 12 : 6,
+  );
 
   @override
   void initState() {
@@ -328,7 +330,10 @@ class _CampaignDeckState extends State<CampaignDeck> {
     // One campaign is not a carousel, and a timer that redraws the same card
     // forever is a wakelock with no upside.
     if (widget.campaigns.length < 2) return;
-    _rotate = Timer.periodic(_dwell, (_) {
+    // One shot rather than periodic, because _move re-arms it — which is how
+    // the next slide gets a dwell of its own rather than the first one's.
+    final showing = widget.campaigns[_index.clamp(0, widget.campaigns.length - 1)];
+    _rotate = Timer(_dwell(showing), () {
       if (mounted) _move(1);
     });
   }

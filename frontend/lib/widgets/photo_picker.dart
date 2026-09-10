@@ -27,6 +27,17 @@ Future<List<Uint8List>> pickPhotos({required bool multiple}) async {
   return [for (final f in files) await f.readAsBytes()];
 }
 
+/// A banner may be a picture, an animation or a short clip, so this asks for
+/// media rather than an image.
+///
+/// It also skips [pickPhotos]'s `imageQuality`, which re-encodes: a GIF put
+/// through it comes back as a single frame, which is a silent way to lose the
+/// one thing the person picking it wanted.
+Future<({Uint8List bytes, String name})?> pickBannerMedia() async {
+  final file = await ImagePicker().pickMedia();
+  return file == null ? null : (bytes: await file.readAsBytes(), name: file.name);
+}
+
 /// One big tappable tile for a single photo — empty prompt, or the picture
 /// with replace and remove over it.
 class PhotoTile extends StatelessWidget {

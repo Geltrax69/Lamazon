@@ -119,14 +119,22 @@ func formPhotos(r *http.Request) ([][]byte, error) {
 // photoBytes pulls every uploaded file out of an already-parsed multipart
 // body, checking each one is really an image.
 func photoBytes(r *http.Request, field string) ([][]byte, error) {
+	return mediaBytes(r, field, photoTypes, maxPhoto)
+}
+
+// mediaBytes reads the attached files and rejects anything outside [allowed].
+// The allow-list is a parameter because a banner may be a clip and a product
+// photo may not, and that difference should live at the route that knows it.
+func mediaBytes(r *http.Request, field string, allowed map[string]bool, limit int64) ([][]byte, error) {
 	files := r.MultipartForm.File[field]
 	if len(files) == 0 {
 		return nil, errors.New("attach at least one file as " + field)
 	}
 	out := make([][]byte, 0, len(files))
 	for _, fh := range files {
-		if fh.Size > maxPhoto {
-			return nil, errors.New(fh.Filename + " is larger than 10 MB")
+		if fh.Size > limit {
+			return nil, errors.New(fh.Filename + " is larger than " +
+				strconv.FormatInt(limit>>20, 10) + " MB")
 		}
 		f, err := fh.Open()
 		if err != nil {
@@ -138,8 +146,8 @@ func photoBytes(r *http.Request, field string) ([][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if kind := http.DetectContentType(buf); !photoTypes[strings.Split(kind, ";")[0]] {
-			return nil, errors.New(fh.Filename + " is not an image (" + kind + ")")
+		if kind := http.DetectContentType(buf); !allowed[strings.Split(kind, ";")[0]] {
+			return nil, errors.New(fh.Filename + " is not a supported file (" + kind + ")")
 		}
 		out = append(out, buf)
 	}

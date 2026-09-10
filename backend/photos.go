@@ -18,6 +18,25 @@ var photoTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true,
 }
 
+// A banner sits behind a headline on the home screen, so it may also be an
+// animation or a short silent clip. A product photo may not: a video in a
+// product grid is a different app, and one seller uploading a 20 MB film
+// would slow the grid down for everybody.
+const maxBanner = 25 << 20
+
+var bannerTypes = map[string]bool{
+	"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true,
+	"video/mp4": true, "video/webm": true, "video/quicktime": true,
+}
+
+// uploadedBanner parses the body and returns the attached banner artwork.
+func uploadedBanner(r *http.Request) ([][]byte, error) {
+	if err := r.ParseMultipartForm(maxBanner); err != nil {
+		return nil, err
+	}
+	return mediaBytes(r, "file", bannerTypes, maxBanner)
+}
+
 // uploadedPhotos parses the body and returns the attached images.
 func uploadedPhotos(r *http.Request) ([][]byte, error) {
 	if err := r.ParseMultipartForm(maxPhoto); err != nil {

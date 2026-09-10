@@ -77,7 +77,12 @@ func slug(s string) string {
 	return out
 }
 
-// upload stores one image in a Media Library folder and returns its https URL.
+// upload stores one asset in a Media Library folder and returns its https URL.
+//
+// The endpoint is /auto/upload rather than /image/upload so a banner clip is
+// filed as a video and comes back on a /video/upload/ URL. Nothing else has
+// to change: the callers already decide what they will accept before they get
+// here, and the kind is readable off the URL afterwards.
 // Uploading the same name into the same folder replaces the picture and
 // invalidates the CDN copy.
 //
@@ -121,7 +126,7 @@ func (c *Cloudinary) upload(ctx context.Context, folder, name string, img []byte
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.base+"/v1_1/"+c.cloud+"/image/upload", &body)
+		c.base+"/v1_1/"+c.cloud+"/auto/upload", &body)
 	if err != nil {
 		return "", err
 	}
