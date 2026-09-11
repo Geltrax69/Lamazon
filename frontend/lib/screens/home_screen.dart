@@ -15,6 +15,7 @@ import '../data/wishlist.dart';
 import '../models/product.dart';
 import '../widgets/app_nav.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/campaign_palette.dart';
 import '../widgets/category_visual.dart';
 import '../widgets/design_system.dart';
 import '../widgets/notify_banner.dart';
@@ -226,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: _departmentHeadline(tabName),
                     subtitle: 'A considered edit from stores in your area.',
                     category: tabName == 'All' ? '' : tabName,
-                    colour: '#143E32',
+                    colour: SeasonSkin.groundHex,
                     cta: 'Explore the edit',
                   ),
                   onTap: () => _openSearch(tabName == 'All' ? '' : tabName),
@@ -404,13 +405,12 @@ class _ServiceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The one surface a festival is allowed to repaint. Everything below it —
-    // product cards, prices, stock — keeps the app's own palette, because a
-    // shop that changes colour everywhere for Diwali is a shop nobody can
-    // read prices in. Null for most of the year.
-    final season = Seasons.instance.current;
-    final ground = season?.ground ?? LamazonTheme.forest;
-    final ink = season?.ink ?? Colors.white;
+    // The chrome a festival repaints — shared with the hero, the department
+    // tiles and the navigation bar, so a season dresses the whole shop rather
+    // than bolting a navy header onto a forest page. Product cards, prices and
+    // stock colours are deliberately not on this list.
+    final ground = SeasonSkin.ground;
+    final ink = SeasonSkin.ink;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LamazonTheme.featuredRadius),
@@ -419,12 +419,9 @@ class _ServiceHeader extends StatelessWidget {
           end: Alignment.bottomRight,
           // A season names one ground; the second stop is derived so a
           // festival palette does not have to specify a gradient to get one.
-          colors: season == null
-              ? const [LamazonTheme.forest, LamazonTheme.strong]
-              : [
-                  ground,
-                  Color.alphaBlend(Colors.black.withValues(alpha: .18), ground),
-                ],
+          colors: SeasonSkin.active
+              ? [ground, SeasonSkin.groundShade]
+              : const [LamazonTheme.forest, LamazonTheme.strong],
         ),
         boxShadow: LamazonTheme.raisedShadows,
       ),
@@ -448,41 +445,52 @@ class _ServiceHeader extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: ListenableBuilder(
-                listenable: AddressBook.instance,
-                builder: (context, _) {
-                  final address = AddressBook.instance.selected;
-                  return InkWell(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AddressesScreen(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  // The only screen in the app with no ScreenHeader, so the
+                  // shop's name is its h1 — without one a screen reader has no
+                  // top of page to jump to. It sits outside the address
+                  // control rather than inside it: a heading that is also a
+                  // button is neither, and tapping the word "Lamazon" opened
+                  // the address picker, which it has nothing to do with.
+                  Semantics(
+                    headingLevel: 1,
+                    container: true,
+                    child: Text(
+                      'Lamazon',
+                      style: TextStyle(
+                        fontFamily: 'InterTight',
+                        fontSize: 22,
+                        height: 28 / 22,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.7,
+                        color: ink,
                       ),
                     ),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Lamazon',
-                            style: TextStyle(
-                              fontFamily: 'InterTight',
-                              fontSize: 22,
-                              height: 28 / 22,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -.7,
-                              color: ink,
-                            ),
+                  ),
+                  const SizedBox(height: 2),
+                  ListenableBuilder(
+                    listenable: AddressBook.instance,
+                    builder: (context, _) {
+                      final address = AddressBook.instance.selected;
+                      return InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AddressesScreen(),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
                             children: [
                               Icon(
                                 LucideIcons.mapPin,
                                 size: 15,
-                                color: season?.accent ?? LamazonTheme.lime,
+                                color: SeasonSkin.accent,
                               ),
                               const SizedBox(width: 5),
                               // Flexible, not Expanded: the chevron follows the
@@ -514,15 +522,15 @@ class _ServiceHeader extends StatelessWidget {
                               Icon(
                                 LucideIcons.chevronDown,
                                 size: 16,
-                                color: season?.accent ?? LamazonTheme.lime,
+                                color: SeasonSkin.accent,
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -649,8 +657,6 @@ class _DepartmentStrip extends StatelessWidget {
           selected: selected,
           button: true,
           label: department.name,
-          // Otherwise: "Electronics, Electronics category, Electronics".
-          excludeSemantics: true,
           child: SizedBox(
             // 74, so "Stationery & Games" and "Household Essentials" fit on
             // two lines instead of ellipsing on both.
@@ -661,52 +667,68 @@ class _DepartmentStrip extends StatelessWidget {
               // The tap target is the whole column; the hover wash over that
               // much area reads as a grey slab, so only the press shows.
               hoverColor: Colors.transparent,
-              child: Column(
-                children: [
-                  AnimatedContainer(
-                    duration: Duration(
-                      milliseconds: MediaQuery.disableAnimationsOf(context)
-                          ? 0
-                          : 180,
+              // The contents are silenced, not the InkWell: otherwise the
+              // tile announced itself three times over ("Electronics,
+              // Electronics category, Electronics") — and, once the exclusion
+              // moved up onto the whole widget, stopped being reachable by
+              // keyboard at all.
+              child: ExcludeSemantics(
+                child: Column(
+                  children: [
+                    AnimatedContainer(
+                      duration: Duration(
+                        milliseconds: MediaQuery.disableAnimationsOf(context)
+                            ? 0
+                            : 180,
+                      ),
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? SeasonSkin.accent
+                            : LamazonTheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: selected
+                            ? LamazonTheme.tactileShadows
+                            : LamazonTheme.surfaceShadows,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: index == 0
+                          ? Icon(
+                              department.icon,
+                              color: selected
+                                  ? SeasonSkin.onAccent
+                                  : LamazonTheme.strong,
+                            )
+                          : CategoryVisual(
+                              name: department.name,
+                              imageUrl: department.imageUrl,
+                            ),
                     ),
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? LamazonTheme.lime
-                          : LamazonTheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: selected
-                          ? LamazonTheme.tactileShadows
-                          : LamazonTheme.surfaceShadows,
+                    const SizedBox(height: 6),
+                    // Two lines. At 66px and one line, four of the nine names
+                    // truncated — "Household…", "Grocery & …", "Snacks & …",
+                    // "Stationery …" — which is navigation you cannot read.
+                    Text(
+                      department.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'InterTight',
+                        fontSize: 11,
+                        height: 1.15,
+                        letterSpacing: .1,
+                        color: selected
+                            ? LamazonTheme.strong
+                            : LamazonTheme.text,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: index == 0
-                        ? Icon(department.icon, color: LamazonTheme.strong)
-                        : CategoryVisual(
-                            name: department.name,
-                            imageUrl: department.imageUrl,
-                          ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Two lines. At 66px and one line, four of the nine names
-                  // truncated — "Household…", "Grocery & …", "Snacks & …",
-                  // "Stationery …" — which is navigation you cannot read.
-                  Text(
-                    department.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'InterTight',
-                      fontSize: 11,
-                      height: 1.15,
-                      letterSpacing: .1,
-                      color: selected ? LamazonTheme.strong : LamazonTheme.text,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -806,48 +828,54 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     label: 'Browse ${entry.name}',
-    // The artwork and the caption below it both name the category too, so
-    // without this the tile announced itself three times over.
-    excludeSemantics: true,
     child: DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
         boxShadow: LamazonTheme.surfaceShadows,
       ),
+      // Same as the product card: the rounded background is painted by
+      // borderRadius, the artwork clips itself, and nothing else reaches the
+      // edge — so the anti-aliased clip was a per-frame saveLayer on every one
+      // of the forty-eight tiles for nothing.
       child: Material(
         color: LamazonTheme.surface,
         borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
-        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(7),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: CategoryVisual(
-                      name: entry.name,
-                      imageUrl: entry.imageUrl,
+          borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
+          // The artwork and the caption below it both name the category, so
+          // the contents are silenced — but only the contents. Excluding the
+          // InkWell too is what took every tile out of the tab order.
+          child: ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.all(7),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: CategoryVisual(
+                        name: entry.name,
+                        imageUrl: entry.imageUrl,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  entry.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'InterTight',
-                    fontSize: 12,
-                    height: 15 / 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: .1,
+                  const SizedBox(height: 7),
+                  Text(
+                    entry.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'InterTight',
+                      fontSize: 12,
+                      height: 15 / 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: .1,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

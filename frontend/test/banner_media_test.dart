@@ -37,8 +37,10 @@ void main() {
     expect(bannerKind('https://example.test/promo.png'), BannerKind.picture);
     expect(bannerKind(''), BannerKind.picture);
     // A query string is not part of the path and must not decide the kind.
-    expect(bannerKind('https://example.test/p.png?from=x.mp4'),
-        BannerKind.picture);
+    expect(
+      bannerKind('https://example.test/p.png?from=x.mp4'),
+      BannerKind.picture,
+    );
   });
 
   test('a GIF is delivered as a clip, not as a GIF', () {
@@ -48,8 +50,11 @@ void main() {
     expect(moving, contains('f_mp4'));
     expect(moving, contains('c_limit,w_1280'));
     expect(moving, contains('ac_none'), reason: 'a shop must not make a noise');
-    expect(moving, endsWith('/v1/Lamazon/Campaigns/diwali.gif'),
-        reason: 'the original is still what is addressed');
+    expect(
+      moving,
+      endsWith('/v1/Lamazon/Campaigns/diwali.gif'),
+      reason: 'the original is still what is addressed',
+    );
   });
 
   test('anything with frames has a still, and the still is a JPEG', () {
@@ -60,8 +65,11 @@ void main() {
     expect(gif, contains('pg_1'), reason: 'one page of an animation');
     expect(gif, contains('f_jpg'));
     expect(gif, isNot(contains('f_auto')));
-    expect(gif, isNot(contains('e_improve')),
-        reason: 'a per-frame effect bills per frame, on a backdrop');
+    expect(
+      gif,
+      isNot(contains('e_improve')),
+      reason: 'a per-frame effect bills per frame, on a backdrop',
+    );
 
     final clip = bannerArtwork(_clip);
     expect(clip, contains('/video/upload/so_0,'), reason: 'its first frame');
@@ -127,8 +135,11 @@ void main() {
       // which is the same shape as a dead URL or a codec nobody has.
       await tester.pumpWidget(_banner(_clip));
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull,
-          reason: 'a banner is not worth a broken home screen');
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'a banner is not worth a broken home screen',
+      );
       expect(find.byType(Image), findsOneWidget);
       expect(_urlOf(tester), contains('so_0'));
     });

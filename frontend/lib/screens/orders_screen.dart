@@ -96,11 +96,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ],
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(
+                              // The bar floats over this list, so the list has
+                              // to end above it. 100 was a guess that ignored
+                              // the home indicator on a phone.
+                              padding: EdgeInsets.fromLTRB(
                                 20,
                                 4,
                                 20,
-                                100,
+                                bottomNavInset(context) + 16,
                               ),
                               itemCount: orders.length,
                               separatorBuilder: (_, _) =>

@@ -1,6 +1,46 @@
 import 'package:flutter/material.dart';
 
+import '../data/season.dart';
 import 'design_system.dart';
+
+/// The shop's decorative colours for right now: a festival's, or its own.
+///
+/// A season used to repaint one widget. The result was a navy header bolted to
+/// an otherwise forest-green page — the hero, the department tiles and the
+/// navigation bar all kept the app's colours, so the feature read as a
+/// rendering fault rather than as a theme.
+///
+/// Every *decorative* surface now reads these instead of naming
+/// [LamazonTheme.forest] and [LamazonTheme.lime] directly. Prices, product
+/// cards, stock and status colours deliberately do not: a shop that changes
+/// colour everywhere for Diwali is a shop nobody can read a price in, and
+/// green-means-in-stock has to survive a green festival.
+abstract final class SeasonSkin {
+  static Season? get _live => Seasons.instance.current;
+
+  static bool get active => _live != null;
+
+  /// The chrome: header, hero, empty category plates.
+  static Color get ground => _live?.ground ?? LamazonTheme.forest;
+
+  /// The same ground as a hex, for the campaign template which stores one.
+  static String get groundHex =>
+      '#${(ground.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+  /// What actions on that ground use: the selected tile, the nav indicator.
+  static Color get accent => _live?.accent ?? LamazonTheme.lime;
+
+  /// Text over [ground]. The server refuses a season under 4.5:1 here.
+  static Color get ink => _live?.ink ?? Colors.white;
+
+  /// Text over [accent]. A season is only validated for ink-on-ground, and an
+  /// accent dark enough to need white is allowed, so this is derived.
+  static Color get onAccent => CampaignPalette.readable(accent);
+
+  /// The ground, deepened — the second stop of every gradient drawn on it.
+  static Color get groundShade =>
+      Color.alphaBlend(Colors.black.withValues(alpha: .18), ground);
+}
 
 /// Named campaign palettes keep admin-managed images in one visual world while
 /// preserving the existing hexadecimal field for API compatibility.
@@ -100,7 +140,23 @@ class CampaignPalette {
     cacao,
   ];
 
+  /// The palette a banner is drawn in.
+  ///
+  /// A banner that never chose a colour — the default, or one of the legacy
+  /// pastels that all translate to forest — follows the season instead. That
+  /// is the difference between a festival header bolted onto a forest-green
+  /// hero and a shop that looks dressed for the day. A banner an admin gave a
+  /// deliberate colour keeps it: they chose it for a reason, and a season is
+  /// not entitled to overrule the thing it is advertising.
   static CampaignPalette resolve(String hex) {
+    final chosen = _resolve(hex);
+    if (SeasonSkin.active && identical(chosen, forest)) {
+      return _resolve(SeasonSkin.groundHex);
+    }
+    return chosen;
+  }
+
+  static CampaignPalette _resolve(String hex) {
     final normalized = hex.trim().toUpperCase();
     for (final preset in presets) {
       if (preset.hex == normalized) return preset;
@@ -146,6 +202,12 @@ class CampaignPalette {
       LamazonTheme.strong,
     );
   }
+
+  /// Whichever of the app's two foregrounds can be read on [ground].
+  static Color readable(Color ground) =>
+      _contrast(LamazonTheme.text, ground) >= 4.5
+      ? LamazonTheme.text
+      : Colors.white;
 
   static double _contrast(Color a, Color b) {
     final x = a.computeLuminance(), y = b.computeLuminance();

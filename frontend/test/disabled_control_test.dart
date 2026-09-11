@@ -10,15 +10,19 @@ import 'package:lamazon/widgets/design_system.dart';
 /// a broken button rather than as a limit. The reason it was inert was only
 /// available as a tooltip, which is to say only to a mouse that happened to
 /// hover.
-Widget _wrap(Widget child) =>
-    MaterialApp(theme: LamazonTheme.data, home: Scaffold(body: Center(child: child)));
+Widget _wrap(Widget child) => MaterialApp(
+  theme: LamazonTheme.data,
+  home: Scaffold(body: Center(child: child)),
+);
 
 Color _fillOf(WidgetTester tester) {
   final box = tester.widget<DecoratedBox>(
-    find.descendant(
-      of: find.byType(TactileIconButton),
-      matching: find.byType(DecoratedBox),
-    ).first,
+    find
+        .descendant(
+          of: find.byType(TactileIconButton),
+          matching: find.byType(DecoratedBox),
+        )
+        .first,
   );
   final decoration = box.decoration as BoxDecoration;
   // The button paints a two-stop gradient; the second stop is the base colour.
@@ -27,10 +31,12 @@ Color _fillOf(WidgetTester tester) {
 
 List<BoxShadow> _shadowOf(WidgetTester tester) {
   final box = tester.widget<DecoratedBox>(
-    find.descendant(
-      of: find.byType(TactileIconButton),
-      matching: find.byType(DecoratedBox),
-    ).first,
+    find
+        .descendant(
+          of: find.byType(TactileIconButton),
+          matching: find.byType(DecoratedBox),
+        )
+        .first,
   );
   return (box.decoration as BoxDecoration).boxShadow ?? const [];
 }

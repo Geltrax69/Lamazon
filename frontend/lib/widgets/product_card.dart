@@ -68,167 +68,220 @@ class ProductCard extends StatelessWidget {
     return null;
   }
 
+  /// Height reserved for everything under the picture.
+  ///
+  /// It used to be the picture that took the slack: the text block is a
+  /// different height on every card — a discount line here, a store there, a
+  /// scarcity warning on one in ten — so `Expanded` handed the difference to
+  /// the image, and a single row measured image tops of 117/137/152px. Fixing
+  /// the text block instead puts the variation in the empty space at the
+  /// bottom of the card, where nobody can see it, and every picture, price and
+  /// `+` in a row lines up.
+  ///
+  /// Sized for the worst case: price + saving + two lines of name + store +
+  /// scarcity. Guarded by the overflow assertion in product_card_test.
+  static const metaHeight = 114.0;
+
   @override
   Widget build(BuildContext context) {
     final note = _note;
+    // The label is the whole card as one spoken sentence, but it may not
+    // swallow the card: excludeSemantics here is what dropped the InkWell's
+    // own focusable node (so no keyboard could reach a product) and deleted
+    // the add-to-cart and save buttons from the accessibility tree outright.
+    // Only the parts the sentence already describes are silenced.
     return Semantics(
       button: onTap != null,
       label: [
-        product.name,
+        // A legacy title can run to 194 characters, which is the entire
+        // spoken name of the card before a price is reached. Cards are
+        // scanned, not read: the tail belongs on the product page.
+        product.name.spokenTitle,
         '₹${product.price.moneyText}',
         if (product.discounted) '${product.discountPercent} percent off',
         if (showStore) 'from ${product.store}',
         if (note != null) note.$1,
       ].join(', '),
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: ColoredBox(
-                          // A ground of its own, so the picture reads as a
-                          // tile rather than as text with an image floating
-                          // above it. The picture is contained rather than
-                          // cropped, so some ground always shows on one axis.
-                          color: LamazonTheme.surface,
-                          // catalogueImage already returns a centred square,
-                          // so the box is filled rather than fitted — there is
-                          // nothing left to letterbox.
-                          child: NetImage(
-                            url: catalogueImage(product.imageUrl),
-                            padTo: null,
-                            fit: BoxFit.cover,
-                            semanticLabel: product.name,
+      // Its own layer, inside the semantics rather than around it. Every
+      // heart on screen listens to the wishlist, so toggling one rebuilds
+      // all of them, and the CartButton runs a scale animation on tap —
+      // without a boundary either one re-rasterises the whole grid it is
+      // sitting in.
+      child: RepaintBoundary(
+        // No clipBehavior on the Material. An anti-aliased clip is a
+        // saveLayer, charged on every frame for every card — forty-two of them
+        // on a phone — and it was clipping content that cannot overflow: the
+        // photograph rounds itself just below, and the text sits well inside
+        // the box. The only thing it bought was a rounded ink splash, and
+        // InkWell's own borderRadius does that for the length of a tap rather
+        // than for the length of the session.
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(LamazonTheme.smallRadius),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ExcludeSemantics(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: ColoredBox(
+                              // A ground of its own, so the picture reads as a
+                              // tile rather than as text with an image floating
+                              // above it. The picture is contained rather than
+                              // cropped, so some ground always shows on one axis.
+                              color: LamazonTheme.surface,
+                              // catalogueImage already returns a centred square,
+                              // so the box is filled rather than fitted — there
+                              // is nothing left to letterbox.
+                              child: NetImage(
+                                url: catalogueImage(product.imageUrl),
+                                padTo: null,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: WishlistHeart(productId: product.id),
-                    ),
-                    // Inside the picture, not under it. It is the thumb's
-                    // target and it was costing the card a whole row of
-                    // height beside the price, where it outweighed the number
-                    // the shopper is actually reading.
-                    if (showAddToCart)
                       Positioned(
+                        top: 4,
                         right: 4,
-                        bottom: 4,
-                        child: CartButton(product: product),
+                        child: WishlistHeart(productId: product.id),
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Price first, and the largest thing on the card.
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '₹${product.price.moneyText}',
-                    style: const TextStyle(
-                      fontFamily: 'InterTight',
-                      fontSize: 17,
-                      height: 21 / 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.2,
-                      color: LamazonTheme.text,
-                    ),
-                  ),
-                  if (product.discounted) ...[
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        '₹${product.mrp.moneyText}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'InterTight',
-                          fontSize: 12.5,
-                          color: LamazonTheme.muted,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: LamazonTheme.muted,
+                      // Inside the picture, not under it. It is the thumb's
+                      // target and it was costing the card a whole row of
+                      // height beside the price, where it outweighed the number
+                      // the shopper is actually reading.
+                      if (showAddToCart)
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: CartButton(product: product),
                         ),
-                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: metaHeight,
+                  child: ExcludeSemantics(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        // Price first, and the largest thing on the card.
+                        // scaleDown rather than ellipsis: a price is the one
+                        // number on the card that may not be cut off, and
+                        // grouped thousands made the pair wide enough to try.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '₹${product.price.moneyText}',
+                                style: const TextStyle(
+                                  fontFamily: 'InterTight',
+                                  fontSize: 17,
+                                  height: 21 / 17,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -.2,
+                                  color: LamazonTheme.text,
+                                ),
+                              ),
+                              if (product.discounted) ...[
+                                const SizedBox(width: 5),
+                                Text(
+                                  '₹${product.mrp.moneyText}',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontFamily: 'InterTight',
+                                    fontSize: 12.5,
+                                    color: LamazonTheme.muted,
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationColor: LamazonTheme.muted,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        // The saving as a readable line rather than a sticker
+                        // over the food. Green, because it is good news, and it
+                        // sits with the number it is about.
+                        if (product.discounted)
+                          Text(
+                            '${product.discountPercent}% off',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontFamily: 'InterTight',
+                              fontSize: 11.5,
+                              height: 15 / 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: LamazonTheme.strong,
+                            ),
+                          ),
+                        const SizedBox(height: 2),
+                        // The name is what you are buying, but you already know
+                        // that from the picture. Medium weight, two lines, and
+                        // it stops shouting over the price.
+                        Text(
+                          product.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'InterTight',
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            height: 16.5 / 13,
+                            letterSpacing: .05,
+                            color: LamazonTheme.text,
+                          ),
+                        ),
+                        if (showStore) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            product.store,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'InterTight',
+                              fontSize: 11,
+                              height: 14 / 11,
+                              letterSpacing: .2,
+                              color: LamazonTheme.muted,
+                            ),
+                          ),
+                        ],
+                        if (note != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            note.$1,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'InterTight',
+                              fontSize: 11.5,
+                              height: 15 / 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: note.$2,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
-              ),
-              // The saving as a readable line rather than a sticker over the
-              // food. Green, because it is good news, and it sits with the
-              // number it is about.
-              if (product.discounted)
-                Text(
-                  '${product.discountPercent}% off',
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontFamily: 'InterTight',
-                    fontSize: 11.5,
-                    height: 15 / 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: LamazonTheme.strong,
-                  ),
-                ),
-              const SizedBox(height: 2),
-              // The name is what you are buying, but you already know that
-              // from the picture. Medium weight, two lines, and it stops
-              // shouting over the price.
-              Text(
-                product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontFamily: 'InterTight',
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                  height: 16.5 / 13,
-                  letterSpacing: .05,
-                  color: LamazonTheme.text,
-                ),
-              ),
-              if (showStore) ...[
-                const SizedBox(height: 2),
-                Text(
-                  product.store,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'InterTight',
-                    fontSize: 11,
-                    letterSpacing: .2,
-                    color: LamazonTheme.muted,
                   ),
                 ),
               ],
-              if (note != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  note.$1,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'InterTight',
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: note.$2,
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -328,7 +381,9 @@ class WishlistHeart extends StatelessWidget {
           button: true,
           selected: liked,
           label: liked ? 'Remove from saved' : 'Save product',
-          excludeSemantics: true,
+          // No excludeSemantics: it would take the InkResponse's own focusable
+          // node with it and drop the heart out of the tab order. Nothing
+          // inside speaks anyway — the tooltip opts out and the icon is mute.
           child: Tooltip(
             message: liked ? 'Remove from saved' : 'Save product',
             excludeFromSemantics: true,

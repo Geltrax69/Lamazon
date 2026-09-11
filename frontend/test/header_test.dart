@@ -22,9 +22,7 @@ void main() {
     tester,
   ) async {
     await mockNetworkImagesFor(() async {
-      await tester.pumpWidget(
-        const MaterialApp(home: HomeScreen()),
-      );
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
       await tester.pump();
 
       expect(
@@ -49,9 +47,7 @@ void main() {
     tester,
   ) async {
     await mockNetworkImagesFor(() async {
-      await tester.pumpWidget(
-        const MaterialApp(home: HomeScreen()),
-      );
+      await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
       await tester.pump();
 
       // The thing the header is actually for survived the removal.

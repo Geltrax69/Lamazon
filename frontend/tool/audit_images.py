@@ -213,6 +213,37 @@ def contact_sheet(products, path, spec, cols=6, tile=190):
     return path
 
 
+# Every image bundled into the app ships on the first paint, before anything
+# is on screen, so their combined weight is the one asset number a shopper on
+# mobile data actually feels. 400 KB is what the current two WebPs need with
+# room for one more. Lower it as assets shrink; never raise it to pass a build.
+BUNDLE_BUDGET = 400 * 1024
+
+
+def audit_bundle(root="assets"):
+    """Weigh what the app bundles, and fail when it outgrows its budget."""
+    import pathlib
+
+    files = sorted(
+        f for f in pathlib.Path(root).rglob("*")
+        if f.is_file() and f.suffix.lower() not in {".ttf", ".otf", ".yaml"}
+    )
+    total = sum(f.stat().st_size for f in files)
+    print(f"bundled artwork — {total / 1024:.0f} KB of {BUNDLE_BUDGET / 1024:.0f} KB")
+    failed = total > BUNDLE_BUDGET
+    for f in files:
+        size = f.stat().st_size
+        heavy = f.suffix.lower() == ".png" and size > 200 * 1024
+        failed = failed or heavy
+        note = "  <- a photograph in PNG; convert to WebP" if heavy else ""
+        print(f"  {size / 1024:7.0f} KB  {f}{note}")
+    if failed:
+        print("\nover budget. Convert photographs to WebP at q82:")
+        print("  python3 -c \"from PIL import Image; im=Image.open('x.png');"
+              " im.convert('RGB').save('x.webp','WEBP',quality=82,method=6)\"")
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Audit product images and fail when they are not catalogue quality."
@@ -221,7 +252,15 @@ def main():
     parser.add_argument("--sheet", metavar="FILE", help="write a contact sheet")
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--no-ocr", action="store_true", help="skip watermark detection")
+    parser.add_argument(
+        "--bundle",
+        action="store_true",
+        help="weigh the assets bundled into the app instead of the catalogue",
+    )
     args = parser.parse_args()
+
+    if args.bundle:
+        sys.exit(audit_bundle())
 
     base = args.api.rstrip("/")
     try:

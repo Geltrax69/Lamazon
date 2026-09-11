@@ -40,18 +40,23 @@ void main() {
     expect(bytes, isNotNull);
 
     final out = await decodeImageFromList(bytes!);
-    expect((out.width / out.height - 2).abs() < 0.02, isTrue,
-        reason: 'got ${out.width}x${out.height}');
+    expect(
+      (out.width / out.height - 2).abs() < 0.02,
+      isTrue,
+      reason: 'got ${out.width}x${out.height}',
+    );
   });
 
   test('centred and unzoomed, it keeps the middle band', () async {
     final source = await _twoTone();
-    final out = await decodeImageFromList((await renderCrop(
-      image: source,
-      frame: const Size(300, 150),
-      zoom: 1,
-      offset: Offset.zero,
-    ))!);
+    final out = await decodeImageFromList(
+      (await renderCrop(
+        image: source,
+        frame: const Size(300, 150),
+        zoom: 1,
+        offset: Offset.zero,
+      ))!,
+    );
 
     // The middle of a square is half red over half blue.
     expect(await _pixel(out, out.width ~/ 2, 2), const Color(0xFFFF0000));
@@ -68,16 +73,33 @@ void main() {
     // the picture has been pushed down. Not the last row — that lands on the
     // seam between the two halves, where the sample is a blend of both.
     Future<Color> at(Offset offset) async {
-      final out = await decodeImageFromList((await renderCrop(
-        image: source,
-        frame: frame,
-        zoom: 1,
-        offset: offset,
-      ))!);
+      final out = await decodeImageFromList(
+        (await renderCrop(
+          image: source,
+          frame: frame,
+          zoom: 1,
+          offset: offset,
+        ))!,
+      );
       return _pixel(out, out.width ~/ 2, (out.height * 0.6).round());
     }
 
     expect(await at(Offset.zero), const Color(0xFF0000FF));
     expect(await at(const Offset(0, 74)), const Color(0xFFFF0000));
+  });
+
+  test('a phone-screen shape is flagged, a photograph is not', () {
+    // Sellers upload screenshots of other shops' listings, another app's
+    // status bar and toolbar included, and the chrome arrives on the product
+    // page. Shape is free and separates the two populations well enough to
+    // warn on.
+    expect(looksLikeAScreenshot(1170, 2532), isTrue, reason: 'iPhone 13 Pro');
+    expect(looksLikeAScreenshot(1080, 2400), isTrue, reason: 'a 20:9 Android');
+    expect(looksLikeAScreenshot(828, 1792), isTrue);
+
+    expect(looksLikeAScreenshot(3024, 4032), isFalse, reason: '4:3 portrait');
+    expect(looksLikeAScreenshot(1080, 1080), isFalse, reason: 'a square');
+    expect(looksLikeAScreenshot(4032, 3024), isFalse, reason: 'landscape');
+    expect(looksLikeAScreenshot(1080, 1920), isFalse, reason: 'a 16:9 crop');
   });
 }

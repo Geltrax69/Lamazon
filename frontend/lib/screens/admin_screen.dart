@@ -220,6 +220,10 @@ class _AdminHomeState extends State<_AdminHome> {
 
   /// Every product in the shop, whoever sells it.
   List<InventoryItem> _items = const [];
+
+  /// Only ever the number on the Banners chip — the panel itself is owned by
+  /// [CampaignManager], which loads its own.
+  int _campaignCount = 0;
   _Tab _tab = _Tab.review;
   String? _error;
   bool _loading = true;
@@ -237,6 +241,10 @@ class _AdminHomeState extends State<_AdminHome> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    final campaignCount = Api.instance
+        .campaigns(admin: true)
+        .then((rows) => rows.length)
+        .catchError((_) => _campaignCount);
     try {
       // Five independent reads. In series this was five round trips of
       // waiting before anything drew.
@@ -266,6 +274,13 @@ class _AdminHomeState extends State<_AdminHome> {
         // The whole catalogue, every store.
         Api.instance.adminItems(),
       ).wait;
+      // Started alongside the rest but awaited separately: records only wait
+      // on nine futures, and this is the tenth. Only the count on the Banners
+      // chip depends on it — Banners was the one destination in the panel with
+      // no number beside it, which read as "this one is different" rather than
+      // "nobody counted this one" — so a failure here costs a number, not the
+      // whole panel.
+      final campaigns = await campaignCount;
       if (!mounted) return;
       setState(() {
         _overview = overview;
@@ -276,6 +291,7 @@ class _AdminHomeState extends State<_AdminHome> {
         _orders = orders;
         _groups = groups;
         _items = items;
+        _campaignCount = campaigns;
         _error = null;
       });
     } catch (e) {
@@ -298,10 +314,7 @@ class _AdminHomeState extends State<_AdminHome> {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(done),
-          ),
+          SnackBar(behavior: SnackBarBehavior.floating, content: Text(done)),
         );
     } catch (e) {
       messenger
@@ -396,7 +409,9 @@ class _AdminHomeState extends State<_AdminHome> {
               controller: field,
               autofocus: true,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Units on the shelf'),
+              decoration: const InputDecoration(
+                labelText: 'Units on the shelf',
+              ),
               onSubmitted: (v) => Navigator.pop(dialog, v),
             ),
           ],
@@ -1300,54 +1315,38 @@ class _AdminHomeState extends State<_AdminHome> {
                       for (final tab in _Tab.values)
                         DropdownMenuItem(
                           value: tab,
-                          child: Text(
-                            tab == _Tab.banners
-                                ? tab.label
-                                : '${tab.label} (${counts[tab]})',
-                          ),
+                          child: Text('${tab.label} (${counts[tab]})'),
                         ),
                     ],
                     onChanged: (value) {
                       if (value != null) _show(value);
                     },
                   )
-                else
-                  Semantics(
-                    container: true,
-                    label: 'Admin section',
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final tab in _Tab.values)
-                          Semantics(
-                            // ChoiceChip announces role=checkbox, which says
-                            // "tick any of these". These are eleven
-                            // destinations and exactly one is current.
-                            inMutuallyExclusiveGroup: true,
-                            selected: _tab == tab,
-                            label: tab == _Tab.banners
-                                ? tab.label
-                                : '${tab.label}, ${counts[tab]}',
-                            excludeSemantics: true,
-                            child: ChoiceChip(
-                              label: Text(
-                                tab == _Tab.banners
-                                    ? tab.label
-                                    : '${tab.label} (${counts[tab]})',
-                              ),
-                              selected: _tab == tab,
-                              onSelected: (_) => _show(tab),
-                              selectedColor: LamazonTheme.accent,
-                              backgroundColor: LamazonTheme.surface,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                else ...[
+                  // Named, and split in two. Eleven identical chips in one row
+                  // said nothing about what any of them did: three of them are
+                  // three views of the stores list — a filter — and the other
+                  // eight are destinations, and nothing on screen distinguished
+                  // the two. They are still chips, still in the same place, and
+                  // still do exactly what they did.
+                  _ChipGroup(
+                    label: 'Stores',
+                    semanticLabel: 'Store list',
+                    chips: [
+                      for (final tab in _storeTabs) _sectionChip(tab, counts),
+                    ],
                   ),
+                  const SizedBox(height: 10),
+                  _ChipGroup(
+                    label: 'Manage',
+                    semanticLabel: 'Admin section',
+                    chips: [
+                      for (final tab in _Tab.values)
+                        if (!_storeTabs.contains(tab))
+                          _sectionChip(tab, counts),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 20),
                 // Only when there is something to search or filter. A search
                 // box, a status dropdown and a date range above an empty list
@@ -1540,6 +1539,7 @@ class _AdminHomeState extends State<_AdminHome> {
         child: Text('No matching records. Try another search or filter.'),
       ),
   ];
+
   /// The six counts, as one band rather than two.
   ///
   /// These sit above every section, not just an overview, so their height is
@@ -1656,6 +1656,26 @@ class _AdminHomeState extends State<_AdminHome> {
       .where((s) => s['status'] == status)
       .toList();
 
+  /// One destination, as a chip. Merged rather than excluded: the chip's own
+  /// node is what carries role and tab stop, and excluding it to stop the
+  /// label being said twice left every section unreachable by keyboard.
+  Widget _sectionChip(_Tab tab, Map<_Tab, int> counts) => MergeSemantics(
+    child: Semantics(
+      // ChoiceChip announces role=checkbox, which says "tick any of these".
+      // These are destinations and exactly one is current.
+      inMutuallyExclusiveGroup: true,
+      selected: _tab == tab,
+      child: ChoiceChip(
+        label: Text('${tab.label} (${counts[tab]})'),
+        selected: _tab == tab,
+        onSelected: (_) => _show(tab),
+        selectedColor: LamazonTheme.accent,
+        backgroundColor: LamazonTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    ),
+  );
+
   Map<_Tab, int> _counts() => {
     _Tab.review: _storesWith('pending').length,
     _Tab.approved: _storesWith('approved').length,
@@ -1663,7 +1683,7 @@ class _AdminHomeState extends State<_AdminHome> {
     _Tab.orders: _orders.length,
     _Tab.products: _items.length,
     _Tab.insights: (_insights?['topStores'] as List?)?.length ?? 0,
-    _Tab.banners: 0,
+    _Tab.banners: _campaignCount,
     _Tab.categories: departments.where((d) => d.name != 'All').length,
     _Tab.policies: _policies.length,
     _Tab.compare: _groups.length,
@@ -2710,6 +2730,52 @@ class _RankRow extends StatelessWidget {
 
 /// The sections of the panel, in the order they matter: what needs a decision
 /// first, then what has been decided, then the day-to-day.
+/// The three views of one list, as opposed to the eight destinations. They
+/// read as filters because that is what they are.
+const _storeTabs = [_Tab.review, _Tab.approved, _Tab.rejected];
+
+/// One labelled row of chips. The caption sits beside them rather than over
+/// them, so naming the two groups costs the panel no vertical space.
+class _ChipGroup extends StatelessWidget {
+  final String label;
+  final String semanticLabel;
+  final List<Widget> chips;
+  const _ChipGroup({
+    required this.label,
+    required this.semanticLabel,
+    required this.chips,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 10, right: 12),
+        child: SizedBox(
+          width: 62,
+          child: Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .8,
+              color: _muted,
+            ),
+          ),
+        ),
+      ),
+      Expanded(
+        child: Semantics(
+          container: true,
+          label: semanticLabel,
+          child: Wrap(spacing: 8, runSpacing: 8, children: chips),
+        ),
+      ),
+    ],
+  );
+}
+
 enum _Tab {
   review('To review'),
   approved('Approved'),
@@ -2942,10 +3008,7 @@ class _Figure extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10.5, color: _muted),
-        ),
+        Text(label, style: const TextStyle(fontSize: 10.5, color: _muted)),
         const SizedBox(height: 1),
         Text(
           value,
@@ -3392,32 +3455,33 @@ class _Tile extends StatelessWidget {
       // One node saying "Orders 4", not two saying "4" and "Orders" — and
       // definitely not the six bare digits these used to announce, which
       // told a screen-reader user nothing at all.
-      child: Semantics(
-        label: '$label: $value',
-        button: onTap != null,
-        excludeSemantics: true,
-        child: ElevatedSurface(
-          onTap: onTap,
-          radius: LamazonTheme.featuredRadius,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Column(
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: color ?? LamazonTheme.text,
-                ),
+      //
+      // The label goes on the surface rather than in a Semantics around it:
+      // a second annotation outside made two nodes, one carrying the name and
+      // the other carrying the tab stop, so the tile a keyboard could reach
+      // was the one with nothing to say.
+      child: ElevatedSurface(
+        onTap: onTap,
+        semanticLabel: '$label: $value',
+        radius: LamazonTheme.featuredRadius,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color ?? LamazonTheme.text,
               ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: LamazonTheme.muted),
+            ),
+          ],
         ),
       ),
     );
@@ -3679,11 +3743,7 @@ class _PolicyEditorState extends State<_PolicyEditor> {
                 action: IconButton(
                   tooltip: _preview ? 'Back to editing' : 'Preview',
                   onPressed: () => setState(() => _preview = !_preview),
-                  icon: Icon(
-                    _preview ? _pencil : _eye,
-                    size: 17,
-                    color: _ink,
-                  ),
+                  icon: Icon(_preview ? _pencil : _eye, size: 17, color: _ink),
                 ),
               ),
               Expanded(
@@ -3785,7 +3845,6 @@ class _PolicyEditorState extends State<_PolicyEditor> {
     ),
   );
 }
-
 
 /// A delete that waits to be looked for.
 ///

@@ -64,7 +64,12 @@ class ShopsScreen extends StatelessWidget {
                   else
                     Expanded(
                       child: ListView.separated(
-                        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 16),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          4,
+                          20,
+                          bottomNavInset(context) + 16,
+                        ),
                         itemCount: list.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (_, i) => _ShopRow(shop: list[i]),
@@ -86,80 +91,93 @@ class _ShopRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ShopScreen(shop: shop)),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 76,
-                height: 76,
-                child: NetImage(url: thumb(shop.imageUrl, 160), padTo: 16 / 9),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+    // InkWell, not GestureDetector: a bare tap handler paints no focus, takes
+    // no tab stop and tells assistive technology nothing, so the whole shop
+    // list was pointer-only.
+    return Semantics(
+      button: true,
+      label: shop.name,
+      child: Material(
+        color: LamazonTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ShopScreen(shop: shop)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: ExcludeSemantics(
+              child: Row(
                 children: [
-                  Text(
-                    shop.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    shop.tagline,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                      color: LamazonTheme.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Row(
-                    children: [
-                      Icon(
-                        LucideIcons.timer,
-                        size: 12,
-                        color: LamazonTheme.muted,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 76,
+                      height: 76,
+                      child: NetImage(
+                        url: thumb(shop.imageUrl, 160),
+                        padTo: 16 / 9,
                       ),
-                      SizedBox(width: 4),
-                      Text(
-                        '12 mins',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: LamazonTheme.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          shop.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          shop.tagline,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: LamazonTheme.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Row(
+                          children: [
+                            Icon(
+                              LucideIcons.timer,
+                              size: 12,
+                              color: LamazonTheme.muted,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '12 mins',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: LamazonTheme.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    size: 18,
+                    color: LamazonTheme.muted,
                   ),
                 ],
               ),
             ),
-            const Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: LamazonTheme.muted,
-            ),
-          ],
+          ),
         ),
       ),
     );

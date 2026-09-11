@@ -33,7 +33,11 @@ void main() {
 
   test('the presets are actually different from one another', () {
     final hexes = CampaignPalette.presets.map((p) => p.hex).toSet();
-    expect(hexes.length, CampaignPalette.presets.length, reason: 'no duplicates');
+    expect(
+      hexes.length,
+      CampaignPalette.presets.length,
+      reason: 'no duplicates',
+    );
     final names = CampaignPalette.presets.map((p) => p.name).toSet();
     expect(names.length, CampaignPalette.presets.length);
   });
@@ -50,8 +54,16 @@ void main() {
     // it rather than trusting the editor, and that derivation is the thing
     // that has to hold — including at the light/dark boundary.
     for (final hex in [
-      '#FFFFFF', '#000000', '#FFFF00', '#7F7F7F', '#6B6B6B', '#6E6E6E',
-      '#00FF00', '#123456', '#FDF6E3', '#C6EE63',
+      '#FFFFFF',
+      '#000000',
+      '#FFFF00',
+      '#7F7F7F',
+      '#6B6B6B',
+      '#6E6E6E',
+      '#00FF00',
+      '#123456',
+      '#FDF6E3',
+      '#C6EE63',
     ]) {
       final p = CampaignPalette.resolve(hex);
       expect(
@@ -89,7 +101,8 @@ void main() {
             greaterThanOrEqualTo(4.5),
             reason: '$hex: button label',
           );
-          if (p.background != Color(0xFF000000 | int.parse(hex.substring(1), radix: 16))) {
+          if (p.background !=
+              Color(0xFF000000 | int.parse(hex.substring(1), radix: 16))) {
             deepened++;
           }
         }
@@ -97,7 +110,11 @@ void main() {
     }
     // And it is not doing it by repainting everything: most colours are kept
     // exactly as typed.
-    expect(deepened / 4913, lessThan(0.5), reason: 'deepened $deepened of 4913');
+    expect(
+      deepened / 4913,
+      lessThan(0.5),
+      reason: 'deepened $deepened of 4913',
+    );
   });
 
   test('nonsense falls back rather than painting an unreadable banner', () {

@@ -54,13 +54,20 @@ class PolicyDoc {
 
 /// What the app shipped with, for a phone with no signal and for the first
 /// frame before the server answers.
+///
+/// It shows the text rather than an apology for not having it. That apology
+/// was right while the shipped copy was a template full of blanks; it is the
+/// wrong answer now that the bundled copy is the same document the server
+/// seeds. The live text is still the database's — this is only what a phone
+/// with no signal reads — and the date at the top is absent rather than
+/// guessed, which is the honest difference between the two.
 List<PolicyDoc> get bundledPolicies => [
   for (final p in shippedPolicies)
     PolicyDoc(
       slug: p['slug']!,
       title: p['title']!,
-      body:
-          'This policy is unavailable. Check your connection and try again before ordering.',
+      body: p['body']!,
+      published: true,
     ),
 ];
 
@@ -252,12 +259,21 @@ class PolicyLinks extends StatelessWidget {
   }
 }
 
-
 /// "3 September 2026". No intl dependency for one date on one screen.
 String _asDate(DateTime d) {
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   final local = d.toLocal();
   return '${local.day} ${months[local.month - 1]} ${local.year}';

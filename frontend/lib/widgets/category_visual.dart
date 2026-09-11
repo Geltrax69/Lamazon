@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'design_system.dart';
+import 'campaign_palette.dart';
 import 'product_card.dart';
 import '../data/catalog.dart';
 import '../data/categories.dart';
@@ -10,7 +10,35 @@ import '../models/product.dart';
 class CategoryVisual extends StatelessWidget {
   final String name, imageUrl;
   const CategoryVisual({super.key, required this.name, this.imageUrl = ''});
-  static int indexFor(String name) {
+
+  /// The photograph this shelf borrows from its own stock, or empty.
+  ///
+  /// Scanning the whole catalogue per tile per build is O(categories x
+  /// catalogue) every layout pass — with forty-eight tiles on the home screen
+  /// that is thousands of comparisons a frame. The answer only changes when
+  /// the catalogue does, so it is computed once per catalogue and kept.
+  static String _faceFor(String category) {
+    if (!identical(_facesFor, shownCatalog)) {
+      _facesFor = shownCatalog;
+      _faces = {};
+      for (final p in shownCatalog) {
+        if (p.availableStock == 0 || p.imageUrl.trim().isEmpty) continue;
+        _faces.putIfAbsent(p.category, () => p.imageUrl);
+      }
+    }
+    return _faces[category] ?? '';
+  }
+
+  static List<Product>? _facesFor;
+  static Map<String, String> _faces = const {};
+
+  /// Cached per name: the answer depends only on the name and the department
+  /// table, and it is asked for on every build of every tile.
+  static final _indexCache = <String, int>{};
+
+  static int indexFor(String name) => _indexCache[name] ??= _indexFor(name);
+
+  static int _indexFor(String name) {
     final n = name.toLowerCase();
     if (RegExp('groc|vegetable|fruit|rice|dairy|milk|oil').hasMatch(n)) {
       return 1;
@@ -46,23 +74,10 @@ class CategoryVisual extends StatelessWidget {
       // Before falling back, look for something the shop actually sells on
       // this shelf. A real product photograph is both truer and better looking
       // than any stand-in, and these fill themselves in as stock arrives.
-      final stocked = shownCatalog.firstWhere(
-        (p) =>
-            p.category == name &&
-            p.imageUrl.trim().isNotEmpty &&
-            p.availableStock != 0,
-        orElse: () => const Product(
-          id: '',
-          name: '',
-          category: '',
-          price: 0,
-          imageUrl: '',
-          description: '',
-        ),
-      );
-      if (stocked.imageUrl.trim().isNotEmpty) {
+      final face = _faceFor(name);
+      if (face.isNotEmpty) {
         return NetImage(
-          url: catalogueImage(stocked.imageUrl, 300),
+          url: catalogueImage(face, 300),
           fit: BoxFit.cover,
           padTo: null,
           semanticLabel: name,
@@ -83,7 +98,7 @@ class CategoryVisual extends StatelessWidget {
             child: Transform.translate(
               offset: Offset(-(i % 4) * c.maxWidth, -(i ~/ 4) * c.maxHeight),
               child: Image.asset(
-                'assets/categories/category-atlas-v2.png',
+                'assets/categories/category-atlas-v2.webp',
                 width: c.maxWidth * 4,
                 height: c.maxHeight * 2,
                 fit: BoxFit.fill,
@@ -116,11 +131,11 @@ class _Plate extends StatelessWidget {
       // hole in it. A repeated texture is fine where a repeated photograph is
       // not: it depicts nothing, so it claims nothing.
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [LamazonTheme.forest, LamazonTheme.strong],
+            colors: [SeasonSkin.ground, SeasonSkin.groundShade],
           ),
         ),
         child: Center(
@@ -131,14 +146,13 @@ class _Plate extends StatelessWidget {
             // tiles carrying no information and actively misleading.
             glyphFor(name, fallback: department.icon),
             size: 28,
-            color: LamazonTheme.lime.withValues(alpha: .82),
+            color: SeasonSkin.accent.withValues(alpha: .82),
           ),
         ),
       ),
     );
   }
 }
-
 
 /// A glyph for one category, chosen from its name.
 ///
@@ -149,11 +163,22 @@ class _Plate extends StatelessWidget {
 /// adhesive tape was not.
 IconData glyphFor(String category, {required IconData fallback}) {
   final n = category.toLowerCase();
-  for (final (pattern, icon) in _glyphs) {
-    if (RegExp(pattern).hasMatch(n)) return icon;
+  for (final (pattern, icon) in _compiledGlyphs) {
+    if (pattern.hasMatch(n)) return icon;
   }
   return fallback;
 }
+
+/// [_glyphs] with every pattern compiled once, at first use.
+///
+/// `RegExp(pattern)` inside the loop recompiled up to fifty expressions on
+/// every call, and this is called once per category tile per build — home
+/// draws forty-eight of them. That is a couple of thousand regular
+/// expressions compiled and thrown away per layout pass, which is most of
+/// what made scrolling the home screen stutter.
+final _compiledGlyphs = [
+  for (final (pattern, icon) in _glyphs) (RegExp(pattern), icon),
+];
 
 /// Ordered: the first match wins, so put the specific before the general.
 /// "Baby food" should be a baby, not a plate.

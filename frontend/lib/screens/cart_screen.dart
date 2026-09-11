@@ -68,17 +68,20 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       const _DeliveryAddress(),
                       const SizedBox(height: 16),
+                      // A statement, not a choice. This was a card with a
+                      // tick in the corner, which is the shape the app uses
+                      // for "one of several, and this is the one you picked" —
+                      // except there is nothing else to pick. A control that
+                      // looks decidable and is not costs a shopper a tap and a
+                      // second of doubt at the last step before paying.
                       const ElevatedSurface(
                         child: ListTile(
                           contentPadding: EdgeInsets.all(16),
                           leading: Icon(LucideIcons.banknote),
-                          title: Text('Cash on delivery'),
+                          title: Text('Paying by cash on delivery'),
                           subtitle: Text(
-                            'Pay the rider on arrival. Online payments are not available.',
-                          ),
-                          trailing: Icon(
-                            LucideIcons.circleCheck,
-                            color: LamazonTheme.strong,
+                            'Hand the amount to the rider when the order '
+                            'arrives. It is the only way to pay today.',
                           ),
                         ),
                       ),
@@ -385,9 +388,7 @@ class _QtyControls extends StatelessWidget {
               : () => Cart.instance.setQty(item.product.id, item.qty + 1),
           filled: true,
           // Says why, rather than leaving a dead grey button.
-          label: atCap
-              ? 'That is all the shop has'
-              : 'Increase quantity',
+          label: atCap ? 'That is all the shop has' : 'Increase quantity',
         ),
       ],
     );

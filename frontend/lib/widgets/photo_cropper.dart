@@ -20,6 +20,7 @@ Future<Uint8List?> cropPhoto(
   Uint8List bytes, {
   double aspect = 16 / 9,
   String title = 'Adjust photo',
+  String? warning,
 }) async {
   final image = await decodeImageFromList(bytes);
   if (!context.mounted) return null;
@@ -27,19 +28,43 @@ Future<Uint8List?> cropPhoto(
     context,
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => _CropScreen(image: image, aspect: aspect, title: title),
+      builder: (_) => _CropScreen(
+        image: image,
+        aspect: aspect,
+        title: title,
+        warning: warning,
+      ),
     ),
   );
 }
+
+/// Whether a picked image is shaped like a phone screen rather than a photo.
+///
+/// Sellers upload screenshots — another shop's product page, status bar and
+/// toolbar included — and the listing carries somebody else's app chrome on
+/// it. Nothing here can read a picture, but shape is free and it separates the
+/// two populations well: a phone camera shoots 4:3 (1.33) and a tall crop
+/// rarely passes 16:9 (1.78), while a phone screen is 19.5:9 (2.17).
+///
+/// ponytail: proportions only, and it warns rather than refuses — a real
+/// photograph of a tall bottle should not be rejected by a rule of thumb. If
+/// false negatives matter later, sample the top strip for a flat status bar.
+bool looksLikeAScreenshot(int width, int height) =>
+    height > width && height / width >= 1.9;
 
 class _CropScreen extends StatefulWidget {
   final ui.Image image;
   final double aspect;
   final String title;
+
+  /// Shown over the frame when the picture looks like a screenshot. A note,
+  /// not a block: the person can still save it.
+  final String? warning;
   const _CropScreen({
     required this.image,
     required this.aspect,
     required this.title,
+    this.warning,
   });
 
   @override
@@ -187,6 +212,40 @@ class _CropScreenState extends State<_CropScreen> {
                     ),
                   ),
                 ),
+                if (widget.warning != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: LamazonTheme.warning.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              LucideIcons.triangleAlert,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.warning!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24),
                   child: Text(

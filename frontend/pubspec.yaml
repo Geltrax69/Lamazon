@@ -75,8 +75,12 @@ flutter:
     - pubspec.yaml
     - shorebird.yaml
     - assets/logo.png
-    - assets/categories/category-atlas-v2.png
-    - assets/categories/campaign-forest.png
+    # WebP, not PNG. These two were 4 MB of the 8.6 MB first load — two
+    # photographs stored in a lossless format built for line art. At q82 they
+    # are 279 KB together and measure 37-38 dB PSNR against the originals,
+    # which is not a difference anyone can see on a banner.
+    - assets/categories/category-atlas-v2.webp
+    - assets/categories/campaign-forest.webp
     - assets/fonts/InterTight-Variable.ttf
   uses-material-design: true
 

@@ -22,7 +22,10 @@ Future<void> _open(WidgetTester tester) async {
 }
 
 Future<void> _paste(WidgetTester tester, String url) async {
-  await tester.enterText(find.widgetWithText(TextFormField, 'Artwork URL (optional)'), url);
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'Artwork URL (optional)'),
+    url,
+  );
   // The preview trails the field on purpose, so let it settle.
   await tester.pump(const Duration(milliseconds: 400));
 }
@@ -48,10 +51,8 @@ void main() {
 
       // Exact strings: the hint above the field says "clip" too, and a finder
       // that matches either of them proves nothing about which one moved.
-      Finder status(String text) => find.descendant(
-        of: find.byType(Row),
-        matching: find.text(text),
-      );
+      Finder status(String text) =>
+          find.descendant(of: find.byType(Row), matching: find.text(text));
 
       // Nothing pasted yet: say what may be pasted, including a page.
       expect(
@@ -62,16 +63,25 @@ void main() {
         findsOneWidget,
       );
 
-      await _paste(tester, 'https://res.cloudinary.com/x/video/upload/v1/a.mp4');
+      await _paste(
+        tester,
+        'https://res.cloudinary.com/x/video/upload/v1/a.mp4',
+      );
       expect(status('Clip — plays muted, loops, no sound.'), findsOneWidget);
 
-      await _paste(tester, 'https://res.cloudinary.com/x/image/upload/v1/a.gif');
+      await _paste(
+        tester,
+        'https://res.cloudinary.com/x/image/upload/v1/a.gif',
+      );
       expect(
         status('Animation — delivered as a clip, not as a GIF.'),
         findsOneWidget,
       );
 
-      await _paste(tester, 'https://res.cloudinary.com/x/image/upload/v1/a.jpg');
+      await _paste(
+        tester,
+        'https://res.cloudinary.com/x/image/upload/v1/a.jpg',
+      );
       expect(
         status('Photo. If this is a page rather than a file, press Fetch.'),
         findsOneWidget,

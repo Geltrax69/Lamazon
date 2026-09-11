@@ -146,16 +146,39 @@ List<String> sellableCategories([String? department]) {
 /// The department a category sits under, at whatever depth. Empty when the
 /// category belongs to nothing the app knows about — a product filed under a
 /// department the admin has since deleted.
-String departmentOf(String category) {
-  for (final d in departments) {
-    if (d.name == 'All') continue;
-    if (d.name == category) return d.name;
-    for (final c in d.categories) {
-      if (c.name == category || c.leaves.contains(category)) return d.name;
+String departmentOf(String category) => _departmentIndex[category] ?? '';
+
+/// Every category name mapped to its department, built once per department
+/// table rather than walked per lookup.
+///
+/// The walk is three loops deep — departments, their categories, their leaves
+/// — and it was run once per category tile per build, forty-eight times a
+/// frame on the home screen. The table only changes when the admin adds a
+/// department, so [invalidateDepartmentIndex] rebuilds it then.
+Map<String, String> get _departmentIndex {
+  final table = departments;
+  if (!identical(_indexedFor, table)) {
+    _indexedFor = table;
+    // putIfAbsent, not assignment: the walk this replaces returned the first
+    // department that matched, and a name can appear under two of them.
+    final index = <String, String>{};
+    for (final d in table) {
+      if (d.name == 'All') continue;
+      index.putIfAbsent(d.name, () => d.name);
+      for (final c in d.categories) {
+        index.putIfAbsent(c.name, () => d.name);
+        for (final leaf in c.leaves) {
+          index.putIfAbsent(leaf, () => d.name);
+        }
+      }
     }
+    _index = index;
   }
-  return '';
+  return _index;
 }
+
+List<Department>? _indexedFor;
+Map<String, String> _index = const {};
 
 /// The same names as [sellableCategories], but kept under the section they
 /// sit in, so a picker can ask for the section first instead of dropping

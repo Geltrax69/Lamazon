@@ -27,8 +27,9 @@ void main() {
     });
   });
 
-  testWidgets('scoped to a department, it shows that department',
-      (tester) async {
+  testWidgets('scoped to a department, it shows that department', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       await tester.pumpWidget(
         const MaterialApp(home: SearchScreen(tab: 'Grocery')),

@@ -26,7 +26,7 @@ class CampaignBanner extends StatelessWidget {
       final palette = CampaignPalette.resolve(campaign.colour);
       final image = campaign.imageUrl.trim().isEmpty
           ? Image.asset(
-              'assets/categories/campaign-forest.png',
+              'assets/categories/campaign-forest.webp',
               fit: BoxFit.cover,
               alignment: Alignment.centerRight,
               excludeFromSemantics: true,
@@ -238,9 +238,8 @@ class _CampaignDeckState extends State<CampaignDeck> {
   ///
   /// A clip gets twice as long: six seconds of a fifteen-second film is a
   /// banner whose ending nobody ever sees.
-  static Duration _dwell(Campaign c) => Duration(
-    seconds: bannerKind(c.imageUrl) == BannerKind.video ? 12 : 6,
-  );
+  static Duration _dwell(Campaign c) =>
+      Duration(seconds: bannerKind(c.imageUrl) == BannerKind.video ? 12 : 6);
 
   @override
   void initState() {
@@ -261,7 +260,8 @@ class _CampaignDeckState extends State<CampaignDeck> {
     if (widget.campaigns.length < 2) return;
     // One shot rather than periodic, because _move re-arms it — which is how
     // the next slide gets a dwell of its own rather than the first one's.
-    final showing = widget.campaigns[_index.clamp(0, widget.campaigns.length - 1)];
+    final showing =
+        widget.campaigns[_index.clamp(0, widget.campaigns.length - 1)];
     _rotate = Timer(_dwell(showing), () {
       if (mounted) _move(1);
     });
@@ -419,7 +419,7 @@ class _CollectionShelfState extends State<CollectionShelf> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.title, style: LamazonTheme.sectionText),
+                  SectionTitle(widget.title),
                   if (widget.subtitle.isNotEmpty) ...[
                     const SizedBox(height: 3),
                     Text(widget.subtitle, style: LamazonTheme.mutedBodyText),

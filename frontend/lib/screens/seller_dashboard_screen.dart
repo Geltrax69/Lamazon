@@ -119,7 +119,12 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                   ),
                   Expanded(
                     child: ListView(
-                      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 16),
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        4,
+                        20,
+                        bottomNavInset(context) + 16,
+                      ),
                       children: [
                         const _SyncBanner(),
                         _ReviewBanner(store: store),
@@ -444,28 +449,47 @@ class _PaneToggle extends StatelessWidget {
     );
   }
 
-  Widget _half(String label, _Pane which) => Expanded(
-    child: GestureDetector(
-      onTap: () => onTap(which),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: pane == which ? _ink : Colors.transparent,
+  Widget _half(String label, _Pane which) {
+    final selected = pane == which;
+    return Expanded(
+      // A tab you cannot Tab to is not a tab. InkWell rather than a bare
+      // GestureDetector, so it takes focus, draws the app's ring and tells a
+      // screen reader it is one of two and which one is current.
+      child: Semantics(
+        button: true,
+        inMutuallyExclusiveGroup: true,
+        selected: selected,
+        child: Material(
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: pane == which ? Colors.white : _muted,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onTap(which),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                // strong, not _ink. A near-black pill is the one surface in
+                // the app wearing a colour the palette does not own; the
+                // selected state everywhere else is the forest green, and
+                // white on it measures well past AA.
+                color: selected ? LamazonTheme.strong : Colors.transparent,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : _muted,
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// The rest of a long list, on request. Says how many are left rather than
@@ -804,10 +828,7 @@ class _ItemRow extends StatelessWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(failure),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(failure), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -831,8 +852,7 @@ class _ItemRow extends StatelessWidget {
             ? null
             : SnackBarAction(
                 label: 'Undo',
-                onPressed: () =>
-                    Seller.instance.setDelisted(item.id, !hiding),
+                onPressed: () => Seller.instance.setDelisted(item.id, !hiding),
               ),
       ),
     );

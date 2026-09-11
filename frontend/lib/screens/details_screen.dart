@@ -81,7 +81,14 @@ class _DetailsScreenState extends State<DetailsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(p.name, style: Theme.of(context).textTheme.headlineMedium),
+          // The product name is this page's h1. It is also the one place the
+          // full stored title is shown — cards shorten it to stay scannable,
+          // this does not, because here it is what you came to read.
+          SectionTitle(
+            p.name,
+            level: 1,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 12,
@@ -208,7 +215,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
               onPick: (v) => setState(() => _picked[option.name] = v),
             ),
           const SizedBox(height: 28),
-          const Text('About this product', style: LamazonTheme.sectionText),
+          const SectionTitle('About this product'),
           const SizedBox(height: 8),
           Text(
             p.description.isEmpty
@@ -315,9 +322,7 @@ List<Widget> _compareSection(BuildContext context, Product p) {
     const SizedBox(height: 22),
     Row(
       children: [
-        const Expanded(
-          child: Text('Local vendors', style: LamazonTheme.sectionText),
-        ),
+        const Expanded(child: SectionTitle('Local vendors')),
         const SizedBox(width: 10),
         ActionButton(
           label: 'Compare all',
@@ -574,11 +579,7 @@ class _QtyStepper extends StatelessWidget {
 
   /// What the shop has. Null for the seed catalogue, which tracks no stock.
   final int? max;
-  const _QtyStepper({
-    required this.qty,
-    required this.onChanged,
-    this.max,
-  });
+  const _QtyStepper({required this.qty, required this.onChanged, this.max});
 
   bool get _atCap => max != null && qty >= max!;
 

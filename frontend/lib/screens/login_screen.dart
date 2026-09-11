@@ -70,6 +70,15 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// The controller for the step on screen. One getter, because three places
+  /// used to switch on _step to find it and a fourth switched on it to decide
+  /// what had been typed.
+  TextEditingController get _typedInto => switch (_step) {
+    _Step.email => _email,
+    _Step.code => _code,
+    _Step.password => _password,
+  };
+
   bool get _valid => switch (_step) {
     _Step.email => Session.isValidEmail(_email.text),
     _Step.code => RegExp(r'^\d{6}$').hasMatch(_code.text.trim()),
@@ -195,11 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// What the person has typed into the field this step is asking about.
-  String get _typed => switch (_step) {
-    _Step.email => _email.text,
-    _Step.code => _code.text,
-    _Step.password => _password.text,
-  }.trim();
+  String get _typed => _typedInto.text.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -300,108 +305,144 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: LamazonTheme.sectionText,
                           ),
                           const SizedBox(height: 14),
-                          TextField(
-                            controller: switch (_step) {
-                              _Step.email => _email,
-                              _Step.code => _code,
-                              _Step.password => _password,
-                            },
-                            keyboardType: switch (_step) {
-                              _Step.email => TextInputType.emailAddress,
-                              _Step.code => TextInputType.number,
-                              _Step.password => TextInputType.text,
-                            },
-                            obscureText: _step == _Step.password,
-                            autocorrect: false,
-                            onChanged: (_) => setState(() {}),
-                            onSubmitted: (_) {
-                              if (_valid && !_busy) _submit();
-                            },
-                            decoration: InputDecoration(
-                              // The card is already `surface`, so the field
-                              // sits a shade back from it to read as inset.
-                              fillColor: LamazonTheme.canvas,
-                              prefixIcon: Icon(
-                                switch (_step) {
-                                  _Step.email => LucideIcons.mail,
-                                  _Step.code => LucideIcons.keyRound,
-                                  _Step.password => LucideIcons.lock,
-                                },
-                                size: 18,
-                                color: LamazonTheme.muted,
-                              ),
-                              labelText: switch (_step) {
-                                _Step.email => 'Email address',
-                                _Step.code => 'Verification code',
-                                _Step.password => 'Password',
-                              },
-                              hintText: switch (_step) {
-                                _Step.email => 'Enter email address',
-                                _Step.code => 'Enter the 6-digit code',
-                                _Step.password => 'Enter password',
-                              },
-                            ),
-                            style: const TextStyle(
-                              fontFamily: 'InterTight',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          ActionButton(
-                            expand: true,
-                            label: _busy
-                                ? 'Please wait…'
-                                : switch (_step) {
-                                    _Step.email => 'Continue',
-                                    _Step.code => 'Verify code',
-                                    _Step.password => 'Sign in',
-                                  },
-                            loading: _busy,
-                            onPressed: _valid && !_busy ? _submit : null,
-                          ),
-                          const SizedBox(height: 12),
-                          // One line, three jobs: the failure, the reason the
-                          // button is inert, or why the address is wanted.
-                          // The middle one waits until something has been
-                          // typed — telling somebody their empty field is
-                          // invalid reads as an error before they have done
-                          // anything wrong.
-                          Semantics(
-                            liveRegion: true,
-                            child: Text(
-                              _error ??
-                                  (_typed.isNotEmpty && !_valid
-                                      ? switch (_step) {
-                                          _Step.email =>
-                                            'That is not an email address yet.',
-                                          _Step.code =>
-                                            'Enter the six digits from your '
-                                                'email.',
-                                          _Step.password =>
-                                            'Enter your password to sign in.',
-                                        }
-                                      : null) ??
-                                  switch (_step) {
-                                    _Step.email =>
-                                      'We only use your email for order '
-                                          'updates and receipts.',
-                                    _Step.code =>
-                                      'We sent a code to '
-                                          '${_email.text.trim()}. It expires '
-                                          'in 10 minutes.',
-                                    _Step.password =>
-                                      'Signing in as ${_email.text.trim()}.',
-                                  },
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'InterTight',
-                                fontSize: 13,
-                                height: 17 / 13,
-                                letterSpacing: 0.2,
-                                color: _error == null
-                                    ? LamazonTheme.muted
-                                    : LamazonTheme.danger,
+                          // The field, the button and the line under them
+                          // are the only three things a keystroke changes, so
+                          // they are the only three it rebuilds.
+                          //
+                          // This used to be `onChanged: setState`, which
+                          // rebuilt the whole sign-in screen — the animated
+                          // photo backdrop included — once per character. That
+                          // is wasteful rather than broken: a release build
+                          // drops no characters either way, at any typing
+                          // speed we could produce. Narrowing it is a frame
+                          // budget fix, not a correctness one.
+                          // AutofillGroup is what lets the platform commit a
+                          // filled field; without one the hints above are a
+                          // suggestion nothing acts on.
+                          AutofillGroup(
+                            child: ListenableBuilder(
+                              listenable: _typedInto,
+                              builder: (context, _) => Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextField(
+                                    // Keyed by step, so email, code and password are
+                                    // three fields rather than one field changing its
+                                    // mind. A browser's password manager keys its
+                                    // autofill on the field it is looking at; one
+                                    // element that is an email box and then a password
+                                    // box is the shape nothing can fill reliably.
+                                    key: ValueKey(_step),
+                                    controller: _typedInto,
+                                    autofillHints: [
+                                      switch (_step) {
+                                        _Step.email => AutofillHints.email,
+                                        _Step.code => AutofillHints.oneTimeCode,
+                                        _Step.password =>
+                                          AutofillHints.password,
+                                      },
+                                    ],
+                                    keyboardType: switch (_step) {
+                                      _Step.email => TextInputType.emailAddress,
+                                      _Step.code => TextInputType.number,
+                                      _Step.password => TextInputType.text,
+                                    },
+                                    obscureText: _step == _Step.password,
+                                    autocorrect: false,
+                                    onSubmitted: (_) {
+                                      if (_valid && !_busy) _submit();
+                                    },
+                                    decoration: InputDecoration(
+                                      // The card is already `surface`, so the field
+                                      // sits a shade back from it to read as inset.
+                                      fillColor: LamazonTheme.canvas,
+                                      prefixIcon: Icon(
+                                        switch (_step) {
+                                          _Step.email => LucideIcons.mail,
+                                          _Step.code => LucideIcons.keyRound,
+                                          _Step.password => LucideIcons.lock,
+                                        },
+                                        size: 18,
+                                        color: LamazonTheme.muted,
+                                      ),
+                                      labelText: switch (_step) {
+                                        _Step.email => 'Email address',
+                                        _Step.code => 'Verification code',
+                                        _Step.password => 'Password',
+                                      },
+                                      hintText: switch (_step) {
+                                        _Step.email => 'Enter email address',
+                                        _Step.code => 'Enter the 6-digit code',
+                                        _Step.password => 'Enter password',
+                                      },
+                                    ),
+                                    style: const TextStyle(
+                                      fontFamily: 'InterTight',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  ActionButton(
+                                    expand: true,
+                                    label: _busy
+                                        ? 'Please wait…'
+                                        : switch (_step) {
+                                            _Step.email => 'Continue',
+                                            _Step.code => 'Verify code',
+                                            _Step.password => 'Sign in',
+                                          },
+                                    loading: _busy,
+                                    onPressed: _valid && !_busy
+                                        ? _submit
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // One line, three jobs: the failure, the reason the
+                                  // button is inert, or why the address is wanted.
+                                  // The middle one waits until something has been
+                                  // typed — telling somebody their empty field is
+                                  // invalid reads as an error before they have done
+                                  // anything wrong.
+                                  Semantics(
+                                    liveRegion: true,
+                                    child: Text(
+                                      _error ??
+                                          (_typed.isNotEmpty && !_valid
+                                              ? switch (_step) {
+                                                  _Step.email =>
+                                                    'That is not an email address yet.',
+                                                  _Step.code =>
+                                                    'Enter the six digits from your '
+                                                        'email.',
+                                                  _Step.password =>
+                                                    'Enter your password to sign in.',
+                                                }
+                                              : null) ??
+                                          switch (_step) {
+                                            _Step.email =>
+                                              'We only use your email for order '
+                                                  'updates and receipts.',
+                                            _Step.code =>
+                                              'We sent a code to '
+                                                  '${_email.text.trim()}. It expires '
+                                                  'in 10 minutes.',
+                                            _Step.password =>
+                                              'Signing in as ${_email.text.trim()}.',
+                                          },
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'InterTight',
+                                        fontSize: 13,
+                                        height: 17 / 13,
+                                        letterSpacing: 0.2,
+                                        color: _error == null
+                                            ? LamazonTheme.muted
+                                            : LamazonTheme.danger,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

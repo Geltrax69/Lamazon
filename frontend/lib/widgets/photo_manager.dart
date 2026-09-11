@@ -65,25 +65,46 @@ class PhotoManager extends StatelessWidget {
       if (!context.mounted) break;
       // Cropped one at a time rather than in a batch: framing five photos
       // before seeing any of them land is a lot to ask on faith.
+      final warning = await _screenshotWarning(photo);
+      if (!context.mounted) break;
       final cropped = await cropPhoto(
         context,
         photo,
         aspect: productAspect,
         title: 'Frame the photo',
+        warning: warning,
       );
       out.add(Shot.local(cropped ?? photo));
     }
     onChanged(out);
   }
 
+  /// The note shown over the frame when a picked image is shaped like a phone
+  /// screen. Sellers upload screenshots of other shops' listings, another
+  /// app's status bar and toolbar included, and until now nothing said so —
+  /// the chrome simply arrived on the product page.
+  Future<String?> _screenshotWarning(Uint8List bytes) async {
+    final image = await decodeImageFromList(bytes);
+    final flagged = looksLikeAScreenshot(image.width, image.height);
+    image.dispose();
+    return flagged
+        ? 'This is the shape of a phone screen, so it may be a screenshot. '
+              'Anything around the product — another app\'s bars, buttons or '
+              'prices — will show on your listing. Frame the product itself.'
+        : null;
+  }
+
   Future<void> _recrop(BuildContext context, int i) async {
     final shot = shots[i];
     if (shot.bytes == null) return; // an uploaded one is already square
+    final warning = await _screenshotWarning(shot.bytes!);
+    if (!context.mounted) return;
     final cropped = await cropPhoto(
       context,
       shot.bytes!,
       aspect: productAspect,
       title: 'Frame the photo',
+      warning: warning,
     );
     if (cropped == null) return;
     final out = [...shots];

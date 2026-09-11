@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../data/cart.dart';
 import '../data/seller.dart';
 import '../data/session.dart';
+import 'campaign_palette.dart';
 import 'design_system.dart';
 
 enum AppTab { home, cart, saved, account, none }
@@ -108,6 +109,9 @@ class AppBottomNav extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 960),
               child: NavigationBar(
+                // The bar is chrome, so a season dresses it too. Without this
+                // the shop wore a festival header above a forest-green bar.
+                indicatorColor: SeasonSkin.accent.withValues(alpha: .74),
                 selectedIndex: selected,
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 onDestinationSelected: (index) {

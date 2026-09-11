@@ -42,6 +42,7 @@ class ScreenHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Semantics(
                 headingLevel: 1,
+                container: true,
                 child: Text(
                   title,
                   maxLines: 1,

@@ -25,8 +25,10 @@ MyOrder _order({
   deliveryCode: code,
 );
 
-Widget _screen(MyOrder o) =>
-    MaterialApp(theme: LamazonTheme.data, home: OrderDetailScreen(order: o));
+Widget _screen(MyOrder o) => MaterialApp(
+  theme: LamazonTheme.data,
+  home: OrderDetailScreen(order: o),
+);
 
 /// A surface tall enough to build the whole screen.
 ///

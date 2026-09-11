@@ -12,9 +12,7 @@ void main() {
   tearDown(StoreDraft.clear);
 
   Future<void> openForm(WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: SellerOnboardingScreen()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: SellerOnboardingScreen()));
     await tester.pump();
   }
 
@@ -68,8 +66,9 @@ void main() {
     });
   });
 
-  testWidgets('editing starts from the store, and keeps no draft',
-      (tester) async {
+  testWidgets('editing starts from the store, and keeps no draft', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       final store = SellerStore(
         name: 'Lalit Computer Tech.',

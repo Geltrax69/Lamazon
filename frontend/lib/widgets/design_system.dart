@@ -307,6 +307,15 @@ abstract final class LamazonTheme {
           color: text,
         ),
       ),
+      // Above the control, not below it. A tooltip below drops straight onto
+      // whatever the control is sitting above — the stock cap's "That is all
+      // the shop has" landed over the "About this product" heading on every
+      // product page. Flutter still flips it back down when there is no room
+      // overhead, so the only thing this changes is which side it prefers.
+      tooltipTheme: const TooltipThemeData(
+        preferBelow: false,
+        verticalOffset: 22,
+      ),
       cardTheme: CardThemeData(elevation: 0, color: surface, shape: rounded),
       dividerTheme: const DividerThemeData(color: track, thickness: 1),
       navigationBarTheme: NavigationBarThemeData(
@@ -397,9 +406,17 @@ class ElevatedSurface extends StatelessWidget {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
     );
-    final content = padding == null
+    // A label plus the labelled subtree is two announcements of the same
+    // control, so a labelled surface silences its contents. It silences the
+    // *contents*, not the InkWell above them: excludeSemantics on the whole
+    // subtree took the focusable node with it and dropped the surface out of
+    // the tab order altogether.
+    final inner = padding == null
         ? child
         : Padding(padding: padding!, child: child);
+    final content = semanticLabel == null
+        ? inner
+        : ExcludeSemantics(child: inner);
     final surface = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
@@ -421,21 +438,28 @@ class ElevatedSurface extends StatelessWidget {
               ),
       ),
     );
+    // The app's focus ring, not the lime wash on its own. That wash measures
+    // 1.10:1 against the surface behind it against a 3:1 requirement, and it
+    // was all the home search field — the most-used control on the shop — had
+    // to show for focus, while every icon button beside it got a 10:1 ring.
+    // Drawn outside the Material so the clip does not eat the outline.
+    final focusable = onTap == null
+        ? surface
+        : FocusRing(
+            borderRadius: BorderRadius.circular(radius),
+            child: surface,
+          );
+
     // A card that is only a card says nothing about itself. Annotating
     // unconditionally — `button: false` counts as an annotation — collapsed
     // everything inside into one node, so a sign-in card announced its
     // heading, field, button and helper text as a single text field and the
     // button stopped being a button.
-    if (onTap == null && semanticLabel == null) return surface;
+    if (onTap == null && semanticLabel == null) return focusable;
     return Semantics(
       button: onTap != null,
       label: semanticLabel,
-      // A label plus the labelled subtree is two announcements of the same
-      // control. Only exclude when this surface actually carries a label —
-      // an unlabelled one is just a container, and hiding its contents would
-      // silence them.
-      excludeSemantics: semanticLabel != null,
-      child: surface,
+      child: focusable,
     );
   }
 }
@@ -757,6 +781,28 @@ class TrackDivider extends StatelessWidget {
   );
 }
 
+/// A section title, and the heading a screen reader jumps between.
+///
+/// The app had heading semantics in exactly two widgets, so most screens were
+/// one flat run of text with no way to skip through it. Anywhere a title was
+/// drawn as a bare Text in [LamazonTheme.sectionText] now draws it here
+/// instead, which is the same pixels and one more piece of structure.
+class SectionTitle extends StatelessWidget {
+  final String text;
+  final int level;
+  final TextStyle? style;
+  const SectionTitle(this.text, {super.key, this.level = 2, this.style});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    headingLevel: level,
+    // Its own node, or the annotation merges into whatever sits beside it and
+    // the heading announces the subtitle under it as part of its own name.
+    container: true,
+    child: Text(text, style: style ?? LamazonTheme.sectionText),
+  );
+}
+
 class SectionHeading extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -781,10 +827,7 @@ class SectionHeading extends StatelessWidget {
             // headingLevel 2: this is the widget every screen uses for its
             // section titles, so one change gives the whole app a heading
             // outline a screen reader can navigate.
-            Semantics(
-              headingLevel: 2,
-              child: Text(title, style: LamazonTheme.sectionText),
-            ),
+            SectionTitle(title),
             if (subtitle != null) ...[
               const SizedBox(height: 3),
               Text(subtitle!, style: LamazonTheme.mutedBodyText),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lamazon/data/money.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
@@ -100,7 +101,7 @@ void main() {
       final p = products.firstWhere((x) => x.extraImages.isNotEmpty);
       await tester.pumpWidget(MaterialApp(home: DetailsScreen(product: p)));
 
-      final unit = '₹${p.price.toStringAsFixed(0)}';
+      final unit = '₹${p.price.moneyText}';
       expect(find.text(unit), findsWidgets); // one of them is the big number
 
       // The bug: the price used to stay at the unit price whatever the stepper
@@ -109,7 +110,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byIcon(LucideIcons.plus));
       await tester.pump();
-      expect(find.text('₹${(p.price * 2).toStringAsFixed(0)}'), findsOneWidget);
+      expect(find.text('₹${(p.price * 2).moneyText}'), findsOneWidget);
       expect(find.text('2 × $unit'), findsOneWidget);
 
       await tester.tap(find.byIcon(LucideIcons.minus));
@@ -447,19 +448,16 @@ void main() {
       // the button names that step rather than promising a purchase it will
       // refuse. The amount stays visible either way, in the Total row.
       expect(find.text('Sign in to place order'), findsOneWidget);
-      expect(
-        find.text('₹${Cart.instance.total.toStringAsFixed(0)}'),
-        findsWidgets,
-      );
+      expect(find.text('₹${Cart.instance.total.moneyText}'), findsWidgets);
       // The unit price is spelled out whenever the line holds more than one.
       expect(find.text('2 items'), findsOneWidget);
-      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsOneWidget);
+      expect(find.text('₹${p.price.moneyText} each'), findsOneWidget);
 
       Cart.instance.setQty(p.id, 1);
       await tester.pump();
       expect(Cart.instance.total, p.price + 15);
       // At one unit "each" would just repeat the line total, so it goes away.
-      expect(find.text('₹${p.price.toStringAsFixed(0)} each'), findsOneWidget);
+      expect(find.text('₹${p.price.moneyText} each'), findsOneWidget);
 
       Cart.instance.remove(p.id);
       await tester.pump();

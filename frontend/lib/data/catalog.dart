@@ -149,7 +149,7 @@ String catalogueImage(String url, [int width = 400]) {
   return url.replaceFirst(
     marker,
     '${marker}c_fill,ar_1:1,g_auto,e_improve:30,'
-        'w_${_bucket(width)},f_auto,q_auto/',
+    'w_${_bucket(width)},f_auto,q_auto/',
   );
 }
 
@@ -171,6 +171,19 @@ int _bucket(int width) {
   return 1200;
 }
 
+/// The letterbox behind a picture that does not fill its shape.
+///
+/// LamazonTheme.surface, as a hex Cloudinary understands. It used to be
+/// `b_auto`, which samples the photograph's own edge: a portrait shot of food
+/// on a wooden table letterboxed against the table, and the product page grew
+/// muddy olive-brown bars that are in no palette the app owns. A colour the
+/// design system already uses is both calmer and predictable — every product
+/// page letterboxes in the same tone.
+///
+/// Kept as a literal here because data/ does not import widgets/; the
+/// catalogue_image test asserts the two stay equal.
+const padFill = 'FFFDF8';
+
 String padded(String url, [double aspect = 1, int? sourceWidth]) {
   const marker = '/image/upload/';
   // Already transformed — a second c_pad would scale the padding, not the
@@ -182,7 +195,7 @@ String padded(String url, [double aspect = 1, int? sourceWidth]) {
   final height = (width / aspect).round();
   return url.replaceFirst(
     marker,
-    '${marker}c_pad,w_$width,h_$height,b_auto,f_auto,q_auto/',
+    '${marker}c_pad,w_$width,h_$height,b_rgb:$padFill,f_auto,q_auto/',
   );
 }
 

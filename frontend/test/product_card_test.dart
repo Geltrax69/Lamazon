@@ -132,7 +132,11 @@ void main() {
   /// Builds the real grid at a real width, because the column count and
   /// whether the contents fit are both decided by the delegate, not by
   /// arithmetic in a comment.
-  Future<int> buildGrid(WidgetTester tester, double width, List<Product> items) async {
+  Future<int> buildGrid(
+    WidgetTester tester,
+    double width,
+    List<Product> items,
+  ) async {
     tester.view.physicalSize = Size(width, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -150,8 +154,11 @@ void main() {
               childAspectRatio: productTileAspect,
             ),
             itemCount: items.length,
-            itemBuilder: (_, i) =>
-                ProductCard(product: items[i], showAddToCart: true, onTap: () {}),
+            itemBuilder: (_, i) => ProductCard(
+              product: items[i],
+              showAddToCart: true,
+              onTap: () {},
+            ),
           ),
         ),
       ),

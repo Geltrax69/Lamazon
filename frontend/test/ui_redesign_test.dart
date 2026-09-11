@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/data/catalog.dart';
@@ -54,7 +55,10 @@ void main() {
         await tester.ensureVisible(place);
         await tester.pump();
         expect(tester.takeException(), isNull);
-        expect(find.text('Cash on delivery'), findsOneWidget);
+        // Stated, not offered: the cart tells you how you will pay rather
+        // than presenting one option as a choice with a tick beside it.
+        expect(find.text('Paying by cash on delivery'), findsOneWidget);
+        expect(find.byIcon(LucideIcons.circleCheck), findsNothing);
       });
     });
   }

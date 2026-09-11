@@ -9,8 +9,8 @@ void main() {
     expect(
       padded(cloud),
       'https://res.cloudinary.com/dq3da5bkb/image/upload/'
-          'c_pad,w_512,h_512,b_auto,f_auto,q_auto/'
-          'v1786549855/Lamazon/PURE_BITES/burger.png',
+      'c_pad,w_512,h_512,b_rgb:$padFill,f_auto,q_auto/'
+      'v1786549855/Lamazon/PURE_BITES/burger.png',
     );
   });
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lamazon/data/money.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:lamazon/data/cart.dart';
@@ -13,32 +14,34 @@ void main() {
     }
   });
 
-  testWidgets('order summary follows the cart as quantities change',
-      (tester) async {
+  testWidgets('order summary follows the cart as quantities change', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       final p = products.first;
       Cart.instance.add(p);
       await tester.pumpWidget(const MaterialApp(home: CartScreen()));
 
       final one = p.price + 15;
-      expect(find.text('₹${one.toStringAsFixed(0)}'), findsOneWidget);
+      expect(find.text('₹${one.moneyText}'), findsOneWidget);
 
       // Adding a unit must move the total, not just the row.
       Cart.instance.setQty(p.id, 2);
       await tester.pump();
       final two = p.price * 2 + 15;
-      expect(find.text('₹${two.toStringAsFixed(0)}'), findsOneWidget);
-      expect(find.text('₹${one.toStringAsFixed(0)}'), findsNothing);
+      expect(find.text('₹${two.moneyText}'), findsOneWidget);
+      expect(find.text('₹${one.moneyText}'), findsNothing);
 
       // Back down again.
       Cart.instance.setQty(p.id, 1);
       await tester.pump();
-      expect(find.text('₹${one.toStringAsFixed(0)}'), findsOneWidget);
+      expect(find.text('₹${one.moneyText}'), findsOneWidget);
     });
   });
 
-  testWidgets('tapping the plus button moves the order summary',
-      (tester) async {
+  testWidgets('tapping the plus button moves the order summary', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       final p = products.first;
       Cart.instance.add(p);
@@ -50,19 +53,26 @@ void main() {
 
       expect(Cart.instance.count, 2);
       final two = p.price * 2 + 15;
-      expect(find.text('₹${two.toStringAsFixed(0)}'), findsOneWidget,
-          reason: 'total should follow the plus button');
+      expect(
+        find.text('₹${two.moneyText}'),
+        findsOneWidget,
+        reason: 'total should follow the plus button',
+      );
 
       await tester.tap(find.byIcon(LucideIcons.minus));
       await tester.pump();
       final one = p.price + 15;
-      expect(find.text('₹${one.toStringAsFixed(0)}'), findsOneWidget,
-          reason: 'total should follow the minus button');
+      expect(
+        find.text('₹${one.moneyText}'),
+        findsOneWidget,
+        reason: 'total should follow the minus button',
+      );
     });
   });
 
-  testWidgets('emptying the cart drops the summary and shipping',
-      (tester) async {
+  testWidgets('emptying the cart drops the summary and shipping', (
+    tester,
+  ) async {
     await mockNetworkImagesFor(() async {
       final p = products.first;
       Cart.instance.add(p);

@@ -115,11 +115,26 @@ func (a *API) handleSavePolicy(w http.ResponseWriter, r *http.Request) {
 // seedPolicies writes the shipped draft of anything that has no row yet. Each
 // document is filled in on its own, so adding a sixth later brings its text
 // with it without touching the five an admin has already edited.
+//
+// It also replaces a row that is still, byte for byte, the *old* shipped
+// draft — the one that opened "Last updated: [Date]". Those five pages have
+// been serving "This policy is not published yet" since the database was
+// seeded, because a single bracketed blank unpublishes a whole document, and
+// DO NOTHING meant a rewrite here could never reach an existing deployment.
+//
+// The condition is deliberately narrow: only text nobody has touched. Anything
+// an admin has written, including a half-finished edit of their own, is left
+// exactly as it is.
+const untouchedDraft = "Last updated: [Date]%"
+
 func (d *DB) seedPolicies(ctx context.Context) error {
 	for _, p := range shippedPolicies() {
 		if _, err := d.sql.ExecContext(ctx, `
 			INSERT INTO policies (slug, title, body) VALUES ($1,$2,$3)
-			ON CONFLICT (slug) DO NOTHING`, p.Slug, p.Title, p.Body); err != nil {
+			ON CONFLICT (slug) DO UPDATE SET
+				title = EXCLUDED.title, body = EXCLUDED.body, updated_at = now()
+			WHERE policies.body LIKE $4`,
+			p.Slug, p.Title, p.Body, untouchedDraft); err != nil {
 			return err
 		}
 	}

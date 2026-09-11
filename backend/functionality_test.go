@@ -203,6 +203,74 @@ func TestPolicyDraftsStayPrivateAndCannotBePublished(t *testing.T) {
 	}
 }
 
+// Every linked page has to be a page. All five used to serve "This policy is
+// not published yet" because the shipped drafts opened with a bracketed date,
+// and one blank unpublishes the whole document.
+func TestEveryShippedPolicyIsPublished(t *testing.T) {
+	h := testAPI(t)
+	if err := lastTestDB.seedPolicies(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	rows := callList(t, h, "/api/policies")
+	if len(rows) != 5 {
+		t.Fatalf("expected five policies, got %d", len(rows))
+	}
+	for _, raw := range rows {
+		row := raw.(map[string]any)
+		slug, _ := row["slug"].(string)
+		if row["published"] != true {
+			t.Fatalf("%s is not published: %v", slug, row["body"])
+		}
+		body, _ := row["body"].(string)
+		if len(body) < 400 || strings.Contains(body, "not published yet") {
+			t.Fatalf("%s serves a stub rather than a document: %q", slug, body)
+		}
+	}
+}
+
+// A rewrite of the shipped text has to reach a database that was seeded before
+// it. ON CONFLICT DO NOTHING meant it never could — the pages that shipped
+// broken stayed broken on every existing deployment.
+func TestSeedReplacesTheUntouchedDraftButNotAnEdit(t *testing.T) {
+	h := testAPI(t)
+	ctx := context.Background()
+
+	// policies is not in the per-test TRUNCATE — it is seeded state, not
+	// per-test data — so this test has to put back what it scribbles on.
+	t.Cleanup(func() {
+		if _, err := lastTestDB.sql.Exec(`DELETE FROM policies`); err != nil {
+			t.Fatal(err)
+		}
+		if err := lastTestDB.seedPolicies(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	// One row left exactly as the old shipped draft, one an admin has written.
+	if _, err := lastTestDB.sql.ExecContext(ctx, `
+		INSERT INTO policies (slug, title, body) VALUES
+		  ('terms','Terms and Conditions','Last updated: [Date]\n\nold draft'),
+		  ('contact','Contact Us','Our own words, written by hand.')
+		ON CONFLICT (slug) DO UPDATE SET body = EXCLUDED.body`); err != nil {
+		t.Fatal(err)
+	}
+	if err := lastTestDB.seedPolicies(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	for _, raw := range callList(t, h, "/api/policies") {
+		row := raw.(map[string]any)
+		got[row["slug"].(string)] = row["body"].(string)
+	}
+	if strings.Contains(got["terms"], "old draft") {
+		t.Fatal("the untouched draft was left in place")
+	}
+	if got["contact"] != "Our own words, written by hand." {
+		t.Fatalf("an admin's own text was overwritten: %q", got["contact"])
+	}
+}
+
 func TestPhotoRequiredForNewProduct(t *testing.T) {
 	h := testAPI(t)
 	openApprovedStore(t, h, map[string]any{"name": "Store", "location": "Block 1", "city": "LPU", "categories": []string{"Food"}})

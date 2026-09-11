@@ -259,23 +259,39 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                         ),
                       ),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<_Sort>(
-                          value: _sort,
-                          isDense: true,
-                          borderRadius: BorderRadius.circular(
-                            LamazonTheme.smallRadius,
+                      // Sized to the longest option, and the menu sized to
+                      // match. Left to itself the button shrank to fit "Best
+                      // match" and the menu grew rightwards past it to fit
+                      // "Price: low to high", which put the popup flush
+                      // against the right edge of the window with no gutter at
+                      // all — the one element on the page that had none.
+                      SizedBox(
+                        width: _sortMenuWidth,
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<_Sort>(
+                            value: _sort,
+                            isDense: true,
+                            isExpanded: true,
+                            menuWidth: _sortMenuWidth,
+                            alignment: AlignmentDirectional.centerEnd,
+                            borderRadius: BorderRadius.circular(
+                              LamazonTheme.smallRadius,
+                            ),
+                            style: LamazonTheme.mutedBodyText,
+                            onChanged: (next) =>
+                                setState(() => _sort = next ?? _sort),
+                            items: [
+                              for (final option in _Sort.values)
+                                DropdownMenuItem(
+                                  value: option,
+                                  child: Text(
+                                    option.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
                           ),
-                          style: LamazonTheme.mutedBodyText,
-                          onChanged: (next) =>
-                              setState(() => _sort = next ?? _sort),
-                          items: [
-                            for (final option in _Sort.values)
-                              DropdownMenuItem(
-                                value: option,
-                                child: Text(option.label),
-                              ),
-                          ],
                         ),
                       ),
                     ],
@@ -304,7 +320,12 @@ class _SearchScreenState extends State<SearchScreen> {
                         },
                       )
                     : GridView.builder(
-                        padding: EdgeInsets.fromLTRB(20, 8, 20, bottomNavInset(context) + 16),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          8,
+                          20,
+                          bottomNavInset(context) + 16,
+                        ),
                         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: productTileMax,
                           mainAxisSpacing: 16,
@@ -405,41 +426,51 @@ class _SearchHint extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 14),
               itemBuilder: (_, i) {
                 final entry = withPhotos[i];
-                return GestureDetector(
-                  onTap: () => onPick(entry.key),
-                  child: SizedBox(
-                    width: 78,
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 74,
-                          height: 74,
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: ClipOval(
-                            child: NetImage(
-                              url: catalogueImage(entry.value.imageUrl, 160),
-                              fit: BoxFit.cover,
-                              padTo: null,
+                return Semantics(
+                  button: true,
+                  label: 'Browse ${entry.key}',
+                  child: InkWell(
+                    onTap: () => onPick(entry.key),
+                    borderRadius: BorderRadius.circular(14),
+                    child: ExcludeSemantics(
+                      child: SizedBox(
+                        width: 78,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 74,
+                              height: 74,
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: ClipOval(
+                                child: NetImage(
+                                  url: catalogueImage(
+                                    entry.value.imageUrl,
+                                    160,
+                                  ),
+                                  fit: BoxFit.cover,
+                                  padTo: null,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            Text(
+                              entry.key,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          entry.key,
-                          maxLines: 2,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            height: 1.25,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -484,11 +515,7 @@ class _SearchHint extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 60),
             child: Column(
               children: [
-                Icon(
-                  LucideIcons.search,
-                  size: 40,
-                  color: LamazonTheme.muted,
-                ),
+                Icon(LucideIcons.search, size: 40, color: LamazonTheme.muted),
                 SizedBox(height: 12),
                 Text(
                   'Search across all shops and products',
@@ -576,7 +603,7 @@ class _HintHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: Text(
+    child: SectionTitle(
       text,
       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
     ),
@@ -599,6 +626,9 @@ class _NoResults extends StatelessWidget {
   }
 }
 
+/// Wide enough for "Price: low to high" plus the chevron, so neither the
+/// button nor its menu has to grow into the window's margin.
+const _sortMenuWidth = 170.0;
 
 /// How the results are ordered. Relevance is whatever the server ranked;
 /// the rest are client-side because the result set is already in hand.

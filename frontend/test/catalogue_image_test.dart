@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/catalog.dart';
+import 'package:lamazon/widgets/design_system.dart';
 
 /// The catalogue transform, and the two properties that make it safe:
 /// the seller's original is never rewritten, and the CDN is asked for a small
@@ -24,9 +26,14 @@ void main() {
     // uploaded is still addressable, which is what the details gallery uses.
     expect(
       catalogueImage(_real),
-      contains('v1786549855/Lamazon/PURE_BITES/PURE_BITES_Aloo_TIkki_Burger_1.png'),
+      contains(
+        'v1786549855/Lamazon/PURE_BITES/PURE_BITES_Aloo_TIkki_Burger_1.png',
+      ),
     );
-    expect(catalogueImage(_real).startsWith('https://res.cloudinary.com/'), isTrue);
+    expect(
+      catalogueImage(_real).startsWith('https://res.cloudinary.com/'),
+      isTrue,
+    );
   });
 
   test('an already-transformed URL is left alone', () {
@@ -41,7 +48,7 @@ void main() {
     for (final url in [
       '',
       'https://example.test/photo.jpg',
-      'assets/categories/campaign-forest.png',
+      'assets/categories/campaign-forest.webp',
     ]) {
       expect(catalogueImage(url), url);
     }
@@ -72,5 +79,49 @@ void main() {
       );
       expect(got, greaterThanOrEqualTo(asked), reason: 'asked for $asked');
     }
+  });
+
+  /// A payload ratchet, in the spirit of palette_ratchet_test: a number that
+  /// may fall and may not rise.
+  ///
+  /// The cold first load was 8.64 MB, and 4 MB of it was two decorative
+  /// photographs shipped as PNG. Nothing in a pull request shows an asset
+  /// getting heavier, so this does. Lower the budget as assets shrink; never
+  /// raise it to make a build pass.
+  test('the bundled artwork stays inside its weight budget', () {
+    const budgetBytes = 400 * 1024;
+    final assets = Directory('assets')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => !f.path.endsWith('.ttf'))
+        .toList();
+    final total = assets.fold<int>(0, (sum, f) => sum + f.lengthSync());
+    expect(
+      total,
+      lessThanOrEqualTo(budgetBytes),
+      reason:
+          'bundled images total ${(total / 1024).round()} KB:\n'
+          '${assets.map((f) => '  ${f.path} '
+              '${(f.lengthSync() / 1024).round()} KB').join('\n')}',
+    );
+    for (final file in assets) {
+      expect(
+        file.path.endsWith('.png') && file.lengthSync() > 200 * 1024,
+        isFalse,
+        reason: '${file.path} is a large PNG; a photograph belongs in WebP',
+      );
+    }
+  });
+
+  test('the letterbox is the app\'s own surface, not the photograph\'s edge', () {
+    // b_auto sampled the picture: a portrait shot on a wooden table gave the
+    // product page muddy olive-brown bars that are in no palette we own.
+    expect(
+      '#$padFill'.toUpperCase(),
+      '#${(LamazonTheme.surface.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}',
+      reason: 'data/ cannot import the theme, so the two are checked here',
+    );
+    expect(padded(_real, 1, 1024), contains('b_rgb:$padFill'));
+    expect(padded(_real, 1, 1024), isNot(contains('b_auto')));
   });
 }

@@ -5,20 +5,13 @@
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
-try {
-  self.importScripts('/firebase-env.js');
-} catch (_) {
-  // Production builds can use the checked-in fallback config below.
-}
+// The same one config index.html reads, and the same project the API's
+// service account sends from. A second hardcoded copy used to live here; a
+// worker registering against a different project than the server pushes to is
+// a silent failure nobody can see from either end.
+self.importScripts('/firebase-env.js');
 
-firebase.initializeApp(self.lamazonFirebaseConfig || {
-  apiKey: 'AIzaSyBGvYciGBw1hGyAiOE2OjOEbeiuonkfsvk',
-  authDomain: 'messages-34023.firebaseapp.com',
-  projectId: 'messages-34023',
-  storageBucket: 'messages-34023.firebasestorage.app',
-  messagingSenderId: '712322562286',
-  appId: '1:712322562286:web:cbbb820967ae46611b1bff',
-});
+firebase.initializeApp(self.lamazonFirebaseConfig);
 
 const messaging = firebase.messaging();
 

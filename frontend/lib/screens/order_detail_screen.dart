@@ -245,9 +245,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         if (order.status == OrderStatus.placed) ...[
                           const SizedBox(height: 10),
                           ActionButton(
-                            label: _cancelling
-                                ? 'Cancelling…'
-                                : 'Cancel order',
+                            label: _cancelling ? 'Cancelling…' : 'Cancel order',
                             primary: false,
                             expand: true,
                             loading: _cancelling,
@@ -312,7 +310,7 @@ class _StatusPanel extends StatelessWidget {
           Semantics(
             headingLevel: 2,
             liveRegion: true,
-            child: Text(order.status.title, style: LamazonTheme.sectionText),
+            child: SectionTitle(order.status.title),
           ),
           if (!order.status.isOver) ...[
             const SizedBox(height: 2),
@@ -452,11 +450,7 @@ class _Notice extends StatelessWidget {
   final IconData icon;
   final Color colour;
   final String text;
-  const _Notice({
-    required this.icon,
-    required this.colour,
-    required this.text,
-  });
+  const _Notice({required this.icon, required this.colour, required this.text});
 
   @override
   Widget build(BuildContext context) => Container(

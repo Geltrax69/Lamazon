@@ -45,21 +45,10 @@ class _ShopScreenState extends State<ShopScreen> {
             children: [
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 46,
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        LucideIcons.arrowLeft,
-                        size: 18,
-                        color: LamazonTheme.text,
-                      ),
-                    ),
+                  ActionIcon(
+                    icon: LucideIcons.arrowLeft,
+                    label: 'Back',
+                    onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),
                 ],

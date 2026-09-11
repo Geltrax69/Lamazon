@@ -8,8 +8,9 @@ import 'package:lamazon/widgets/product_card.dart';
 import 'package:network_image_mock/network_image_mock.dart';
 
 void main() {
-  testWidgets('product cards keep their size as the window widens',
-      (tester) async {
+  testWidgets('product cards keep their size as the window widens', (
+    tester,
+  ) async {
     Session.instance.skip();
     AddressBook.instance.enableLocation();
     await mockNetworkImagesFor(() async {
@@ -20,9 +21,11 @@ void main() {
         tester.view.devicePixelRatio = 1.0;
         await tester.pumpWidget(const LamazonApp());
         await tester.pump(const Duration(seconds: 1));
-        for (var attempt = 0;
-            attempt < 10 && find.byType(ProductCard).evaluate().isEmpty;
-            attempt++) {
+        for (
+          var attempt = 0;
+          attempt < 10 && find.byType(ProductCard).evaluate().isEmpty;
+          attempt++
+        ) {
           if (find.byType(ListView).evaluate().isNotEmpty) {
             await tester.drag(
               find.byType(ListView).first,
@@ -33,12 +36,20 @@ void main() {
         }
 
         final card = tester.getSize(find.byType(ProductCard).first);
-        expect(card.width, lessThanOrEqualTo(productTileMax),
-            reason: 'card too wide at ${width}px');
+        expect(
+          card.width,
+          lessThanOrEqualTo(productTileMax),
+          reason: 'card too wide at ${width}px',
+        );
 
-        final count = tester.widgetList<ProductCard>(find.byType(ProductCard)).length;
-        expect(count, greaterThanOrEqualTo(lastCount),
-            reason: 'fewer cards visible at ${width}px');
+        final count = tester
+            .widgetList<ProductCard>(find.byType(ProductCard))
+            .length;
+        expect(
+          count,
+          greaterThanOrEqualTo(lastCount),
+          reason: 'fewer cards visible at ${width}px',
+        );
         lastCount = count;
       }
     });

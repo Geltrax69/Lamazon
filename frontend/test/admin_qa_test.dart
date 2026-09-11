@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'dart:ui' show Tristate;
+
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -75,7 +78,12 @@ Map<String, dynamic> _fixture() {
         },
     ],
     'riders': [
-      {'phone': '9000000001', 'name': 'Rider One', 'active': true, 'delivered': 4},
+      {
+        'phone': '9000000001',
+        'name': 'Rider One',
+        'active': true,
+        'delivered': 4,
+      },
     ],
   };
 }
@@ -175,7 +183,10 @@ Future<bool> _goTo(WidgetTester tester, String label) async {
     return true;
   }
   final counted = find.byWidgetPredicate(
-    (w) => w is ChoiceChip && w.label is Text && (w.label as Text).data!.startsWith(label),
+    (w) =>
+        w is ChoiceChip &&
+        w.label is Text &&
+        (w.label as Text).data!.startsWith(label),
   );
   if (counted.evaluate().isNotEmpty) {
     await tester.tap(counted.first, warnIfMissed: false);
@@ -189,7 +200,9 @@ Future<bool> _goTo(WidgetTester tester, String label) async {
 double _luminance(Color c) {
   double channel(double v) {
     final s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : math.pow((s + 0.055) / 1.055, 2.4).toDouble();
+    return s <= 0.03928
+        ? s / 12.92
+        : math.pow((s + 0.055) / 1.055, 2.4).toDouble();
   }
 
   return 0.2126 * channel((c.r * 255).roundToDouble()) +
@@ -218,7 +231,9 @@ void main() {
           final reportError = FlutterError.onError;
           var current = 'startup';
           FlutterError.onError = (details) {
-            broken.add('$current: ${details.exceptionAsString().split('\n').first}');
+            broken.add(
+              '$current: ${details.exceptionAsString().split('\n').first}',
+            );
           };
           try {
             await _open(tester, entry.value);
@@ -304,6 +319,14 @@ void main() {
       await http.runWithClient(() async {
         await _open(tester, _viewports['desktop']!);
         expect(await _goTo(tester, 'Products'), isTrue);
+        // Forty-two products do not fit one screen, and a ListView does not
+        // build what it cannot show.
+        await tester.scrollUntilVisible(
+          find.text('In orders'),
+          220,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
 
         // The three numbers that do not mean the same thing.
         expect(find.text('On shelf'), findsWidgets);
@@ -317,6 +340,55 @@ void main() {
         await _close(tester);
       }, _api);
     });
+  });
+
+  testWidgets('every section chip and KPI tile is in the tab order', (
+    tester,
+  ) async {
+    // Admin once went pointer-only: the eleven section chips lost their role
+    // and their tab stop, the six KPI tiles kept role="button" with no tab
+    // stop, and the entire panel offered a keyboard exactly two controls —
+    // Refresh and Sign out. Section navigation was unreachable.
+    final handle = tester.ensureSemantics();
+    await mockNetworkImagesFor(() async {
+      await http.runWithClient(() async {
+        await _open(tester, _viewports['desktop']!);
+
+        final nodes = <SemanticsData>[];
+        void walk(SemanticsNode n) {
+          nodes.add(n.getSemanticsData());
+          n.visitChildren((c) {
+            walk(c);
+            return true;
+          });
+        }
+
+        walk(
+          // rootPipelineOwner owns no semantics of its own.
+          // ignore: deprecated_member_use
+          tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!,
+        );
+        final buttons = nodes.where(
+          (d) => d.flagsCollection.isButton && !d.flagsCollection.isHidden,
+        );
+        expect(
+          buttons
+              .where((d) => d.flagsCollection.isFocused == Tristate.none)
+              .map((d) => d.label),
+          isEmpty,
+          reason: 'a panel you can only operate with a mouse is not a panel',
+        );
+        expect(
+          buttons
+              .where((d) => d.flagsCollection.isFocused != Tristate.none)
+              .length,
+          greaterThanOrEqualTo(_tabs.length + 2),
+          reason: 'every section, plus Refresh and Sign out',
+        );
+        await _close(tester);
+      }, _api);
+    });
+    handle.dispose();
   });
 
   test('every colour the admin puts words in passes AA on both grounds', () {

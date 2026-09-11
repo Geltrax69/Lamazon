@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -173,5 +174,91 @@ func TestContrastMatchesWCAG(t *testing.T) {
 		if got < c.want-0.3 || got > c.want+0.3 {
 			t.Fatalf("contrast(%s,%s) = %.2f, want about %.2f", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// Two seasons live at once is an ambiguous shop: whichever the ORDER BY picks
+// is what shoppers see, and an admin has no way to predict which. Overlaps
+// used to be accepted silently.
+func TestSeasonRefusesOverlappingWindows(t *testing.T) {
+	h := testAPI(t)
+	admin := adminSignIn(t, h)
+	now := time.Now()
+
+	save := func(id string, from, to time.Time, enabled bool) (int, map[string]any) {
+		return callAs(t, h, admin, http.MethodPut, "/api/admin/seasons/"+id, map[string]any{
+			"name": id, "startsAt": iso(from), "endsAt": iso(to),
+			"ground": "#7A1F12", "accent": "#F2B441", "ink": "#FFFDF8",
+			"enabled": enabled,
+		})
+	}
+
+	// Starts an hour ago, not "now": starts_at is this process's clock and the
+	// liveness check is Postgres's, so a season beginning at this instant is a
+	// coin flip on which of the two is a millisecond ahead.
+	from, to := now.Add(-time.Hour), now.AddDate(0, 0, 7)
+	if code, body := save("diwali", from, to, true); code != 200 {
+		t.Fatalf("the first season should save: %d %v", code, body)
+	}
+
+	for _, probe := range []struct {
+		what     string
+		from, to time.Time
+	}{
+		{"starting inside it", now.AddDate(0, 0, 3), now.AddDate(0, 0, 10)},
+		{"ending inside it", now.AddDate(0, 0, -3), now.AddDate(0, 0, 3)},
+		{"swallowing it whole", now.AddDate(0, 0, -2), now.AddDate(0, 0, 9)},
+		{"sitting inside it", now.AddDate(0, 0, 2), now.AddDate(0, 0, 4)},
+	} {
+		code, body := save("clash", probe.from, probe.to, true)
+		if code != http.StatusConflict {
+			t.Fatalf("a season %s should be refused, got %d %v", probe.what, code, body)
+		}
+		// The admin has to be able to act on it, which means knowing which
+		// season it clashed with.
+		if msg, _ := body["error"].(string); !strings.Contains(msg, "diwali") {
+			t.Fatalf("the refusal should name the other season, got %q", msg)
+		}
+	}
+
+	// A handover is not an overlap: the windows are half-open, so one ending
+	// where the next begins is exactly one live season all the way through.
+	if code, body := save("after", to, now.AddDate(0, 0, 14), true); code != 200 {
+		t.Fatalf("a season starting as the last one ends should save: %d %v", code, body)
+	}
+
+	// A disabled season is a draft, not a schedule, so it may overlap freely.
+	if code, body := save("draft", now.AddDate(0, 0, 1), now.AddDate(0, 0, 2), false); code != 200 {
+		t.Fatalf("a disabled season should save over a live one: %d %v", code, body)
+	}
+
+	// And editing a season without moving it does not clash with itself.
+	if code, body := save("diwali", from, to, true); code != 200 {
+		t.Fatalf("a season should not conflict with itself: %d %v", code, body)
+	}
+
+	// Exactly one is live, which is the property all of this exists to keep.
+	_, public := callAs(t, h, "", http.MethodGet, "/api/storefront/season", nil)
+	season, ok := public["season"].(map[string]any)
+	if !ok || season["id"] != "diwali" {
+		t.Fatalf("the live season should be the only enabled one: %v", public["season"])
+	}
+}
+
+// "invalid season" told an API client nothing. The message now says what it
+// could not read, and which format it wanted.
+func TestSeasonDecodeFailureSaysWhy(t *testing.T) {
+	h := testAPI(t)
+	admin := adminSignIn(t, h)
+	code, body := callAs(t, h, admin, http.MethodPut, "/api/admin/seasons/x", map[string]any{
+		"name": "x", "startsAt": "18 October", "endsAt": "25 October",
+		"ground": "#7A1F12", "accent": "#F2B441", "ink": "#FFFDF8",
+	})
+	if code != http.StatusBadRequest {
+		t.Fatalf("an unparseable date should be refused, got %d", code)
+	}
+	msg, _ := body["error"].(string)
+	if !strings.Contains(msg, "RFC 3339") || msg == "invalid season" {
+		t.Fatalf("the refusal should say what it wanted, got %q", msg)
 	}
 }

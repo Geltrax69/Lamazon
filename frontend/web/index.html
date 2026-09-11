@@ -50,8 +50,39 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- The two origins the first screen needs before it can show anything: the
+       API it asks for the catalogue, and the CDN every product photograph
+       comes from. Opening those connections while flutter_bootstrap.js is
+       still parsing saves a DNS lookup and a TLS handshake each — a few
+       hundred milliseconds on a phone, before the first byte of the first
+       image. Harmless if a build points somewhere else; an unused preconnect
+       is closed after ten seconds. -->
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
+  <link rel="preconnect" href="https://api.geltrax.engineer" crossorigin>
+  <link rel="dns-prefetch" href="https://res.cloudinary.com">
+  <link rel="dns-prefetch" href="https://api.geltrax.engineer">
+
   <title>Lamazon</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Render at no more than 2x, whatever the screen reports.
+       CanvasKit rasterises the whole scene itself every frame; there is no
+       browser compositor doing the cheap thing. At the devicePixelRatio of 3
+       that phones report, a 390x844 screen is 1170x2532 real pixels redrawn
+       per frame — 2.25x the work of 2x for a difference nobody can see on a
+       product photograph. Set before flutter_bootstrap.js, because the engine
+       reads this once on start-up. -->
+  <script>
+    (function () {
+      var real = window.devicePixelRatio || 1;
+      if (real > 2) {
+        Object.defineProperty(window, 'devicePixelRatio', {
+          get: function () { return 2; },
+          configurable: true,
+        });
+      }
+    })();
+  </script>
+
   <script src="firebase-env.js"></script>
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -62,33 +93,32 @@
       onMessage,
     } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
 
-    // FIXME(ops): this fallback points at Firebase project `messages-34023`,
-    // which is not this product's project. Web API keys are not secret, but a
-    // default aimed at an unrelated project means push silently registers
-    // against the wrong place when the deploy forgets to set
-    // window.lamazonFirebaseConfig. Set that on every environment and delete
-    // the fallback, or replace these values with Lamazon's own project.
-    const firebaseConfig = window.lamazonFirebaseConfig || {
-      apiKey: 'AIzaSyBGvYciGBw1hGyAiOE2OjOEbeiuonkfsvk',
-      authDomain: 'messages-34023.firebaseapp.com',
-      projectId: 'messages-34023',
-      storageBucket: 'messages-34023.firebasestorage.app',
-      messagingSenderId: '712322562286',
-      appId: '1:712322562286:web:cbbb820967ae46611b1bff',
-    };
-
-    if (!window.lamazonFirebaseConfig) {
-      console.warn(
-        'Lamazon: using the built-in Firebase fallback config. ' +
-        'Set window.lamazonFirebaseConfig for this environment.',
-      );
-    }
-
-    const app = initializeApp(firebaseConfig);
+    // One source of truth: web/firebase-env.js, loaded above and checked in
+    // because a Firebase *web* config is not a secret — it ships inside the JS
+    // bundle whatever you do, and the project it names (`messages-34023`) is
+    // the same one the API's service account sends from. The client and the
+    // server have to agree on it or a token registers against a project that
+    // will never push to it.
+    //
+    // What used to be here was a second copy of those same values, behind a
+    // FIXME asking ops to delete it. Two copies of a config that must match
+    // the server is how they stop matching. If the file is missing, push is
+    // off for this build and says so — that is a deploy to fix, not something
+    // to paper over with a default.
+    const firebaseConfig = window.lamazonFirebaseConfig;
+    const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
     let messagingPromise;
     let foregroundHandlerReady = false;
 
+    if (!app) {
+      console.warn(
+        'Lamazon: firebase-env.js did not load, so push is off for this ' +
+        'build. Deploy it alongside index.html.',
+      );
+    }
+
     window.lamazonFirebaseMessagingToken = async (vapidKey) => {
+      if (!app) return '';
       if (!(await isSupported())) return '';
       if (Notification.permission !== 'granted') return '';
       if (!vapidKey) {

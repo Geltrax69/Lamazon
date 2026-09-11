@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lamazon/data/money.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lamazon/data/cart.dart';
 import 'package:lamazon/models/product.dart';
@@ -49,16 +50,15 @@ void main() {
       }
     });
 
-    testWidgets('cart names the MRP and totals what was saved',
-        (tester) async {
+    testWidgets('cart names the MRP and totals what was saved', (tester) async {
       await mockNetworkImagesFor(() async {
         Cart.instance.add(at(price: 2500, mrp: 5000), 2);
         await tester.pumpWidget(const MaterialApp(home: CartScreen()));
 
-        expect(find.text('MRP ₹10000'), findsOneWidget);
+        expect(find.text('MRP ₹${10000.moneyText}'), findsOneWidget);
         expect(find.text('50% OFF'), findsOneWidget);
         expect(
-          find.text('You saved ₹5000 on this order'),
+          find.text('You saved ₹${5000.moneyText} on this order'),
           findsOneWidget,
         );
       });

@@ -101,8 +101,12 @@ func (a *API) handleAdminSeasons(w http.ResponseWriter, r *http.Request) {
 // PUT /api/admin/seasons/{id}
 func (a *API) handleSaveSeason(w http.ResponseWriter, r *http.Request) {
 	var s Season
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&s) != nil {
-		writeError(w, http.StatusBadRequest, "invalid season")
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&s); err != nil {
+		// "invalid season" told an API client nothing about which field it got
+		// wrong. Dates are the usual answer, so the message says so.
+		writeError(w, http.StatusBadRequest,
+			"Could not read the season: "+err.Error()+
+				`. Dates are RFC 3339, like "2026-10-18T00:00:00Z".`)
 		return
 	}
 	s.ID = r.PathValue("id")
@@ -134,6 +138,34 @@ func (a *API) handleSaveSeason(w http.ResponseWriter, r *http.Request) {
 			"The text colour is too close to the ground to read. Pick a lighter or darker one — it needs a contrast ratio of 4.5, for the same reason road signs do.")
 		return
 	}
+	// Two seasons live at once is an ambiguous shop: whichever the ORDER BY
+	// happens to pick is what shoppers see, and an admin has no way to predict
+	// it. Refused at the point where somebody can still change the dates,
+	// rather than resolved silently at read time.
+	//
+	// Half-open windows, so a season ending on the 18th and one starting on
+	// the 18th do not count as overlapping — that is a handover, not a clash.
+	if s.Enabled {
+		var other, starts, ends string
+		err := a.db.sql.QueryRowContext(r.Context(), `
+			SELECT name, to_char(starts_at, 'DD Mon'), to_char(ends_at, 'DD Mon')
+			FROM storefront_seasons
+			WHERE id <> $1 AND enabled AND starts_at < $3 AND ends_at > $2
+			ORDER BY starts_at LIMIT 1`,
+			s.ID, s.StartsAt, s.EndsAt).Scan(&other, &starts, &ends)
+		switch {
+		case err == nil:
+			writeError(w, http.StatusConflict,
+				"These dates overlap \""+other+"\", which runs "+starts+" to "+
+					ends+". Two seasons cannot be live at once — move the dates, "+
+					"or turn that one off first.")
+			return
+		case !errors.Is(err, sql.ErrNoRows):
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
 	hints := make([]string, 0, len(s.Hints))
 	for _, h := range s.Hints {
 		if h = strings.TrimSpace(h); h != "" && len([]rune(h)) <= 60 {
