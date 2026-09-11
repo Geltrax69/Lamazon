@@ -140,9 +140,17 @@ class ProductCard extends StatelessWidget {
                               // catalogueImage already returns a centred square,
                               // so the box is filled rather than fitted — there
                               // is nothing left to letterbox.
+                              // 300, not the default 400. A card is never
+                              // wider than productTileMax (150) and the app
+                              // renders at 2x at most, so 300 is every pixel
+                              // one can display — 400 fetched and decoded 1.8x
+                              // the data for no visible gain, forty-two times
+                              // over, in the seconds after launch when the
+                              // phone is busiest.
                               child: NetImage(
-                                url: catalogueImage(product.imageUrl),
+                                url: catalogueImage(product.imageUrl, 300),
                                 padTo: null,
+                                sourceWidth: 300,
                                 fit: BoxFit.cover,
                               ),
                             ),
@@ -529,6 +537,12 @@ class NetImage extends StatelessWidget {
       padTo == null
           ? optimizedImage(url, sourceWidth ?? 1024)
           : padded(url, padTo!, sourceWidth),
+      // Decode to what is drawn, not to whatever arrived. Without this every
+      // picture is held at its full fetched resolution, and a grid of them is
+      // tens of megabytes of texture the phone has to find at the worst
+      // possible moment. Null leaves the decoder alone where the original is
+      // genuinely wanted.
+      cacheWidth: sourceWidth,
       semanticLabel: semanticLabel,
       excludeFromSemantics: semanticLabel == null,
       fit: fit ?? (padTo == null ? BoxFit.cover : BoxFit.contain),
