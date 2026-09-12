@@ -10,6 +10,13 @@
 <meta property="og:description" content="{{.Description}}">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="/app/favicon.png">
+{{if .Gate}}<!-- Sign in first. The session the app keeps is a localStorage key,
+     not a cookie, so only the browser can answer this — and in <head> it
+     answers before a pixel is painted, which is why there is no flash of a
+     shop you are about to be redirected away from. It is a doorway, not a
+     lock: every API call still carries the token. -->
+<script>try{if(!localStorage.getItem('flutter.session.token'))
+location.replace('/login?next='+encodeURIComponent(location.pathname+location.search))}catch(e){}</script>{{end}}
 <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
 <link rel="dns-prefetch" href="https://res.cloudinary.com">
 <!-- The app's own design, in HTML. Inlined rather than linked: a stylesheet is

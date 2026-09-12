@@ -42,7 +42,7 @@
     <p class="note" id="say">We only use your email for order updates and receipts.</p>
   </form>
 
-  <a class="guest" href="/">Browse the shop instead</a>
+  <a class="guest" href="/search">Browse the shop instead</a>
   <p class="legal">By continuing, you agree to our
     <a href="/app">Terms</a> and <a href="/app">Privacy Policy</a>.</p>
 </div>
@@ -98,7 +98,15 @@
       // Private browsing, or storage full. The app can still ask again.
       tell('Signed in, but this browser would not remember it.', true);
     }
-    location.href = '/app';
+    location.href = whereTo();
+  }
+
+  // Back to the page that sent you here, or the shop. "/…" only: a next of
+  // "//evil.example" or "https://…" is somebody else's site wearing our
+  // login form, so anything that is not a path on this origin becomes "/".
+  function whereTo() {
+    var next = new URLSearchParams(location.search).get('next') || '/';
+    return next.charAt(0) === '/' && next.charAt(1) !== '/' ? next : '/';
   }
 
   form.addEventListener('submit', function (e) {

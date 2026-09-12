@@ -122,6 +122,11 @@ type storePage struct {
 	BannerArt   string
 	Canonical   string
 	CartCount   int
+	// Gate asks the browser to bounce a signed-out visitor to /login before
+	// this page paints. Only the pages you land on to *shop* set it: a
+	// product link somebody shared, and search, stay open so a stranger (and
+	// a crawler) can still read a price.
+	Gate bool
 }
 
 func (a *API) render(w http.ResponseWriter, name string, page storePage) {
@@ -163,6 +168,7 @@ func (a *API) handleStoreHome(w http.ResponseWriter, r *http.Request) {
 		Banner:      a.banner(r),
 		BannerArt:   faceFor("", items),
 		Canonical:   "/",
+		Gate:        true,
 	})
 }
 

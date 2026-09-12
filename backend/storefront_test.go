@@ -45,7 +45,10 @@ func TestStorefrontServesProductsAsHTML(t *testing.T) {
 			t.Errorf("home does not mention %q", want)
 		}
 	}
-	if strings.Contains(page, "<script") {
+	// One script, and it is the doorway in <head>, not the page. Everything
+	// below the fold is already drawn when it arrives; nothing here waits on
+	// a fetch, a hydrate or a renderer.
+	if body := page[strings.Index(page, "</head>"):]; strings.Contains(body, "<script") {
 		t.Error("the shop window must not need JavaScript to show a price")
 	}
 }
@@ -185,6 +188,40 @@ func TestStorefrontLoginIsRenderedNotAssembled(t *testing.T) {
 	for _, path := range []string{"/api/login", "/api/login/verify", "/api/login/password"} {
 		if !strings.Contains(page, path) {
 			t.Errorf("login page does not call %s", path)
+		}
+	}
+}
+
+// The doorway: land on the shop signed out and you get the login form first.
+//
+// The check has to be in the browser — the session is a localStorage key, not
+// a cookie, so the server cannot see it and an edge cache must not try to. It
+// also has to be in <head>, before anything paints, and it must not be on the
+// login page itself or signing in is a redirect loop.
+func TestHomeAsksYouToSignInFirst(t *testing.T) {
+	h := testAPI(t)
+
+	_, home := getHTML(t, h, "/")
+	head := home[:strings.Index(home, "</head>")]
+	if !strings.Contains(head, "flutter.session.token") ||
+		!strings.Contains(head, "/login?next=") {
+		t.Error("home no longer sends a signed-out visitor to /login before it paints")
+	}
+
+	// A loop is the failure mode, and it is silent: the page flickers.
+	_, login := getHTML(t, h, "/login")
+	if strings.Contains(login, "location.replace('/login") {
+		t.Error("the login page redirects to itself")
+	}
+	if !strings.Contains(login, "function whereTo()") {
+		t.Error("signing in no longer returns you to the page you came from")
+	}
+
+	// Shared links stay open. A product somebody sent you, and search, are
+	// the two pages a stranger is allowed to read.
+	for _, path := range []string{"/search", "/search?q=burger"} {
+		if _, page := getHTML(t, h, path); strings.Contains(page, "/login?next=") {
+			t.Errorf("%s should be readable without signing in", path)
 		}
 	}
 }
