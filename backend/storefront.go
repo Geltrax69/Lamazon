@@ -126,10 +126,16 @@ type storePage struct {
 
 func (a *API) render(w http.ResponseWriter, name string, page storePage) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// A shop window goes stale in minutes, not days. The CDN may serve a
-	// slightly old page instantly while it fetches a fresh one behind — which
-	// is the whole trick that makes this feel instant on a repeat visit.
-	w.Header().Set("Cache-Control", "public, max-age=60, stale-while-revalidate=600")
+	// A shop window goes stale in minutes, not days.
+	//
+	// s-maxage is the one that matters: the origin is ~900ms away from an
+	// Indian phone, so every request that reaches it undoes the point of
+	// serving HTML. Cached at the edge it is tens of milliseconds, and
+	// stale-while-revalidate means even the sixty-first second is served from
+	// the POP while a fresh copy is fetched behind it. max-age stays low so a
+	// price a shop just changed is not stuck in somebody's browser.
+	w.Header().Set("Cache-Control",
+		"public, max-age=30, s-maxage=60, stale-while-revalidate=600")
 	if err := storefront.ExecuteTemplate(w, name, page); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 	}

@@ -1,12 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter && cd frontend && $HOME/flutter/bin/flutter pub get",
-  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release --wasm --dart-define=API_BASE_URL=https://api.geltrax.engineer && python3 tool/prune_fonts.py build/web lib",
-  "outputDirectory": "frontend/build/web",
+  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release --wasm --base-href /app/ --dart-define=API_BASE_URL=https://api.geltrax.engineer && python3 tool/prune_fonts.py build/web lib && mkdir -p build/site/app && mv build/web/* build/site/app/",
+  "outputDirectory": "frontend/build/site",
   "framework": null,
   "headers": [
     {
-      "source": "/canvaskit/(.*)",
+      "source": "/app/canvaskit/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -15,7 +15,7 @@
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/app/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "source": "/index.html",
+      "source": "/app/index.html",
       "headers": [
         {
           "key": "Cache-Control",
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "source": "/flutter_service_worker.js",
+      "source": "/app/flutter_service_worker.js",
       "headers": [
         {
           "key": "Cache-Control",
@@ -60,7 +60,7 @@
       ]
     },
     {
-      "source": "/manifest.json",
+      "source": "/app/manifest.json",
       "headers": [
         {
           "key": "Cache-Control",
@@ -70,6 +70,14 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/app",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/app/index.html"
+    },
     {
       "source": "/",
       "destination": "https://api.geltrax.engineer/"
@@ -88,7 +96,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/app/index.html"
     }
   ]
 }
