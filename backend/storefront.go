@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -38,6 +39,11 @@ var storefrontFuncs = template.FuncMap{
 	"hero":     func(url string) string { return catalogueImage(url, 800) },
 	"discount": discountPercent,
 	"hasPrice": func(p Product) bool { return p.MRP > p.Price },
+	// The app only puts a quick-add on things you buy without choosing a
+	// size, which is food and groceries. Same rule here.
+	"quickAdd": func(p Product) bool {
+		return strings.EqualFold(p.Tab, "Food") || strings.EqualFold(p.Tab, "Grocery")
+	},
 	// Stock is a pointer because "not tracked" and "none left" are different
 	// answers, and a template cannot follow one on its own.
 	"deref": func(v *int) int {
@@ -109,9 +115,13 @@ type storePage struct {
 	Description string
 	Query       string
 	Products    []Product
+	Offers      []Product // discounted and in stock, for the "Around you" row
 	Product     Product
-	Departments []string
+	Departments []deptTile
+	Banner      *Campaign
+	BannerArt   string
 	Canonical   string
+	CartCount   int
 }
 
 func (a *API) render(w http.ResponseWriter, name string, page storePage) {
@@ -142,7 +152,10 @@ func (a *API) handleStoreHome(w http.ResponseWriter, r *http.Request) {
 		Title:       "Lamazon — local shops, delivered on campus",
 		Description: "Order from shops around campus. Real stock, real prices, cash on delivery.",
 		Products:    items,
-		Departments: departmentsOf(items),
+		Offers:      savingsOn(items),
+		Departments: a.departments(r, items),
+		Banner:      a.banner(r),
+		BannerArt:   faceFor("", items),
 		Canonical:   "/",
 	})
 }
@@ -202,16 +215,97 @@ func (a *API) handleStoreLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// departmentsOf lists the tabs the catalogue actually has stock in, in the
-// order they first appear, so an empty department never gets a chip.
-func departmentsOf(items []Product) []string {
-	seen := map[string]bool{}
-	var out []string
+// deptTile is a shelf and the picture it is shown under.
+type deptTile struct {
+	Name string
+	Art  string
+}
+
+// departments are the top-level shelves. Failing to read them costs the strip,
+// not the page.
+//
+// Almost none of them carry artwork of their own — the app falls back to a
+// bundled atlas, which is a Flutter asset these pages cannot reach — so each
+// tile borrows a photograph of something the shelf actually sells. That is
+// what CategoryVisual does in the app for the same reason, and it is truer
+// than a stock illustration: the tiles fill in as stock arrives.
+func (a *API) departments(r *http.Request, items []Product) []deptTile {
+	flat, err := a.db.categories(r)
+	if err != nil {
+		return nil
+	}
+	out := make([]deptTile, 0, len(flat))
+	for _, c := range flat {
+		if c.Parent != "" || c.Name == "All" {
+			continue
+		}
+		art := c.ImageURL
+		if art == "" {
+			art = faceFor(c.Name, items)
+		}
+		out = append(out, deptTile{Name: c.Name, Art: art})
+	}
+	return out
+}
+
+// faceFor is the first photograph on a shelf worth showing: something in
+// stock, with a picture. An empty tab means "anything in the shop".
+func faceFor(tab string, items []Product) string {
 	for _, p := range items {
-		if p.Tab != "" && !seen[p.Tab] {
-			seen[p.Tab] = true
-			out = append(out, p.Tab)
+		if p.ImageURL == "" || (p.AvailableStock != nil && *p.AvailableStock == 0) {
+			continue
+		}
+		if tab == "" || strings.EqualFold(p.Tab, tab) {
+			return p.ImageURL
+		}
+	}
+	return ""
+}
+
+// banner is the campaign the app would be showing: the first enabled one.
+func (a *API) banner(r *http.Request) *Campaign {
+	rows, err := a.db.sql.QueryContext(r.Context(), `
+		SELECT id, title, subtitle, cta, category, department, image_url, colour
+		FROM storefront_campaigns WHERE enabled ORDER BY position, id LIMIT 1`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil
+	}
+	var c Campaign
+	if err := rows.Scan(&c.ID, &c.Title, &c.Subtitle, &c.CTA, &c.Category,
+		&c.Department, &c.ImageURL, &c.Colour); err != nil {
+		return nil
+	}
+	return &c
+}
+
+// savingsOn is what "Around you" shows: a real discount on something the shop
+// can actually sell today. Ten, because it is a row you swipe, not a page.
+func savingsOn(items []Product) []Product {
+	out := make([]Product, 0, 10)
+	for _, p := range items {
+		if p.MRP > p.Price && (p.AvailableStock == nil || *p.AvailableStock > 0) {
+			out = append(out, p)
+			if len(out) == 10 {
+				break
+			}
 		}
 	}
 	return out
+}
+
+// GET /app — the application itself, which this storefront is the doorway to.
+//
+// In production Vercel answers /app with the Flutter build before the request
+// reaches Go, so this only runs when the API is being browsed directly. It
+// sends people somewhere real rather than showing them a 404.
+func (a *API) handleAppRedirect(w http.ResponseWriter, r *http.Request) {
+	target := os.Getenv("APP_URL")
+	if target == "" {
+		target = "https://lamazon-two.vercel.app/"
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }

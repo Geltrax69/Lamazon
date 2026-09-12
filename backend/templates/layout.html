@@ -5,105 +5,165 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{.Title}}</title>
 <meta name="description" content="{{.Description}}">
+<meta name="theme-color" content="#143E32">
 <meta property="og:title" content="{{.Title}}">
 <meta property="og:description" content="{{.Description}}">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
 <link rel="dns-prefetch" href="https://res.cloudinary.com">
-<!-- Inlined, not linked. A stylesheet is a render-blocking round trip, and the
-     whole point of these pages is that the first packet is the first paint.
-     It is small enough that inlining costs less than fetching. System fonts
-     for the same reason: a webfont is 300 KB and a flash of nothing. -->
+<!-- The app's own design, in HTML. Inlined rather than linked: a stylesheet is
+     a render-blocking round trip and the whole point of these pages is that
+     the first packet is the first paint. System fonts for the same reason —
+     InterTight is 300 KB and a flash of nothing. The shapes, the spacing and
+     the palette are the Flutter screen's; only the renderer is different. -->
 <style>
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:#F7F6F0;color:#17221D;
+:root{
+  --canvas:#F7F6F0; --surface:#FFFDF8; --forest:#143E32; --strong:#1D4939;
+  --lime:#C6EE63; --ink:#17221D; --muted:#6B6B6B; --track:#E1E5DD;
+  --peach:#F7B2A0; --green:#1D4939;
+  --gut:16px; --r:22px; --nav:84px;
+}
+body{margin:0;background:var(--canvas);color:var(--ink);
   font:400 15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-  -webkit-font-smoothing:antialiased}
+  -webkit-font-smoothing:antialiased;padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom))}
 a{color:inherit;text-decoration:none}
 img{display:block;max-width:100%}
-.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
-header{background:#143E32;color:#fff;padding:14px 0 16px}
-header .row{display:flex;align-items:center;gap:12px;justify-content:space-between}
-.brand{font-size:21px;font-weight:650;letter-spacing:-.5px}
-.brand span{color:#C6EE63}
-.appjump{font-size:12.5px;border:1px solid rgba(255,255,255,.35);border-radius:999px;
-  padding:7px 13px;white-space:nowrap}
-form.find{display:flex;gap:8px;margin-top:12px}
-form.find input{flex:1;min-width:0;border:0;border-radius:12px;padding:12px 14px;
-  font-size:15px;background:#FFFDF8;color:#17221D}
-form.find button{border:0;border-radius:12px;padding:12px 18px;font-size:14px;
-  font-weight:600;background:#C6EE63;color:#1D4939}
-nav.depts{display:flex;gap:8px;overflow-x:auto;padding:14px 0 2px;
+svg{display:block;flex:0 0 auto}
+.wrap{max-width:1180px;margin:0 auto;padding:0 var(--gut)}
+
+/* The service header: a card, not a bar. */
+.hero-head{background:linear-gradient(135deg,var(--forest),#0E2E25);color:#fff;
+  border-radius:var(--r);margin-top:12px;padding:16px 16px 15px;
+  box-shadow:0 10px 26px rgba(20,62,50,.14)}
+.hero-head .name{font-size:22px;font-weight:600;letter-spacing:-.7px;line-height:28px}
+.hero-head .where{display:flex;align-items:center;gap:5px;margin-top:2px;
+  font-size:13.5px;letter-spacing:.2px;color:rgba(255,255,255,.82)}
+.hero-head .where svg{color:var(--lime)}
+
+/* The search field, floating on the canvas. */
+.seek{display:flex;align-items:center;gap:12px;background:var(--surface);
+  border-radius:var(--r);padding:14px 16px;margin-top:12px;
+  box-shadow:0 10px 26px rgba(20,62,50,.10);border:0;width:100%}
+.seek input{flex:1;min-width:0;border:0;background:transparent;font-size:15px;
+  letter-spacing:.2px;color:var(--ink);outline:none}
+.seek input::placeholder{color:var(--muted)}
+.seek button{border:0;background:transparent;padding:0;color:var(--strong);cursor:pointer}
+.seek svg{color:var(--strong)}
+
+/* Departments: a photograph and a name, two lines allowed. */
+.depts{display:flex;gap:11px;overflow-x:auto;padding:16px 0 4px;margin:0 calc(var(--gut) * -1);
+  padding-left:var(--gut);padding-right:var(--gut);
   -webkit-overflow-scrolling:touch;scrollbar-width:none}
-nav.depts::-webkit-scrollbar{display:none}
-nav.depts a{flex:0 0 auto;background:#FFFDF8;border:1px solid #E1E5DD;border-radius:999px;
-  padding:7px 14px;font-size:13.5px;font-weight:500}
-h1{font-size:22px;line-height:1.25;margin:22px 0 2px;letter-spacing:-.4px}
-h2{font-size:17px;margin:26px 0 2px;letter-spacing:-.2px}
-.sub{color:#6B6B6B;font-size:13.5px;margin:0 0 14px}
-.grid{display:grid;gap:18px 14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
-  padding:4px 0 40px;list-style:none;margin:0}
-.card .shot{aspect-ratio:1;border-radius:12px;overflow:hidden;background:#FFFDF8}
+.depts::-webkit-scrollbar{display:none}
+.dept{flex:0 0 auto;width:74px;text-align:center}
+.dept .tile{width:54px;height:54px;margin:0 auto;border-radius:16px;overflow:hidden;
+  background:var(--surface);box-shadow:0 4px 12px rgba(20,62,50,.08);
+  display:flex;align-items:center;justify-content:center}
+.dept .tile img{width:100%;height:100%;object-fit:cover}
+.dept .tile.bare{background:linear-gradient(135deg,var(--forest),var(--strong));color:var(--lime)}
+.dept.on .tile{background:var(--lime);box-shadow:0 6px 14px rgba(20,62,50,.16)}
+.dept .label{font-size:11px;line-height:1.15;letter-spacing:.1px;margin-top:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dept.on .label{font-weight:600;color:var(--strong)}
+
+/* Section headings. */
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:34px}
+.head h2{font-size:17px;margin:0;letter-spacing:-.2px}
+.head p{margin:3px 0 0;font-size:13.5px;color:var(--muted)}
+.head .more{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background:var(--surface);
+  box-shadow:0 4px 12px rgba(20,62,50,.10);display:flex;align-items:center;justify-content:center;
+  color:var(--strong)}
+
+/* Product cards. */
+.grid{display:grid;gap:20px 14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  padding:14px 0 8px;list-style:none;margin:0}
+.rail{display:flex;gap:14px;overflow-x:auto;padding:14px 0 8px;margin:0 calc(var(--gut) * -1);
+  padding-left:var(--gut);padding-right:var(--gut);list-style:none;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.rail .card{flex:0 0 150px}
+.card{position:relative}
+.card .shot{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--surface)}
 .card .shot img{width:100%;height:100%;object-fit:cover}
-.price{font-size:17px;font-weight:700;margin-top:8px;letter-spacing:-.2px}
-.was{font-size:12.5px;color:#6B6B6B;text-decoration:line-through;margin-left:5px;font-weight:400}
-.off{font-size:11.5px;font-weight:700;color:#1D4939}
-.name{font-size:13px;font-weight:500;margin-top:2px}
-.shop{font-size:11px;color:#6B6B6B;letter-spacing:.2px;margin-top:2px}
-.empty{padding:40px 0 60px;color:#6B6B6B}
-footer{border-top:1px solid #E1E5DD;padding:22px 0 40px;color:#6B6B6B;font-size:12.5px}
-footer a{text-decoration:underline;margin-right:14px}
-@media (min-width:700px){h1{font-size:27px}.grid{gap:22px 18px}}
+.save{position:absolute;top:4px;right:4px;width:34px;height:34px;border-radius:50%;
+  background:rgba(255,253,248,.78);display:flex;align-items:center;justify-content:center;
+  color:var(--strong)}
+.add{position:absolute;right:4px;bottom:4px;width:34px;height:34px;border-radius:50%;
+  background:var(--lime);display:flex;align-items:center;justify-content:center;color:var(--strong)}
+.price{font-size:17px;font-weight:700;margin-top:8px;letter-spacing:-.2px;line-height:21px}
+.was{font-size:12.5px;color:var(--muted);text-decoration:line-through;margin-left:5px;font-weight:400}
+.off{font-size:11.5px;font-weight:700;color:var(--green);line-height:15px}
+.pname{font-size:13px;font-weight:500;line-height:16.5px;letter-spacing:.05px;margin-top:2px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pshop{font-size:11px;color:var(--muted);letter-spacing:.2px;margin-top:2px}
+.empty{padding:40px 0 60px;color:var(--muted)}
+
+/* The floating bar, as in the app. */
+.bar{position:fixed;left:0;right:0;bottom:0;padding:0 12px calc(12px + env(safe-area-inset-bottom));
+  z-index:30;pointer-events:none}
+.bar .inner{max-width:960px;margin:0 auto;background:var(--surface);border-radius:var(--r);
+  box-shadow:0 10px 30px rgba(20,62,50,.16);display:flex;pointer-events:auto}
+.bar a{flex:1;padding:10px 0 9px;text-align:center;color:var(--ink);font-size:12px}
+.bar .pill{width:56px;height:32px;margin:0 auto 3px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;color:var(--strong)}
+.bar a.on .pill{background:var(--lime)}
+.bar a.on{font-weight:600;color:var(--strong)}
+@media (min-width:760px){
+  :root{--gut:20px}
+  .grid{gap:24px 18px}
+}
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <div class="row">
-      <a class="brand" href="/">Lamazon<span>.</span></a>
-      <a class="appjump" href="/app">Open the app &rarr;</a>
+<div class="wrap">
+  <div class="hero-head">
+    <div class="name">Lamazon</div>
+    <div class="where">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span>Choose delivery location</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
-    <form class="find" action="/search" method="get" role="search">
-      <input type="search" name="q" value="{{.Query}}" placeholder="Search products and shops"
-             aria-label="Search products and shops">
-      <button type="submit">Search</button>
-    </form>
   </div>
-</header>
-<main class="wrap">
+
+  <form class="seek" action="/search" method="get" role="search">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="search" name="q" value="{{.Query}}" placeholder="Search products, shops and more" aria-label="Search products, shops and more">
+    <button type="submit" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+    </button>
+  </form>
 {{end}}
 
 {{define "foot"}}
-</main>
-<footer>
-  <div class="wrap">
-    <a href="/app">Open the app</a>
-    <a href="/search">Browse everything</a>
-    <p>Cash on delivery. Ordered from shops on campus.</p>
+</div>
+<nav class="bar" aria-label="Sections">
+  <div class="inner">
+    <a href="/" class="on"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></span>Home</a>
+    <a href="/app"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></span>Cart</a>
+    <a href="/app"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>Saved</a>
+    <a href="/login"><span class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Account</a>
   </div>
-</footer>
+</nav>
 </body>
 </html>
 {{end}}
 
 {{define "cards"}}
-<ul class="grid">
-  {{range .}}
-  <li class="card">
-    <a href="/p/{{.ID}}">
-      <div class="shot">
-        {{if .ImageURL}}
-        <img src="{{thumb .ImageURL}}" alt="{{.Name}}" width="300" height="300"
-             loading="lazy" decoding="async">
-        {{end}}
-      </div>
-      <div class="price">&#8377;{{money .Price}}{{if hasPrice .}}<span class="was">&#8377;{{money .MRP}}</span>{{end}}</div>
-      {{if hasPrice .}}<div class="off">{{discount .}}% off</div>{{end}}
-      <div class="name">{{.Name}}</div>
-      <div class="shop">{{.Store}}</div>
-    </a>
-  </li>
-  {{end}}
-</ul>
+{{range .}}
+<li class="card">
+  <a href="/p/{{.ID}}">
+    <div class="shot">
+      {{if .ImageURL}}<img src="{{thumb .ImageURL}}" alt="{{.Name}}" width="300" height="300" loading="lazy" decoding="async">{{end}}
+      <span class="save" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>
+      {{if quickAdd .}}<span class="add" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>{{end}}
+    </div>
+    <div class="price">&#8377;{{money .Price}}{{if hasPrice .}}<span class="was">&#8377;{{money .MRP}}</span>{{end}}</div>
+    {{if hasPrice .}}<div class="off">{{discount .}}% off</div>{{end}}
+    <div class="pname">{{.Name}}</div>
+    <div class="pshop">{{.Store}}</div>
+  </a>
+</li>
+{{end}}
 {{end}}
