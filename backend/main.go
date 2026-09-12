@@ -238,6 +238,13 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("POST /api/delivery/orders/{id}/pick", s.handleRiderPick)
 	mux.HandleFunc("POST /api/delivery/orders/{id}/deliver", s.handleRiderDeliver)
 
+	// The shop window. Plain HTML, no session, no JavaScript — the pages a
+	// stranger lands on, which the Flutter bundle is far too heavy to serve.
+	// Everything behind a sign-in stays in the app at /app.
+	mux.HandleFunc("GET /", s.handleStoreHome)
+	mux.HandleFunc("GET /p/{id}", s.handleStoreProduct)
+	mux.HandleFunc("GET /search", s.handleStoreSearch)
+
 	return withCORS(withGzip(s.withStaff(s.withAuth(mux))))
 }
 

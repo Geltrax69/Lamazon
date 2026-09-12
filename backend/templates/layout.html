@@ -1,0 +1,110 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Title}}</title>
+<meta name="description" content="{{.Description}}">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
+<link rel="dns-prefetch" href="https://res.cloudinary.com">
+<!-- Inlined, not linked. A stylesheet is a render-blocking round trip, and the
+     whole point of these pages is that the first packet is the first paint.
+     It is small enough that inlining costs less than fetching. System fonts
+     for the same reason: a webfont is 300 KB and a flash of nothing. -->
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:#F7F6F0;color:#17221D;
+  font:400 15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+header{background:#143E32;color:#fff;padding:14px 0 16px}
+header .row{display:flex;align-items:center;gap:12px;justify-content:space-between}
+.brand{font-size:21px;font-weight:650;letter-spacing:-.5px}
+.brand span{color:#C6EE63}
+.appjump{font-size:12.5px;border:1px solid rgba(255,255,255,.35);border-radius:999px;
+  padding:7px 13px;white-space:nowrap}
+form.find{display:flex;gap:8px;margin-top:12px}
+form.find input{flex:1;min-width:0;border:0;border-radius:12px;padding:12px 14px;
+  font-size:15px;background:#FFFDF8;color:#17221D}
+form.find button{border:0;border-radius:12px;padding:12px 18px;font-size:14px;
+  font-weight:600;background:#C6EE63;color:#1D4939}
+nav.depts{display:flex;gap:8px;overflow-x:auto;padding:14px 0 2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+nav.depts::-webkit-scrollbar{display:none}
+nav.depts a{flex:0 0 auto;background:#FFFDF8;border:1px solid #E1E5DD;border-radius:999px;
+  padding:7px 14px;font-size:13.5px;font-weight:500}
+h1{font-size:22px;line-height:1.25;margin:22px 0 2px;letter-spacing:-.4px}
+h2{font-size:17px;margin:26px 0 2px;letter-spacing:-.2px}
+.sub{color:#6B6B6B;font-size:13.5px;margin:0 0 14px}
+.grid{display:grid;gap:18px 14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  padding:4px 0 40px;list-style:none;margin:0}
+.card .shot{aspect-ratio:1;border-radius:12px;overflow:hidden;background:#FFFDF8}
+.card .shot img{width:100%;height:100%;object-fit:cover}
+.price{font-size:17px;font-weight:700;margin-top:8px;letter-spacing:-.2px}
+.was{font-size:12.5px;color:#6B6B6B;text-decoration:line-through;margin-left:5px;font-weight:400}
+.off{font-size:11.5px;font-weight:700;color:#1D4939}
+.name{font-size:13px;font-weight:500;margin-top:2px}
+.shop{font-size:11px;color:#6B6B6B;letter-spacing:.2px;margin-top:2px}
+.empty{padding:40px 0 60px;color:#6B6B6B}
+footer{border-top:1px solid #E1E5DD;padding:22px 0 40px;color:#6B6B6B;font-size:12.5px}
+footer a{text-decoration:underline;margin-right:14px}
+@media (min-width:700px){h1{font-size:27px}.grid{gap:22px 18px}}
+{{block "css" .}}{{end}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="row">
+      <a class="brand" href="/">Lamazon<span>.</span></a>
+      <a class="appjump" href="/app">Open the app &rarr;</a>
+    </div>
+    <form class="find" action="/search" method="get" role="search">
+      <input type="search" name="q" value="{{.Query}}" placeholder="Search products and shops"
+             aria-label="Search products and shops">
+      <button type="submit">Search</button>
+    </form>
+  </div>
+</header>
+<main class="wrap">
+{{end}}
+
+{{define "foot"}}
+</main>
+<footer>
+  <div class="wrap">
+    <a href="/app">Open the app</a>
+    <a href="/search">Browse everything</a>
+    <p>Cash on delivery. Ordered from shops on campus.</p>
+  </div>
+</footer>
+</body>
+</html>
+{{end}}
+
+{{define "cards"}}
+<ul class="grid">
+  {{range .}}
+  <li class="card">
+    <a href="/p/{{.ID}}">
+      <div class="shot">
+        {{if .ImageURL}}
+        <img src="{{thumb .ImageURL}}" alt="{{.Name}}" width="300" height="300"
+             loading="lazy" decoding="async">
+        {{end}}
+      </div>
+      <div class="price">&#8377;{{money .Price}}{{if hasPrice .}}<span class="was">&#8377;{{money .MRP}}</span>{{end}}</div>
+      {{if hasPrice .}}<div class="off">{{discount .}}% off</div>{{end}}
+      <div class="name">{{.Name}}</div>
+      <div class="shop">{{.Store}}</div>
+    </a>
+  </li>
+  {{end}}
+</ul>
+{{end}}

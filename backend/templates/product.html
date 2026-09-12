@@ -1,0 +1,51 @@
+{{define "css"}}
+.detail{display:grid;gap:20px;padding-bottom:44px}
+.detail .shot{aspect-ratio:1;border-radius:16px;overflow:hidden;background:#FFFDF8;max-width:460px}
+.detail .shot img{width:100%;height:100%;object-fit:cover}
+.detail h1{margin:0 0 6px}
+.big{font-size:29px;font-weight:800;letter-spacing:-.6px}
+.big .was{font-size:16px;font-weight:400}
+.badge{display:inline-block;background:#F7B2A0;color:#17221D;border-radius:999px;
+  padding:3px 10px;font-size:12px;font-weight:700;margin-left:8px}
+.stock{color:#1D4939;font-weight:600;font-size:14px;margin-top:8px}
+.gone{color:#B3261E;font-weight:600;font-size:14px;margin-top:8px}
+.facts{background:#FFFDF8;border-radius:14px;padding:14px 16px;margin-top:18px;font-size:14px}
+.facts div+div{margin-top:10px;padding-top:10px;border-top:1px solid #E1E5DD}
+.buy{display:inline-block;background:#143E32;color:#fff;border-radius:999px;
+  padding:14px 28px;font-weight:650;font-size:15px;margin-top:20px}
+.about{margin-top:26px}
+.about p{color:#3A4A42;font-size:14.5px;line-height:1.6}
+@media (min-width:760px){.detail{grid-template-columns:460px 1fr;gap:36px;align-items:start}}
+{{end}}
+
+{{define "product.html"}}{{template "head" .}}
+{{with .Product}}
+<article class="detail">
+  <div class="shot">
+    {{if .ImageURL}}
+    <img src="{{hero .ImageURL}}" alt="{{.Name}}" width="800" height="800" fetchpriority="high" decoding="async">
+    {{end}}
+  </div>
+  <div>
+    <p class="shop" style="margin-top:18px">{{.Store}}</p>
+    <h1>{{.Name}}</h1>
+    <div class="big">&#8377;{{money .Price}}{{if hasPrice .}}<span class="was was">&#8377;{{money .MRP}}</span><span class="badge">{{discount .}}% OFF</span>{{end}}</div>
+    {{if .AvailableStock}}
+      {{if gt (deref .AvailableStock) 0}}<p class="stock">{{deref .AvailableStock}} available</p>
+      {{else}}<p class="gone">Out of stock</p>{{end}}
+    {{end}}
+    <div class="facts">
+      <div><strong>Local delivery</strong><br>&#8377;15 per order. Timing confirmed by the shop.</div>
+      <div><strong>Cash on delivery</strong><br>Pay the rider when your order arrives.</div>
+    </div>
+    <a class="buy" href="/app">Add to cart in the app</a>
+    {{if .Description}}
+    <section class="about">
+      <h2>About this product</h2>
+      <p>{{.Description}}</p>
+    </section>
+    {{end}}
+  </div>
+</article>
+{{end}}
+{{template "foot" .}}{{end}}

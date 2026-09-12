@@ -1,0 +1,9 @@
+{{define "search.html"}}{{template "head" .}}
+<h1>{{if .Query}}{{len .Products}} result{{if ne (len .Products) 1}}s{{end}} for &ldquo;{{.Query}}&rdquo;{{else}}Everything in the shop{{end}}</h1>
+<p class="sub">{{if .Query}}Tap a product to see it in full.{{else}}{{len .Products}} products from shops near you.{{end}}</p>
+{{if .Products}}
+  {{template "cards" .Products}}
+{{else}}
+  <p class="empty">Nothing matched &ldquo;{{.Query}}&rdquo;. Try a shorter word, or <a href="/search" style="text-decoration:underline">browse everything</a>.</p>
+{{end}}
+{{template "foot" .}}{{end}}
