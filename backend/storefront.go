@@ -187,6 +187,21 @@ func (a *API) handleStoreSearch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /login — the sign-in form, usable before the app could have booted.
+//
+// The only page here that needs JavaScript, because signing in is a
+// conversation with the API rather than a document. The markup and the styling
+// still arrive rendered, so the form is on screen and typeable in a couple of
+// hundred milliseconds; the script only wakes up when somebody presses a
+// button.
+func (a *API) handleStoreLogin(w http.ResponseWriter, r *http.Request) {
+	a.render(w, "login.html", storePage{
+		Title:       "Log in — Lamazon",
+		Description: "Sign in to order from shops around campus.",
+		Canonical:   "/login",
+	})
+}
+
 // departmentsOf lists the tabs the catalogue actually has stock in, in the
 // order they first appear, so an empty department never gets a chip.
 func departmentsOf(items []Product) []string {

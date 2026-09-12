@@ -151,3 +151,40 @@ func TestCatalogueImageAsksForTheSizeItDraws(t *testing.T) {
 		t.Error("a non-Cloudinary URL should pass straight through")
 	}
 }
+
+// The sign-in page is the one here that needs a script, because signing in is
+// a conversation rather than a document. What must not regress is that the
+// form is already *rendered* — a stranger can start typing before the app
+// could have compiled — and that it hands over to the app under the key names
+// session_handoff_test.dart pins on the other side.
+func TestStorefrontLoginIsRenderedNotAssembled(t *testing.T) {
+	h := testAPI(t)
+	code, page := getHTML(t, h, "/login")
+	if code != 200 {
+		t.Fatalf("login page: %d", code)
+	}
+	for _, want := range []string{
+		`<form`, `id="who"`, `type="email"`, `autocomplete="email"`,
+		"Log in or sign up",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the form is not in the HTML: missing %q", want)
+		}
+	}
+	// The handoff contract. Renaming either side without the other silently
+	// signs everybody in twice.
+	for _, key := range []string{
+		"flutter.", "session.email", "session.token",
+		"session.refresh", "session.expiresAt",
+	} {
+		if !strings.Contains(page, key) {
+			t.Errorf("the handoff no longer writes %q — see session_handoff_test.dart", key)
+		}
+	}
+	// It posts to the endpoints that exist rather than inventing its own.
+	for _, path := range []string{"/api/login", "/api/login/verify", "/api/login/password"} {
+		if !strings.Contains(page, path) {
+			t.Errorf("login page does not call %s", path)
+		}
+	}
+}

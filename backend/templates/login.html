@@ -1,0 +1,152 @@
+{{define "login.html"}}{{template "head" .}}
+<style>
+.signin{max-width:400px;margin:34px auto 60px}
+.signin h1{margin:0 0 6px;font-size:24px}
+.card{background:#FFFDF8;border-radius:18px;padding:22px 20px 24px;margin-top:18px;
+  box-shadow:0 1px 2px rgba(20,62,50,.06),0 8px 24px rgba(20,62,50,.06)}
+.card label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+.card input{width:100%;border:1px solid #E1E5DD;border-radius:12px;padding:13px 14px;
+  font-size:16px;background:#F7F6F0;color:#17221D}
+.card input:focus{outline:2px solid #1D4939;outline-offset:1px;border-color:#1D4939}
+.card button{width:100%;border:0;border-radius:999px;padding:14px;margin-top:14px;
+  font-size:15px;font-weight:650;background:#143E32;color:#fff}
+.card button[disabled]{opacity:.55}
+.note{font-size:13px;color:#6B6B6B;margin:12px 0 0;text-align:center;line-height:1.45}
+.note.bad{color:#B3261E}
+.guest{display:block;text-align:center;margin-top:18px;font-size:14px;text-decoration:underline}
+.legal{font-size:12.5px;color:#6B6B6B;text-align:center;margin-top:22px}
+.legal a{text-decoration:underline}
+</style>
+<div class="signin">
+  <h1>Log in or sign up</h1>
+  <p class="sub">One address. We send a code to prove it is yours.</p>
+
+  <!-- Rendered, not assembled. The markup and the styling are already here
+       when the page lands, so the form is usable in a couple of hundred
+       milliseconds; the script below only runs once somebody presses a
+       button. The app's own sign-in could not appear until 2.7 MB of
+       WebAssembly had compiled. -->
+  <form class="card" id="f" novalidate>
+    <label for="who">Email address</label>
+    <input id="who" name="email" type="email" inputmode="email"
+           autocomplete="email" autocapitalize="off" autocorrect="off"
+           spellcheck="false" required placeholder="you@example.com">
+
+    <div id="secretRow" hidden>
+      <label for="secret" id="secretLabel" style="margin-top:14px">Password</label>
+      <input id="secret" name="secret" type="password" autocomplete="current-password"
+             inputmode="text" placeholder="">
+    </div>
+
+    <button type="submit" id="go">Continue</button>
+    <p class="note" id="say">We only use your email for order updates and receipts.</p>
+  </form>
+
+  <a class="guest" href="/">Browse the shop instead</a>
+  <p class="legal">By continuing, you agree to our
+    <a href="/app">Terms</a> and <a href="/app">Privacy Policy</a>.</p>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('f');
+  var who = document.getElementById('who');
+  var secret = document.getElementById('secret');
+  var secretRow = document.getElementById('secretRow');
+  var secretLabel = document.getElementById('secretLabel');
+  var go = document.getElementById('go');
+  var say = document.getElementById('say');
+  var step = 'email';
+
+  function tell(message, bad) {
+    say.textContent = message;
+    say.className = bad ? 'note bad' : 'note';
+  }
+
+  function post(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+        return data;
+      });
+    });
+  }
+
+  // Hand the session to the Flutter app the way the app itself stores one.
+  //
+  // shared_preferences writes every key under a "flutter." prefix and JSON
+  // encodes the value, so this has to match exactly — it is a real coupling
+  // and the reason session_handoff_test.dart pins the key names. Same origin
+  // is what makes it possible at all: /login and /app share localStorage.
+  function handOver(session) {
+    var expiry = new Date(Date.now() + (session.expiresIn - 60) * 1000);
+    var pairs = {
+      'session.email': session.email,
+      'session.token': session.token,
+      'session.refresh': session.refreshToken,
+      'session.expiresAt': expiry.toISOString(),
+    };
+    try {
+      for (var key in pairs) {
+        localStorage.setItem('flutter.' + key, JSON.stringify(pairs[key]));
+      }
+    } catch (e) {
+      // Private browsing, or storage full. The app can still ask again.
+      tell('Signed in, but this browser would not remember it.', true);
+    }
+    location.href = '/app';
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = who.value.trim();
+    if (!email || email.indexOf('@') < 1) return tell('That is not an email address yet.', true);
+
+    go.disabled = true;
+    tell('Just a moment…');
+
+    if (step === 'email') {
+      post('/api/login', { email: email }).then(function (data) {
+        go.disabled = false;
+        // Some deployments answer the first step with a session outright —
+        // a local server with SKIP_LOGIN_CODE does. Nothing left to ask for.
+        if (data.token) return handOver(data);
+        step = data.needsPassword ? 'password' : 'code';
+        secretRow.hidden = false;
+        if (step === 'password') {
+          secretLabel.textContent = 'Password';
+          secret.type = 'password';
+          secret.setAttribute('autocomplete', 'current-password');
+          secret.inputMode = 'text';
+          tell('Signing in as ' + email + '.');
+        } else {
+          secretLabel.textContent = 'Verification code';
+          secret.type = 'text';
+          secret.setAttribute('autocomplete', 'one-time-code');
+          secret.inputMode = 'numeric';
+          tell('We sent a six-digit code to ' + email + '. It expires in 10 minutes.');
+        }
+        go.textContent = step === 'password' ? 'Sign in' : 'Verify code';
+        secret.focus();
+      }).catch(function (err) { go.disabled = false; tell(err.message, true); });
+      return;
+    }
+
+    var value = secret.value.trim();
+    if (!value) { go.disabled = false; return tell('Enter it to carry on.', true); }
+    var path = step === 'password' ? '/api/login/password' : '/api/login/verify';
+    var body = step === 'password'
+      ? { email: email, password: value }
+      : { email: email, code: value };
+    post(path, body).then(handOver).catch(function (err) {
+      go.disabled = false;
+      tell(err.message, true);
+    });
+  });
+})();
+</script>
+{{template "foot" .}}{{end}}

@@ -1,4 +1,5 @@
-{{define "css"}}
+{{define "product.html"}}{{template "head" .}}
+<style>
 .detail{display:grid;gap:20px;padding-bottom:44px}
 .detail .shot{aspect-ratio:1;border-radius:16px;overflow:hidden;background:#FFFDF8;max-width:460px}
 .detail .shot img{width:100%;height:100%;object-fit:cover}
@@ -16,9 +17,7 @@
 .about{margin-top:26px}
 .about p{color:#3A4A42;font-size:14.5px;line-height:1.6}
 @media (min-width:760px){.detail{grid-template-columns:460px 1fr;gap:36px;align-items:start}}
-{{end}}
-
-{{define "product.html"}}{{template "head" .}}
+</style>
 {{with .Product}}
 <article class="detail">
   <div class="shot">

@@ -244,6 +244,7 @@ func routes(s *API) http.Handler {
 	mux.HandleFunc("GET /", s.handleStoreHome)
 	mux.HandleFunc("GET /p/{id}", s.handleStoreProduct)
 	mux.HandleFunc("GET /search", s.handleStoreSearch)
+	mux.HandleFunc("GET /login", s.handleStoreLogin)
 
 	return withCORS(withGzip(s.withStaff(s.withAuth(mux))))
 }
