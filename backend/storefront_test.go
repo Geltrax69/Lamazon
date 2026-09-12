@@ -217,6 +217,25 @@ func TestHomeAsksYouToSignInFirst(t *testing.T) {
 		t.Error("signing in no longer returns you to the page you came from")
 	}
 
+	// And it is only the form. A bottom bar, a delivery-location picker and a
+	// product search on a sign-in page are four controls that all lead back
+	// to a page that bounces you straight here again.
+	for _, furniture := range []struct{ what, markup string }{
+		{"the bottom bar", `class="bar"`},
+		{"the search field", `name="q"`},
+		{"the delivery-location picker", `class="where"`},
+	} {
+		if strings.Contains(login, furniture.markup) {
+			t.Errorf("the login page still carries %s", furniture.what)
+		}
+	}
+	// The shop itself keeps all three.
+	for _, markup := range []string{`class="bar"`, `name="q"`, `class="where"`} {
+		if !strings.Contains(home, markup) {
+			t.Errorf("the shop lost %s", markup)
+		}
+	}
+
 	// Shared links stay open. A product somebody sent you, and search, are
 	// the two pages a stranger is allowed to read.
 	for _, path := range []string{"/search", "/search?q=burger"} {

@@ -127,6 +127,11 @@ type storePage struct {
 	// product link somebody shared, and search, stay open so a stranger (and
 	// a crawler) can still read a price.
 	Gate bool
+	// Bare drops the shop's furniture — the delivery-location picker, the
+	// product search and the bottom bar. Sign-in is not a place in the shop
+	// you can navigate away from; every one of those controls led back to a
+	// page that would bounce you straight here again.
+	Bare bool
 }
 
 func (a *API) render(w http.ResponseWriter, name string, page storePage) {
@@ -224,6 +229,7 @@ func (a *API) handleStoreLogin(w http.ResponseWriter, r *http.Request) {
 		Title:       "Log in — Lamazon",
 		Description: "Sign in to order from shops around campus.",
 		Canonical:   "/login",
+		Bare:        true,
 	})
 }
 
