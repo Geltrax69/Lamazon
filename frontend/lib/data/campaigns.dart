@@ -29,6 +29,7 @@ class Campaign {
     enabled: r['enabled'] as bool? ?? true,
     position: (r['position'] as num?)?.toInt() ?? 0,
   );
+
   /// The same banner with different artwork. The editor previews a URL that
   /// trails the field by a moment, and must not save that trailing copy.
   Campaign withArtwork(String url) => Campaign(

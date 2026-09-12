@@ -39,9 +39,7 @@ void showAddedToast(
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: basket
-                      ? const Color(0xFF43A047)
-                      : LamazonTheme.text,
+                  color: basket ? const Color(0xFF43A047) : LamazonTheme.text,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

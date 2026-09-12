@@ -110,10 +110,10 @@ class Api {
   /// Every season an admin has scheduled, past and future.
   Future<List<dynamic>> adminSeasons() async =>
       (await _staffCall(
-        StaffSession.admin,
-        'GET',
-        '/api/admin/seasons',
-      ))['seasons']
+            StaffSession.admin,
+            'GET',
+            '/api/admin/seasons',
+          ))['seasons']
           as List<dynamic>? ??
       const [];
 
@@ -1038,11 +1038,8 @@ class Api {
 
   /// Refused with 409 while any order references the item, exactly as the
   /// seller route is. Being an admin does not make the loss recoverable.
-  Future<void> adminDeleteItem(String id) => _staffCall(
-    StaffSession.admin,
-    'DELETE',
-    '/api/admin/items/$id',
-  );
+  Future<void> adminDeleteItem(String id) =>
+      _staffCall(StaffSession.admin, 'DELETE', '/api/admin/items/$id');
 
   /// Off the shop, history untouched. The way past the delete guard.
   Future<void> adminSetDelisted(String id, bool delisted) => _staffCall(

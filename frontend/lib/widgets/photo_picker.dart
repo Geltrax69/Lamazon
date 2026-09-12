@@ -35,7 +35,9 @@ Future<List<Uint8List>> pickPhotos({required bool multiple}) async {
 /// one thing the person picking it wanted.
 Future<({Uint8List bytes, String name})?> pickBannerMedia() async {
   final file = await ImagePicker().pickMedia();
-  return file == null ? null : (bytes: await file.readAsBytes(), name: file.name);
+  return file == null
+      ? null
+      : (bytes: await file.readAsBytes(), name: file.name);
 }
 
 /// One big tappable tile for a single photo — empty prompt, or the picture

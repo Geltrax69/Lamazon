@@ -57,7 +57,6 @@ class Address {
 /// widen this list as coverage grows, nothing else changes.
 const serviceableCities = ['Lovely Professional University'];
 
-
 /// Accepted shorthands for the places above, so "LPU" or "lpu, phagwara"
 /// still resolves.
 const _aliases = {

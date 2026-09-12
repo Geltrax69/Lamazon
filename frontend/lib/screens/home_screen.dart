@@ -180,6 +180,8 @@ class _HomeScreenState extends State<HomeScreen> {
         )
         .toList();
     final visible = scopedProducts.take(_shownCount).toList();
+    // Hoisted: one answer for the whole grid, not one per card.
+    final namesStores = mixesStores(visible);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -351,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: visible.length,
                   itemBuilder: (_, index) => ProductCard(
                     product: visible[index],
-                    showStore: mixesStores(visible),
+                    showStore: namesStores,
                     showAddToCart:
                         visible[index].options.isEmpty &&
                         visible[index].sizes.isEmpty,

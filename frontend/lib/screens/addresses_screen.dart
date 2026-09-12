@@ -258,7 +258,6 @@ Future<void> _delete(BuildContext context, Address address) async {
   }
 }
 
-
 /// One address in the list. A radio option, not a plain tappable box: exactly
 /// one of them is the delivery address at any time, and as a GestureDetector
 /// none of them were focusable or announced as choosable.

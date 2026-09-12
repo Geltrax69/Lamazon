@@ -408,6 +408,7 @@ class _CollectionShelfState extends State<CollectionShelf> {
   Widget build(BuildContext context) {
     if (widget.products.isEmpty) return const SizedBox.shrink();
     final wide = MediaQuery.sizeOf(context).width >= 720;
+    final namesStores = mixesStores(widget.products);
     final scaled = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.4);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,7 +468,7 @@ class _CollectionShelfState extends State<CollectionShelf> {
               width: 166 * scaled,
               child: ProductCard(
                 product: widget.products[index],
-                showStore: mixesStores(widget.products),
+                showStore: namesStores,
                 showAddToCart:
                     widget.products[index].options.isEmpty &&
                     widget.products[index].sizes.isEmpty,

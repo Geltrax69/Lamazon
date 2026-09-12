@@ -129,6 +129,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final q = _query.trim();
     final results = _sorted;
+    final namesStores = mixesStores(results);
     return Scaffold(
       // The bar floats over the content rather than reserving a strip, which
       // is how it sits on home — bottomNavigationBar would push every screen
@@ -335,7 +336,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemCount: results.length,
                         itemBuilder: (_, i) => ProductCard(
                           product: results[i],
-                          showStore: mixesStores(results),
+                          showStore: namesStores,
                           showAddToCart:
                               results[i].tab == 'Food' ||
                               results[i].tab == 'Grocery',
@@ -389,6 +390,7 @@ class _SearchHint extends StatelessWidget {
       ...pool.where((p) => p.discounted),
       ...pool.where((p) => !p.discounted),
     ].take(6).toList();
+    final namesPickStores = mixesStores(picks);
 
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 4, 20, bottomNavInset(context) + 24),
@@ -496,7 +498,7 @@ class _SearchHint extends StatelessWidget {
             itemCount: picks.length,
             itemBuilder: (_, i) => ProductCard(
               product: picks[i],
-              showStore: mixesStores(picks),
+              showStore: namesPickStores,
               showAddToCart:
                   picks[i].tab == 'Food' || picks[i].tab == 'Grocery',
               onTap: () => Navigator.push(

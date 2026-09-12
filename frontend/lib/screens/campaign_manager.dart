@@ -231,6 +231,7 @@ class _CampaignEditorState extends State<CampaignEditor> {
     enabled: _enabled,
     position: int.tryParse(_position.text) ?? 0,
   );
+
   /// Takes the pasted link, whatever it is, and comes back with something the
   /// banner can actually show.
   static String _reason(Object error) =>
@@ -275,7 +276,10 @@ class _CampaignEditorState extends State<CampaignEditor> {
     }
     return switch (bannerKind(_preview)) {
       BannerKind.video => ('Clip — plays muted, loops, no sound.', false),
-      BannerKind.animation => ('Animation — delivered as a clip, not as a GIF.', false),
+      BannerKind.animation => (
+        'Animation — delivered as a clip, not as a GIF.',
+        false,
+      ),
       BannerKind.picture => (
         'Photo. If this is a page rather than a file, press Fetch.',
         false,
@@ -605,11 +609,7 @@ class _LinkStatus extends StatelessWidget {
   final String message;
   final bool wrong;
   final VoidCallback? onFetch;
-  const _LinkStatus({
-    required this.message,
-    required this.wrong,
-    this.onFetch,
-  });
+  const _LinkStatus({required this.message, required this.wrong, this.onFetch});
 
   @override
   Widget build(BuildContext context) => Row(

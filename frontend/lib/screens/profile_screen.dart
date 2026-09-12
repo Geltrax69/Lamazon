@@ -46,7 +46,12 @@ class ProfileScreen extends StatelessWidget {
             builder: (context, _) {
               final loggedIn = Session.instance.loggedIn;
               return ListView(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, bottomNavInset(context) + 20),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  bottomNavInset(context) + 20,
+                ),
                 children: [
                   Row(
                     children: [

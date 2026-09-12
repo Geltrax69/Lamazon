@@ -33,6 +33,7 @@ class WishlistScreen extends StatelessWidget {
               final items = shownCatalog
                   .where((p) => Wishlist.instance.contains(p.id))
                   .toList();
+              final namesStores = mixesStores(items);
               return Column(
                 children: [
                   Padding(
@@ -80,7 +81,12 @@ class WishlistScreen extends StatelessWidget {
                             ).pushNamedAndRemoveUntil('/', (r) => false),
                           )
                         : GridView.builder(
-                            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomNavInset(context) + 16),
+                            padding: EdgeInsets.fromLTRB(
+                              20,
+                              8,
+                              20,
+                              bottomNavInset(context) + 16,
+                            ),
                             gridDelegate:
                                 SliverGridDelegateWithMaxCrossAxisExtent(
                                   maxCrossAxisExtent: productTileMax,
@@ -90,7 +96,7 @@ class WishlistScreen extends StatelessWidget {
                                 ),
                             itemCount: items.length,
                             itemBuilder: (_, i) => ProductCard(
-                              showStore: mixesStores(items),
+                              showStore: namesStores,
                               product: items[i],
                               showAddToCart:
                                   items[i].tab == 'Food' ||

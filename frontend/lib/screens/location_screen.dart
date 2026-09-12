@@ -59,7 +59,9 @@ class _LocationScreenState extends State<LocationScreen> {
   /// time, in the order the fields are read.
   String? get _problem {
     if (_name.text.trim().isEmpty) return 'Enter the recipient name.';
-    if (!RegExp(r'^(?:\+91[ -]?)?[6-9][0-9]{9}$').hasMatch(_phone.text.trim())) {
+    if (!RegExp(
+      r'^(?:\+91[ -]?)?[6-9][0-9]{9}$',
+    ).hasMatch(_phone.text.trim())) {
       return 'Enter a valid 10-digit Indian mobile number.';
     }
     if (_line.text.trim().isEmpty) {
@@ -246,14 +248,11 @@ class _LocationScreenState extends State<LocationScreen> {
                           ChoiceChip(
                             label: Text(c),
                             selected: _city.text.trim() == c,
-                            onSelected: (_) =>
-                                setState(() => _city.text = c),
+                            onSelected: (_) => setState(() => _city.text = c),
                             showCheckmark: false,
                             backgroundColor: LamazonTheme.surface,
                             selectedColor: LamazonTheme.lime,
-                            side: const BorderSide(
-                              color: LamazonTheme.track,
-                            ),
+                            side: const BorderSide(color: LamazonTheme.track),
                             labelStyle: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -351,7 +350,9 @@ class _Field extends StatelessWidget {
         children: [
           // Decorative: the field's own label is what names it, so the icon
           // must not add a second announcement.
-          ExcludeSemantics(child: Icon(icon, size: 18, color: LamazonTheme.muted)),
+          ExcludeSemantics(
+            child: Icon(icon, size: 18, color: LamazonTheme.muted),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
